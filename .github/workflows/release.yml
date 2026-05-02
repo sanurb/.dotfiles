@@ -35,22 +35,28 @@ jobs:
       - name: Install syft
         uses: anchore/sbom-action/download-syft@v0.17.7
 
+      # Pre-warm the cosign TUF root cache. Without this, parallel
+      # `cosign sign-blob` calls race on creating ~/.sigstore/root and
+      # one fails with "creating cached local store: resource
+      # temporarily unavailable". A single `initialize` populates the
+      # cache once; subsequent calls just read it.
+      - name: Initialize cosign
+        run: cosign initialize
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          # `--parallelism=1` serializes the signing pipe. Sigstore's
+          # Fulcio occasionally drops HTTP/2 streams under burst load
+          # from a single client; serializing trades ~30s of release
+          # wall time for deterministic signing against transient
+          # peer-side stream errors.
+          args: release --clean --parallelism=1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # PAT with contents:write on sanurb/homebrew-tap. The default
           # GITHUB_TOKEN cannot push to a separate repo, so this must be
           # configured before the first tagged release.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          # Disable cosign's TUF root cache. GoReleaser invokes `cosign
-          # sign-blob` in parallel for multiple artifacts; they race on
-          # the cache flock and one fails with "creating cached local
-          # store: resource temporarily unavailable". Bypassing the
-          # cache costs an extra TUF fetch per sign (~hundreds of ms)
-          # in exchange for deterministic parallelism.
-          SIGSTORE_NO_CACHE: "true"
