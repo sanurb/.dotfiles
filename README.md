@@ -7,55 +7,59 @@ to `moon run dotfiles:<task>`.
 
 ## Installation
 
-`dots` supports two installation paths with different guarantees. Pick the
-one that matches your environment.
+`dots` is two components: a TUI binary that writes a profile, and a Nix
+flake + Home Manager modules that realize the profile into your `$HOME`.
+The TUI runs anywhere; realization needs Nix and a clone of this repo.
+That asymmetry produces three install paths — pick the one that matches
+how far you want to go.
 
-| Path | Source | Linking | Reproducibility |
-|------|--------|---------|-----------------|
-| Pre-built binary (Homebrew, install script) | GoReleaser CI | Dynamically linked against system libs | Per-release pinned via signed checksums |
-| Nix flake | Built from source on your machine | Linked against the Nix store | Fully hermetic, integrates with the rest of the dotfiles flake |
-
-**Recommendation.** Use the pre-built binary if you just want to try `dots` or
-do not have Nix installed. Use the Nix flake if you want the full `dots`
-experience as designed — the binary, the Home Manager modules, and the
-declared toolchain all from one source of truth.
-
-### Homebrew
+### Path 1 — Try the TUI (no Nix required)
 
 ```sh
 brew install sanurb/tap/dots
+dots install
 ```
 
-This installs the latest release from the [`sanurb/homebrew-tap`][tap] tap.
-Updates land via `brew upgrade dots`.
+Walks you through the wizard and writes the profile to disk. Realization
+(`dots deploy`) needs Nix and the workspace; without those, the TUI is
+still a valid way to see what a profile looks like. Continue with Path 2
+or 3 when you're ready to apply it.
 
-### Install script
+### Path 2 — Full install (recommended)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh | sh
+brew install sanurb/tap/dots
+dots install                                # configure profile via TUI
+# Install Nix if you don't have it: https://determinate.systems/nix-installer
+git clone https://github.com/sanurb/.dotfiles ~/.dotfiles
+cd ~/.dotfiles
+dots deploy                                 # realize the profile
 ```
 
-The script:
+The Homebrew binary handles the interactive bits; the clone + Nix handle
+realization. Re-run `dots deploy` after editing your profile or pulling
+upstream changes.
 
-- Detects your OS and architecture.
-- Downloads the matching archive from the latest GitHub Release.
-- Verifies the SHA-256 checksum against the published `SHA256SUMS` file.
-- Verifies the cosign signature on `SHA256SUMS` if `cosign` is on `$PATH`.
-- Refuses to run as root unless `ALLOW_ROOT=1` is set.
-- Installs to `~/.local/bin/dots` by default (override with `INSTALL_DIR`).
-
-For the strictest install, skip the pipe-to-sh and verify by hand — see
-[RELEASING.md](./RELEASING.md#verifying-a-downloaded-release).
-
-### Nix flake
+### Path 3 — Nix-native (no Homebrew)
 
 ```sh
-nix run github:sanurb/.dotfiles
+# Requires Nix installed already.
+nix run github:sanurb/.dotfiles -- install
+nix run github:sanurb/.dotfiles -- deploy
 ```
 
-For the full home-manager-managed environment, follow the flake usage in
-`flake.nix` — `dots` is one component of that environment, not the whole
-thing.
+Builds `dots` from source against the Nix store. Useful on hosts without
+Homebrew or where you want one fewer package manager in the loop.
+
+### Prerequisites
+
+| Requirement | Path 1 | Path 2 | Path 3 |
+|-------------|:------:|:------:|:------:|
+| Homebrew    | ✓      | ✓      |        |
+| Nix         |        | ✓      | ✓      |
+| Repo clone  |        | ✓      |        |
+
+Nix installer: https://determinate.systems/nix-installer.
 
 ## Verifying a release
 
