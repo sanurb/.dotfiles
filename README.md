@@ -32,7 +32,7 @@ Updates land via `brew upgrade dots`.
 ### Install script
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh | bash
 ```
 
 The script:
