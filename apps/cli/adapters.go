@@ -13,6 +13,7 @@ import (
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
 
 // backupSession is a lazily-created per-run backup directory. The first
@@ -179,7 +180,7 @@ func loadInitialState(workspaceRoot string) state.State {
 }
 
 func newWizardDeps() ui.Deps {
-	root, err := workspaceRoot()
+	root, err := workspace.Root()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error: cannot locate workspace root:", err)
 		os.Exit(1)

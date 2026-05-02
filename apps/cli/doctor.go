@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
 
 // Severity for an individual check. Doctor exits non-zero iff any
@@ -228,7 +229,7 @@ func checkFormatting() []Check {
 		c.Detail = "treefmt missing — declared in devenv.nix; rerun `direnv reload`"
 		return []Check{c}
 	}
-	root, err := workspaceRoot()
+	root, err := workspace.Root()
 	if err != nil {
 		c.Severity = SevFail
 		c.Detail = err.Error()
@@ -310,7 +311,7 @@ func checkRuntimes() []Check {
 // .prototools at the workspace root. Sub-tables ([plugins], [settings])
 // are ignored — they don't pin runtimes.
 func readPrototools() (map[string]string, error) {
-	root, err := workspaceRoot()
+	root, err := workspace.Root()
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +379,7 @@ func checkPersona() []Check {
 		out = append(out, c)
 	}
 
-	root, err := workspaceRoot()
+	root, err := workspace.Root()
 	if err != nil {
 		out = append(out, Check{
 			Name: ".dots-state.toml", Category: cat,
@@ -469,18 +470,3 @@ func multiplexerBinary(v string) string {
 	return v // tmux, zellij
 }
 
-func workspaceRoot() (string, error) {
-	if v := os.Getenv("MOON_WORKSPACE_ROOT"); v != "" {
-		return v, nil
-	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for dir := wd; dir != "/" && dir != "."; dir = filepath.Dir(dir) {
-		if _, err := os.Stat(filepath.Join(dir, ".prototools")); err == nil {
-			return dir, nil
-		}
-	}
-	return "", fmt.Errorf("could not locate workspace root (no .prototools found)")
-}

@@ -11,6 +11,7 @@ import (
 	"runtime"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
 
 // Build-time metadata. GoReleaser injects real values via -ldflags; the
@@ -22,15 +23,61 @@ var (
 	date    = "unknown"
 )
 
+// command pairs a handler with its workspace requirement. The product
+// has two distribution stories: the TUI/version/help layer that runs
+// anywhere (a Homebrew-shippable binary), and the realization layer
+// (deploy/doctor/sync/scan/backup) that consumes the flake at the
+// workspace root and is meaningless outside it. The dispatcher uses
+// requiresWorkspace to gate the second category with an actionable
+// message instead of letting subcommand internals fail opaquely.
+type command struct {
+	requiresWorkspace bool
+	run               func(rest []string) int
+}
+
+func commands() map[string]command {
+	return map[string]command{
+		"install": {requiresWorkspace: false, run: func([]string) int {
+			return ui.Run(ui.ModeInstall, newWizardDeps())
+		}},
+		"sync": {requiresWorkspace: true, run: func([]string) int {
+			// Reconcile .git/hooks with .moon/workspace.yml's `vcs.hooks`
+			// before the activation phase. A brownfield sync is the most
+			// likely entry point for a tree whose hooks predate the Moon
+			// migration (or were stomped by another tool); running the
+			// sync here means the next commit/push goes through the
+			// canonical `moon run` gates rather than a stale shim. Errors
+			// are non-fatal — see syncMoonHooksSilent for the rationale.
+			syncMoonHooksSilent()
+			return ui.Run(ui.ModeSync, newWizardDeps())
+		}},
+		"scan":   {requiresWorkspace: true, run: func([]string) int { return runScan() }},
+		"backup": {requiresWorkspace: true, run: func([]string) int { return runBackup(false) }},
+		"deploy": {requiresWorkspace: true, run: func([]string) int { return runDeploy() }},
+		"doctor": {requiresWorkspace: true, run: func(rest []string) int {
+			// Per-subcommand flag set: top-level flag.Parse() stops at the
+			// first non-flag arg, so `dots doctor --json` was silently
+			// dropping the flag. Local FlagSet captures it correctly.
+			fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+			jsonOut := fs.Bool("json", false, "emit machine-readable JSON")
+			_ = fs.Parse(rest)
+			return runDoctor(*jsonOut)
+		}},
+	}
+}
+
 func main() {
+	cmds := commands()
+
 	if len(os.Args) < 2 {
 		// `dots` with no args opens the install wizard. There is exactly
-		// one TUI surface in this binary by design.
-		os.Exit(ui.Run(ui.ModeInstall, newWizardDeps()))
+		// one TUI surface in this binary by design. install is the
+		// workspace-optional product surface, so no gate fires here.
+		os.Exit(cmds["install"].run(nil))
 	}
 
-	cmd, rest := os.Args[1], os.Args[2:]
-	switch cmd {
+	name, rest := os.Args[1], os.Args[2:]
+	switch name {
 	case "-h", "--help", "help":
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(0)
@@ -38,39 +85,38 @@ func main() {
 		fmt.Printf("dots %s (commit %s, built %s, %s/%s)\n",
 			version, commit, date, runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
-	case "install":
-		os.Exit(ui.Run(ui.ModeInstall, newWizardDeps()))
-	case "sync":
-		// Reconcile .git/hooks with .moon/workspace.yml's `vcs.hooks`
-		// before the activation phase. A brownfield sync is the most
-		// likely entry point for a tree whose hooks predate the Moon
-		// migration (or were stomped by another tool); running the
-		// sync here means the next commit/push goes through the
-		// canonical `moon run` gates rather than a stale shim. Errors
-		// are non-fatal — see syncMoonHooksSilent for the rationale.
-		// Formatting drift is no longer healed here: the pre-commit
-		// hook is the auto-heal edge, and the doctor gate on deploy
-		// still reports any drift that slips through.
-		syncMoonHooksSilent()
-		os.Exit(ui.Run(ui.ModeSync, newWizardDeps()))
-	case "scan":
-		os.Exit(runScan())
-	case "backup":
-		os.Exit(runBackup(false))
-	case "deploy":
-		os.Exit(runDeploy())
-	case "doctor":
-		// Per-subcommand flag set: top-level flag.Parse() stops at the
-		// first non-flag arg, so `dots doctor --json` was silently
-		// dropping the flag. Local FlagSet captures it correctly.
-		fs := flag.NewFlagSet("doctor", flag.ExitOnError)
-		jsonOut := fs.Bool("json", false, "emit machine-readable JSON")
-		_ = fs.Parse(rest)
-		os.Exit(runDoctor(*jsonOut))
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", cmd, usage)
+	}
+
+	c, ok := cmds[name]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", name, usage)
 		os.Exit(2)
 	}
+
+	if c.requiresWorkspace {
+		if _, err := workspace.Root(); err != nil {
+			fmt.Fprint(os.Stderr, workspaceRequiredMessage(name))
+			os.Exit(2)
+		}
+	}
+
+	os.Exit(c.run(rest))
+}
+
+// workspaceRequiredMessage is the user-facing surface for the gate.
+// Exit code 2 (misuse / wrong context) and stderr — distinct from a
+// runtime error. The message is actionable: clone-and-run, or nix run.
+func workspaceRequiredMessage(name string) string {
+	return fmt.Sprintf(`dots %s: this command requires a workspace.
+
+Clone the repo and run from inside it:
+  git clone https://github.com/sanurb/.dotfiles ~/.dotfiles
+  cd ~/.dotfiles
+  dots %s
+
+Or run via Nix without a persistent clone:
+  nix run github:sanurb/.dotfiles -- %s
+`, name, name, name)
 }
 
 const usage = `dots
@@ -84,6 +130,10 @@ Usage:
   dots deploy                moon run dotfiles:deploy (no wizard)
   dots doctor [--json]       Validate every pinned runtime + LSP
   dots version               Print binary version, commit, build date
+
+install/version/help run anywhere. The remaining subcommands realize the
+workspace and require a clone of the dotfiles repo + Nix on PATH; outside
+a workspace they exit with an actionable message and code 2.
 
 Non-interactive automation: prefer moon directly (moon run dotfiles:deploy).
 The deploy task is gated on cli:check, which runs the doctor — drift fails
