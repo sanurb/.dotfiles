@@ -23,6 +23,20 @@
 
   programs.zoxide.enable = true;
 
+  # ripgrep — declarative config via home-manager's `arguments` list.
+  # Flags here are baked into a generated ripgreprc and exposed via
+  # RIPGREP_CONFIG_PATH, so every shell sees the same defaults whether
+  # invoked interactively or from scripts.
+  programs.ripgrep = {
+    enable = true;
+    arguments = [
+      # Search hidden files / directories.
+      "--hidden"
+      # Skip really huge binary blobs.
+      "--max-filesize=5M"
+    ];
+  };
+
   # Starship — config held as a TOML asset and projected as a read-only
   # symlink into ~/.config/starship.toml. Editing the live file is a
   # no-op; the only path to change is editing the asset and re-deploying.
