@@ -4,6 +4,42 @@
 that matches `v*`. The pipeline produces signed, multi-arch archives, an
 SBOM, a Homebrew formula update, and a GitHub Release.
 
+## What a release ships (and what it does not)
+
+`dots` has two components, and only one is in the release artifact:
+
+- **Released:** the `dots` binary — the TUI plus the realization-adjacent
+  subcommands. Every subcommand is compiled into the same binary.
+  Workspace-required subcommands (`deploy`, `doctor`, `sync`, `scan`,
+  `backup`) ship in the binary but exit with code 2 and an actionable
+  message when invoked outside a workspace; the binary alone cannot
+  realize a profile.
+- **Not released:** the Nix flake, the Home Manager modules, the
+  realization layer. These are obtained by cloning the repo or by
+  invoking `nix run github:sanurb/.dotfiles -- <subcommand>`. They are
+  versioned by git, not by SemVer tags.
+
+The Homebrew formula and the GitHub Release archives carry only the
+binary. A user on the `try-the-TUI` install path (`brew install …`)
+gets a working `dots install` and `dots version`; running `dots deploy`
+from that path prints the workspace-required message and exits 2 —
+this is by design.
+
+## Versioning
+
+SemVer (`vMAJOR.MINOR.PATCH`).
+
+- **Major** bump: breaking change to the on-disk state schema
+  (`.dots-state.toml` keys / value sets) consumed by `home.nix`, or
+  removal of a subcommand.
+- **Minor** bump: new subcommand, new state field with a safe default,
+  new TUI step.
+- **Patch** bump: bug fixes, dependency bumps, doc-only changes.
+
+The flake and the binary share the tag space — a `v1.x` binary expects
+the `v1.x` flake at the workspace root. Mixing major versions across
+the two is unsupported.
+
 ## One-time prerequisites
 
 Before the first tagged release, the following must exist:
