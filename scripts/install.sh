@@ -1,12 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 # install.sh — fetch the latest dots release, verify, install.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh | sh
 #
-# Pipe to `bash`, not `sh`. POSIX `sh` (dash on Debian/Ubuntu, /bin/sh on
-# Alpine) does not support [[ ]], arrays, or `${!var}` indirect expansion;
-# the shebang is ignored when the script runs from stdin.
+# POSIX-compatible: the shebang is ignored when the script runs from
+# stdin, so this script avoids bashisms ([[ ]], arrays, indirect
+# expansion, `echo -e`) on purpose. It runs identically under sh, bash,
+# zsh, dash, ash, busybox sh.
 #
 # Environment:
 #   INSTALL_DIR   target dir for the binary (default: ~/.local/bin)
@@ -20,7 +21,7 @@
 #   SHA256SUMS file's keyless OIDC signature is also verified. For the
 #   strictest install, fetch + verify by hand following RELEASING.md.
 
-set -euo pipefail
+set -eu
 
 GITHUB="${GITHUB:-https://github.com}"
 REPO="sanurb/.dotfiles"
@@ -30,51 +31,58 @@ VERSION="${VERSION:-latest}"
 ALLOW_ROOT="${ALLOW_ROOT:-0}"
 
 # ANSI colors when stdout is a TTY. When piped to a non-TTY (CI logs,
-# `tee install.log`), strings stay plain.
-Color_Off=''; Red=''; Green=''; Yellow=''; Dim=''; Bold_White=''; Bold_Green=''
-if [[ -t 1 ]]; then
-  Color_Off='\033[0m'
-  Red='\033[0;31m'
-  Green='\033[0;32m'
-  Yellow='\033[0;33m'
-  Dim='\033[0;2m'
-  Bold_White='\033[1m'
-  Bold_Green='\033[1;32m'
+# `tee install.log`), strings stay plain. Built with literal escape
+# bytes via printf so we never depend on `echo -e` (POSIX `echo` does
+# not support `-e`; bash-in-POSIX-mode prints it as text).
+esc=$(printf '\033')
+if [ -t 1 ]; then
+  Color_Off="${esc}[0m"
+  Red="${esc}[0;31m"
+  Green="${esc}[0;32m"
+  Yellow="${esc}[0;33m"
+  Dim="${esc}[0;2m"
+  Bold_White="${esc}[1m"
+  Bold_Green="${esc}[1;32m"
+else
+  Color_Off=''; Red=''; Green=''; Yellow=''; Dim=''; Bold_White=''; Bold_Green=''
 fi
 
-error()     { echo -e "${Red}error${Color_Off}: $*" >&2; exit 1; }
-warn()      { echo -e "${Yellow}warning${Color_Off}: $*" >&2; }
-info()      { echo -e "${Dim}$* ${Color_Off}"; }
-info_bold() { echo -e "${Bold_White}$* ${Color_Off}"; }
-success()   { echo -e "${Green}$* ${Color_Off}"; }
+error()     { printf '%serror%s: %s\n' "$Red"        "$Color_Off" "$*" >&2; exit 1; }
+warn()      { printf '%swarning%s: %s\n' "$Yellow"   "$Color_Off" "$*" >&2; }
+info()      { printf '%s%s%s\n' "$Dim"        "$*" "$Color_Off"; }
+info_bold() { printf '%s%s%s\n' "$Bold_White" "$*" "$Color_Off"; }
+success()   { printf '%s%s%s\n' "$Green"      "$*" "$Color_Off"; }
 
 tildify() {
-  if [[ "$1" = "$HOME"/* ]]; then
-    # Intentional literal "~" — this is a display string for the user,
-    # not a path the shell will re-expand.
-    # shellcheck disable=SC2088
-    echo "~/${1#"$HOME"/}"
-  else
-    echo "$1"
-  fi
+  case "$1" in
+    "$HOME"/*)
+      # Intentional literal "~" — this is a display string for the
+      # user, not a path the shell will re-expand.
+      # shellcheck disable=SC2088
+      printf '~/%s\n' "${1#"$HOME"/}"
+      ;;
+    *)
+      printf '%s\n' "$1"
+      ;;
+  esac
 }
 
 # --- Pre-flight ----------------------------------------------------------
 
-if [[ "$(id -u)" -eq 0 && "$ALLOW_ROOT" != "1" ]]; then
+if [ "$(id -u)" -eq 0 ] && [ "$ALLOW_ROOT" != "1" ]; then
   error "refusing to run as root. Re-run as your user, or set ALLOW_ROOT=1 to override."
 fi
 
-command -v curl >/dev/null || error "curl is required to install dots"
-command -v tar  >/dev/null || error "tar is required to install dots"
+command -v curl >/dev/null 2>&1 || error "curl is required to install dots"
+command -v tar  >/dev/null 2>&1 || error "tar is required to install dots"
 
 # Pick a SHA-256 implementation. macOS 13+ ships its own `sha256sum`
-# without GNU's `-c` flag, so we don't use `-c` anywhere; we just compute
-# the digest and string-compare against SHA256SUMS.
+# without GNU's `-c` flag, so we don't use `-c` anywhere; we just
+# compute the digest and string-compare against SHA256SUMS.
 sha256_of() {
-  if   command -v shasum    >/dev/null; then shasum -a 256 "$1" | awk '{print $1}'
-  elif command -v sha256sum >/dev/null; then sha256sum   "$1" | awk '{print $1}'
-  elif command -v openssl   >/dev/null; then openssl dgst -sha256 "$1" | awk '{print $NF}'
+  if   command -v shasum    >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then sha256sum   "$1" | awk '{print $1}'
+  elif command -v openssl   >/dev/null 2>&1; then openssl dgst -sha256 "$1" | awk '{print $NF}'
   else error "no SHA-256 tool found (need shasum, sha256sum, or openssl)"
   fi
 }
@@ -92,19 +100,19 @@ esac
 
 # Rosetta 2: a darwin/amd64 shell on Apple Silicon would download an
 # x86_64 binary that runs through translation. Prefer the native build.
-if [[ "$target" = "darwin_amd64" ]] \
-  && [[ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]]; then
+if [ "$target" = "darwin_amd64" ] \
+  && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]; then
   target=darwin_arm64
   info "Your shell is running in Rosetta 2 — downloading native dots for $target instead."
 fi
 
 # --- Resolve version -----------------------------------------------------
 
-if [[ "$VERSION" = "latest" ]]; then
+if [ "$VERSION" = "latest" ]; then
   info "resolving latest release"
   VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
     | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1)
-  [[ -n "$VERSION" ]] || error "could not resolve latest release tag"
+  [ -n "$VERSION" ] || error "could not resolve latest release tag"
 fi
 
 version_no_v="${VERSION#v}"
@@ -126,15 +134,13 @@ curl --fail --location --silent       --output "$tmp/SHA256SUMS" "$base_url/SHA2
 
 info "verifying SHA-256"
 expected=$(awk -v f="$archive" '$2 == f || $2 == "*"f { print $1; exit }' "$tmp/SHA256SUMS")
-[[ -n "$expected" ]] || error "no checksum entry for $archive in SHA256SUMS"
+[ -n "$expected" ] || error "no checksum entry for $archive in SHA256SUMS"
 actual=$(sha256_of "$tmp/$archive")
-if [[ "$expected" != "$actual" ]]; then
-  error "checksum mismatch for $archive
-    expected: $expected
-    actual:   $actual"
+if [ "$expected" != "$actual" ]; then
+  error "checksum mismatch for $archive (expected $expected, got $actual)"
 fi
 
-if command -v cosign >/dev/null; then
+if command -v cosign >/dev/null 2>&1; then
   info "verifying cosign signature"
   curl --fail --location --silent --output "$tmp/SHA256SUMS.sig" "$base_url/SHA256SUMS.sig"
   curl --fail --location --silent --output "$tmp/SHA256SUMS.pem" "$base_url/SHA256SUMS.pem"
@@ -159,9 +165,10 @@ install -m 0755 "$tmp/$BINARY" "$INSTALL_DIR/$BINARY" \
 exe="$INSTALL_DIR/$BINARY"
 success "$BINARY $VERSION was installed successfully to ${Bold_Green}$(tildify "$exe")${Color_Off}"
 
-# Already on PATH? We're done.
-if command -v "$BINARY" >/dev/null && [[ "$(command -v "$BINARY")" = "$exe" ]]; then
-  echo
+# Already on PATH and resolves to our just-installed binary? We're done.
+if command -v "$BINARY" >/dev/null 2>&1 \
+  && [ "$(command -v "$BINARY")" = "$exe" ]; then
+  printf '\n'
   info "Run '$BINARY --help' to get started"
   exit 0
 fi
@@ -172,34 +179,32 @@ fi
 # installer appends unconditionally; we grep for a marker first so a
 # reinstall doesn't pile up duplicates.
 
-echo
+printf '\n'
 
-# Render INSTALL_DIR for embedding inside a double-quoted string. Inside
-# user $HOME, prefer "$HOME/...": it travels across machines if they ever
-# move home dirs. Outside, use the absolute path. Either way, no extra
-# layer of literal quotes — the template puts those.
-if [[ "$INSTALL_DIR" = "$HOME"/* ]]; then
-  install_dir_lit="\$HOME/${INSTALL_DIR#"$HOME"/}"
-else
-  install_dir_lit="$INSTALL_DIR"
-fi
+# Render INSTALL_DIR for embedding inside a double-quoted export. Inside
+# user $HOME, prefer "$HOME/...": survives across moved home dirs.
+case "$INSTALL_DIR" in
+  "$HOME"/*) install_dir_lit="\$HOME/${INSTALL_DIR#"$HOME"/}" ;;
+  *)         install_dir_lit="$INSTALL_DIR" ;;
+esac
 
 refresh_command=''
 user_shell=$(basename "${SHELL:-sh}")
 
+# Append a `# dots`-marked block to $1 if no such block exists yet.
+# Remaining args are the lines of the block.
 append_if_missing() {
-  # $1 = config file, $2... = lines to append
-  local cfg="$1"; shift
-  local marker="# dots"
+  cfg="$1"; shift
+  marker="# dots"
   mkdir -p "$(dirname "$cfg")"
-  if [[ -f "$cfg" ]] && grep -qF "$marker" "$cfg"; then
+  if [ -f "$cfg" ] && grep -qF "$marker" "$cfg"; then
     info "$(tildify "$cfg") already has a dots section — leaving it alone"
     return 0
   fi
   {
-    echo
-    echo "$marker"
-    for line in "$@"; do echo "$line"; done
+    printf '\n'
+    printf '%s\n' "$marker"
+    for line in "$@"; do printf '%s\n' "$line"; done
   } >> "$cfg"
   info "Added $(tildify "$INSTALL_DIR") to \$PATH in $(tildify "$cfg")"
 }
@@ -208,62 +213,60 @@ case "$user_shell" in
   fish)
     cmd="fish_add_path \"$install_dir_lit\""
     cfg="$HOME/.config/fish/config.fish"
-    if [[ -w "$cfg" ]] || [[ ! -e "$cfg" ]]; then
+    if [ -w "$cfg" ] || [ ! -e "$cfg" ]; then
       append_if_missing "$cfg" "$cmd"
       refresh_command="source $(tildify "$cfg")"
     else
-      echo "Manually add to $(tildify "$cfg"):"
+      printf 'Manually add to %s:\n' "$(tildify "$cfg")"
       info_bold "  $cmd"
     fi
     ;;
   zsh)
     cmd="export PATH=\"$install_dir_lit:\$PATH\""
     cfg="$HOME/.zshrc"
-    if [[ -w "$cfg" ]] || [[ ! -e "$cfg" ]]; then
+    if [ -w "$cfg" ] || [ ! -e "$cfg" ]; then
       append_if_missing "$cfg" "$cmd"
       refresh_command="exec ${SHELL:-zsh}"
     else
-      echo "Manually add to $(tildify "$cfg"):"
+      printf 'Manually add to %s:\n' "$(tildify "$cfg")"
       info_bold "  $cmd"
     fi
     ;;
   bash)
     cmd="export PATH=\"$install_dir_lit:\$PATH\""
-    bash_configs=("$HOME/.bashrc" "$HOME/.bash_profile")
-    [[ -n "${XDG_CONFIG_HOME:-}" ]] && bash_configs+=("$XDG_CONFIG_HOME/bash/bashrc")
-    set_manually=true
-    for cfg in "${bash_configs[@]}"; do
-      if [[ -w "$cfg" ]] || { [[ ! -e "$cfg" ]] && [[ -w "$(dirname "$cfg")" ]]; }; then
+    set_manually=1
+    for cfg in "$HOME/.bashrc" "$HOME/.bash_profile"; do
+      if [ -w "$cfg" ] || { [ ! -e "$cfg" ] && [ -w "$(dirname "$cfg")" ]; }; then
         append_if_missing "$cfg" "$cmd"
         refresh_command="source $(tildify "$cfg")"
-        set_manually=false
+        set_manually=0
         break
       fi
     done
-    if $set_manually; then
-      echo "Manually add to a bash rc:"
+    if [ "$set_manually" = "1" ]; then
+      printf 'Manually add to a bash rc:\n'
       info_bold "  $cmd"
     fi
     ;;
   nu | nushell)
     cmd="\$env.PATH = (\$env.PATH | split row (char esep) | prepend \"$INSTALL_DIR\")"
     cfg="$HOME/.config/nushell/env.nu"
-    if [[ -w "$cfg" ]] || [[ ! -e "$cfg" ]]; then
+    if [ -w "$cfg" ] || [ ! -e "$cfg" ]; then
       append_if_missing "$cfg" "$cmd"
       refresh_command="exec ${SHELL:-nu}"
     else
-      echo "Manually add to $(tildify "$cfg"):"
+      printf 'Manually add to %s:\n' "$(tildify "$cfg")"
       info_bold "  $cmd"
     fi
     ;;
   *)
-    echo "Manually add to your shell rc:"
+    printf 'Manually add to your shell rc:\n'
     info_bold "  export PATH=\"$INSTALL_DIR:\$PATH\""
     ;;
 esac
 
-echo
+printf '\n'
 info "To get started, run:"
-echo
-[[ -n "$refresh_command" ]] && info_bold "  $refresh_command"
+printf '\n'
+[ -n "$refresh_command" ] && info_bold "  $refresh_command"
 info_bold "  $BINARY --help"
