@@ -1,0 +1,10 @@
+Step 4 of 6                                                          ● ● ● ◉ ○ ○
+
+Shell
+Choose your login shell.
+
+  [x] macOS ★
+  [ ] linux
+▸ [ ] wsl
+
+↑/↓ move   enter select   esc back   ? help   q quit

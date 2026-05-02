@@ -1,0 +1,37 @@
+# Nix / devenv
+.devenv/
+.devenv.flake.nix
+.direnv/
+.pre-commit-config.yaml
+result
+result-*
+.result-home
+.result-*
+
+# Moon
+.moon/cache/
+.moon/docker/
+
+# Proto
+.proto/
+
+# Go
+apps/cli/bin/
+apps/cli/coverage.out
+
+# GoReleaser snapshot/release output
+dist/
+
+# Local identity (never committed — see modules/git.nix)
+.local.identity.nix
+
+# Persona state — written by `dots install`, host-specific. The committed
+# .dots-state.toml.example documents the schema; the live file is local.
+.dots-state.toml
+
+# OS
+.DS_Store
+
+# Local bootstrap / install logs — per-machine, never committed
+bootstrap.log
+proto-*-install.log

@@ -1,0 +1,12 @@
+$schema: "https://moonrepo.dev/schemas/tasks.json"
+
+# Inherited tasks shared across every project. Per-project moon.yml
+# files override or extend these.
+fileGroups:
+  sources:
+    - "**/*"
+  configs:
+    - "*.yml"
+    - "*.yaml"
+    - "*.toml"
+    - "*.nix"

@@ -1,0 +1,72 @@
+$schema: "https://moonrepo.dev/schemas/project.json"
+
+type: application
+language: go
+platform: system
+
+project:
+  name: cli
+  description: "dots — interactive workspace frontend."
+
+# Per "Orthogonality": this project knows nothing about Nix or Home
+# Manager. It compiles, tests, and runs as a self-contained Go binary.
+# At runtime it shells out to `moon run dotfiles:*` — that is the only
+# coupling, and it is one-way.
+tasks:
+  tidy:
+    command: "go mod tidy"
+    inputs:
+      - "go.mod"
+      - "go.sum"
+    options:
+      cache: false
+
+  # Wrapped in `bash -c` so the `-ldflags='-s -w'` argument survives as a
+  # single shell-quoted token. Moon argv-splits naked YAML args on
+  # whitespace, which would hand `-w` to go build as a stray flag.
+  build:
+    command: "bash"
+    args:
+      - "-c"
+      - "go build -trimpath -ldflags='-s -w' -o bin/dots ."
+    inputs:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+    outputs:
+      - "bin/dots"
+
+  test:
+    command: "go test ./..."
+    inputs:
+      - "**/*.go"
+
+  # NOTE: per-project `fmt` is intentionally absent. Formatting is
+  # owned by the workspace-root `root:fmt` task (treefmt → gofumpt +
+  # nixpkgs-fmt) so there is exactly one verdict on style. Run
+  # `moon run root:fmt` from anywhere in the tree.
+  lint:
+    command: "go vet ./..."
+    inputs:
+      - "**/*.go"
+
+  run:
+    command: "go run ."
+    local: true
+    options:
+      cache: false
+
+  # Workspace health gate. Builds the binary, then runs `dots doctor`
+  # against .prototools + the declarative LSP set. Exit code is the deploy
+  # contract: drift here fails the entire pipeline. SOP: "Declare, Don't
+  # Script."
+  check:
+    command: "./bin/dots doctor"
+    deps:
+      - "~:build"
+    inputs:
+      - "bin/dots"
+      - "/.prototools"
+      - "/devenv.nix"
+    options:
+      cache: false

@@ -1,0 +1,79 @@
+$schema: "https://moonrepo.dev/schemas/project.json"
+
+type: configuration
+language: bash
+platform: system
+
+project:
+  name: dotfiles
+  description: "Home Manager projection."
+
+# Tasks here are the *only* sanctioned way to mutate ~/. The Go CLI in
+# apps/cli is the interactive frontend; these tasks are the cacheable,
+# deterministic backend that Moon (and CI) drive.
+tasks:
+  check:
+    command: "nix flake check --impure --accept-flake-config"
+    inputs:
+      - "@globs(configs)"
+      - "/flake.nix"
+      - "/flake.lock"
+      - "/devenv.nix"
+    options:
+      runFromWorkspaceRoot: true
+
+  # Cache disabled: home.nix reads .dots-state.toml at the workspace
+  # root (via builtins.fromTOML), and Moon doesn't include that file in
+  # its task hash. Nix's own evaluation cache handles the repeat-build
+  # case efficiently. --impure is required so home.nix can resolve
+  # $MOON_WORKSPACE_ROOT and read the gitignored state file outside the
+  # flake source filter.
+  #
+  # Routed through nom (nix-output-monitor): live build graph + clear
+  # signal when a derivation falls back to source-build instead of
+  # substituting from cache.nixos.org.
+  build:
+    command: "nom build --impure --accept-flake-config .#homeActivation -o .result-home"
+    inputs:
+      - "@globs(configs)"
+      - "/flake.nix"
+      - "/flake.lock"
+    outputs:
+      - "/.result-home"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+
+  # Hard gate: cli:check (the Go doctor) must pass before activation.
+  # No drift in .prototools pins, no missing LSP from devenv.nix, no
+  # missing core binary — or the deploy refuses to run. This is the
+  # enforcement clause of "Declare, Don't Script."
+  deploy:
+    command: "./.result-home/activate"
+    deps:
+      - "cli:check"
+      - "~:build"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+
+  # Project-relative — backup is dotfiles-specific (collisions in $HOME
+  # are about Home Manager's projection surface, not the toolchain).
+  backup:
+    command: "bash scripts/backup.sh"
+    inputs:
+      - "scripts/backup.sh"
+    options:
+      cache: false
+
+  fmt:
+    command: "nix fmt"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+
+  update:
+    command: "nix flake update"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true

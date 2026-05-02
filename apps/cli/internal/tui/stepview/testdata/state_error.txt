@@ -1,0 +1,8 @@
+Step 5 of 6                                                          ● ● ● ● ◉ ○
+
+Profile
+Materialize the chosen profile.
+
+✗ Cannot read $HOME/.config: permission denied
+
+↑/↓ move   enter select   esc back   ? help   q quit

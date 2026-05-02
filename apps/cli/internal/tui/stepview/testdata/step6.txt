@@ -1,0 +1,10 @@
+Step 6 of 6                                                          ● ● ● ● ● ◉
+
+Confirm
+Review your selections before writing selection.toml.
+
+▸ [x] macOS ★
+  [ ] linux
+  [ ] wsl
+
+↑/↓ move   enter confirm   esc back   ? help   q quit

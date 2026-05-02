@@ -1,0 +1,10 @@
+Step 3 of 6                                                          ● ● ◉ ○ ○ ○
+
+Terminal emulator
+Pick the terminal app to configure.
+
+  [ ] macOS ★
+▸ [x] linux
+  [ ] wsl
+
+↑/↓ move   enter select   esc back   ? help   q quit

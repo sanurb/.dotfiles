@@ -1,0 +1,24 @@
+# Bill of Materials — May 2026 stable pins.
+# Single source of truth for runtime versions across every host.
+# Proto resolves these on `proto use` (run automatically by devenv's
+# enterShell). To verify drift: `moon run dotfiles:check-toolchain`.
+
+node = "24"     # Active LTS as of Oct 2025; current LTS in May 2026
+bun  = "1"      # Latest 1.x stable
+go   = "1.26"   # 2026.02 release line
+rust = "stable" # rustup channel — proto's rust plugin shells through
+
+# Tooling that participates in the same hermetic boundary as runtimes.
+moon = "1.40"
+
+[plugins]
+# Built-in proto plugins (node, bun, deno, go, rust, python) load
+# automatically — no entry needed. Declare community Wasm plugins here.
+# Examples (commented; uncomment to activate):
+# zig = "https://github.com/konomae/zigup-plugin/releases/download/v0.1.0/zigup_plugin.wasm"
+# biome = "https://github.com/moonrepo/plugins/releases/download/biome_tool-v0.4.0/biome_tool.wasm"
+
+[settings]
+# Pinned versions are authoritative; never auto-bump on shell entry.
+auto-install = true
+detect-strategy = "prefer-prototools"

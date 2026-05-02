@@ -1,0 +1,22 @@
+# .dots-state.toml — managed by the dots CLI. Edit via 'dots install'.
+# This file is the single source of truth for the environment's persona:
+# shell, terminal, multiplexer. home.nix reads it via builtins.fromTOML.
+# Mandatory infrastructure (atuin, zoxide, starship) is not represented
+# here — those are non-negotiable and live in modules/foundation.nix.
+#
+# This is the committed reference. The live file is named
+# `.dots-state.toml` (gitignored, host-specific).
+
+schema_version = 1
+
+[pillars]
+# shell:       fish | zsh | nushell      (zsh implies Powerlevel10k prompt)
+# terminal:    ghostty | kitty | wezterm | alacritty
+# multiplexer: zellij | tmux | none
+shell       = "fish"
+terminal    = "ghostty"
+multiplexer = "zellij"
+
+[capabilities]
+editor = true
+git    = true

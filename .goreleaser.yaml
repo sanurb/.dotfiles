@@ -1,0 +1,166 @@
+# GoReleaser config for `dots`.
+# Spec: GoReleaser v2 (schema unchanged from v1.26+; v2 just removed deprecated keys).
+# Run `goreleaser check` after edits.
+
+version: 2
+
+project_name: dots
+
+# `go mod tidy` is intentionally NOT a release hook — go.sum drift should
+# fail in CI/pre-commit, not at release time. By the time we tag, the
+# module graph is already canonical.
+
+builds:
+  - id: dots
+    main: ./
+    dir: ./apps/cli
+    binary: dots
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.CommitDate}}
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: dots
+    ids: [dots]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "SHA256SUMS"
+  algorithm: sha256
+
+# cosign keyless signing using GitHub OIDC. Requires `id-token: write` on the
+# release workflow. Each archive and the checksum file gets a `.sig` and a
+# `.pem` (Sigstore Fulcio cert).
+signs:
+  - id: archives
+    cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+    artifacts: archive
+  - id: checksum
+    cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+    artifacts: checksum
+
+# CycloneDX SBOM per archive via syft.
+sboms:
+  - id: archive
+    artifacts: archive
+    documents:
+      - "${artifact}.sbom.json"
+    cmd: syft
+    args:
+      - "$artifact"
+      - --output
+      - cyclonedx-json=$document
+
+# Homebrew tap. Requires HOMEBREW_TAP_TOKEN secret on the release workflow
+# (a fine-grained PAT with contents:write on sanurb/homebrew-tap).
+brews:
+  - name: dots
+    ids: [dots]
+    repository:
+      owner: sanurb
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: goreleaser-bot
+      email: bot@goreleaser.com
+    commit_msg_template: "dots: bump to {{ .Tag }}"
+    homepage: "https://github.com/sanurb/.dotfiles"
+    description: "Interactive frontend for the Nix-managed dotfiles environment."
+    license: MIT
+    install: |
+      bin.install "dots"
+    test: |
+      assert_match "dots", shell_output("#{bin}/dots --version")
+
+release:
+  github:
+    owner: sanurb
+    name: .dotfiles
+  prerelease: auto
+  draft: false
+  mode: replace
+  header: |
+    ## dots {{ .Tag }}
+
+    Pre-built binaries for macOS and Linux (amd64, arm64).
+
+  footer: |
+    ## Verifying the release
+
+    Each archive is signed with [cosign](https://docs.sigstore.dev/) using
+    keyless OIDC (no managed keys). To verify a download:
+
+    ```sh
+    # 1. Verify the checksum file signature.
+    cosign verify-blob \
+      --certificate-identity-regexp "https://github.com/sanurb/.dotfiles" \
+      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+      --certificate SHA256SUMS.pem \
+      --signature SHA256SUMS.sig \
+      SHA256SUMS
+
+    # 2. Verify your archive matches the checksum file.
+    grep "dots_${VERSION}_${OS}_${ARCH}.tar.gz" SHA256SUMS | shasum -a 256 -c -
+
+    # 3. (Optional) Verify the archive signature directly.
+    cosign verify-blob \
+      --certificate-identity-regexp "https://github.com/sanurb/.dotfiles" \
+      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+      --certificate dots_${VERSION}_${OS}_${ARCH}.tar.gz.pem \
+      --signature dots_${VERSION}_${OS}_${ARCH}.tar.gz.sig \
+      dots_${VERSION}_${OS}_${ARCH}.tar.gz
+    ```
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: Bug fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"

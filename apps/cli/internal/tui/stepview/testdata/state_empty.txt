@@ -1,0 +1,8 @@
+Step 3 of 6                                                          ● ● ◉ ○ ○ ○
+
+Terminal emulator
+Pick the terminal app to configure.
+
+No supported terminals detected on $PATH.
+
+↑/↓ move   enter select   esc back   ? help   q quit

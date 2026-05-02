@@ -1,0 +1,54 @@
+$schema: "https://moonrepo.dev/schemas/workspace.json"
+
+# Single source of truth for all projects in the monorepo.
+# Each entry below is hashed independently, so a Ghostty color change
+# does not invalidate the Go binary cache.
+projects:
+  # Workspace-level concerns (toolchain validation, repo-wide checks)
+  # live as code in the cli project's doctor command — see SOP
+  # "Declare, Don't Script". Imperative shell installers are forbidden.
+  #
+  # `root` owns monorepo-spanning tasks (treefmt orchestration) whose
+  # inputs cross project boundaries. Anchoring it at "." gives Moon a
+  # single hash key over every formattable file — incremental cache
+  # invalidates exactly when something formattable actually changed.
+  root: "."
+  cli: "apps/cli"
+  dotfiles: "apps/dotfiles"
+
+vcs:
+  manager: "git"
+  defaultBranch: "main"
+  # Toolchain Collapse: git hooks are Moon tasks, not a separate Nix
+  # plugin and not a separate hook manager. Moon writes
+  # .git/hooks/{pre-commit,pre-push} from the entries below; both shell
+  # out to `moon run` so the verdict goes through the same content-hash
+  # cache as a regular task invocation. `--affected --status=staged`
+  # filters the task graph to projects whose declared inputs intersect
+  # the staged set — unchanged projects are a no-op cache hit, not a
+  # re-run, which is the whole point of binding hooks to Moon instead
+  # of to a globbing pre-commit framework.
+  hooks:
+    pre-commit:
+      # `root:fmt` is `treefmt --fail-on-change` over **/*.go + **/*.nix.
+      # Drift exits non-zero, aborting the commit; a clean staged tree
+      # short-circuits via Moon's hash cache.
+      - "moon run root:fmt --affected --status=staged"
+    pre-push:
+      # cli:lint = `go vet`, cli:test = `go test`. Wildcard targets
+      # (`:lint`, `:test`) hit every project that declares them, so
+      # adding lint/test to a future project automatically extends the
+      # gate without editing this file.
+      - "moon run :lint --affected"
+      - "moon run :test --affected"
+  # `dots sync` calls `moon sync hooks` explicitly; flipping this on
+  # makes any `moon run` also reconcile .git/hooks back to the spec
+  # above, so a fresh clone or a hand-edited hook self-heals on the
+  # next task invocation. Declarative, not advisory.
+  syncHooks: true
+
+runner:
+  cacheLifetime: "7 days"
+  inheritColorsForPipedTasks: true
+
+telemetry: false
