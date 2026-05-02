@@ -38,7 +38,11 @@ type command struct {
 func commands() map[string]command {
 	return map[string]command{
 		"install": {requiresWorkspace: false, run: func([]string) int {
-			return ui.Run(ui.ModeInstall, newWizardDeps())
+			code := ui.Run(ui.ModeInstall, newWizardDeps())
+			if code == 0 {
+				printInstallNextSteps()
+			}
+			return code
 		}},
 		"sync": {requiresWorkspace: true, run: func([]string) int {
 			// Reconcile .git/hooks with .moon/workspace.yml's `vcs.hooks`
@@ -101,6 +105,27 @@ func main() {
 	}
 
 	os.Exit(c.run(rest))
+}
+
+// printInstallNextSteps tells the user what to do after a successful
+// install wizard. Branches on workspace presence: in-workspace, the
+// next step is `dots apply`-equivalent (`dots deploy` here); outside,
+// the user needs Nix and a clone before realization. Reuses the same
+// detection helper as the dispatcher gate — one source of truth for
+// "is this an install-only host vs a realization host."
+func printInstallNextSteps() {
+	if _, err := workspace.Root(); err == nil {
+		fmt.Println()
+		fmt.Println("Profile written. Run `dots deploy` to realize this profile.")
+		return
+	}
+	fmt.Println()
+	fmt.Println("Profile written.")
+	fmt.Println()
+	fmt.Println("To realize this profile, you need the dotfiles workspace and Nix:")
+	fmt.Println("  1. Install Nix:    https://determinate.systems/nix-installer")
+	fmt.Println("  2. Clone the repo: git clone https://github.com/sanurb/.dotfiles ~/.dotfiles")
+	fmt.Println("  3. Realize:        cd ~/.dotfiles && dots deploy")
 }
 
 // workspaceRequiredMessage is the user-facing surface for the gate.
