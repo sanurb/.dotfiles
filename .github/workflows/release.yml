@@ -47,3 +47,10 @@ jobs:
           # GITHUB_TOKEN cannot push to a separate repo, so this must be
           # configured before the first tagged release.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # Disable cosign's TUF root cache. GoReleaser invokes `cosign
+          # sign-blob` in parallel for multiple artifacts; they race on
+          # the cache flock and one fails with "creating cached local
+          # store: resource temporarily unavailable". Bypassing the
+          # cache costs an extra TUF fetch per sign (~hundreds of ms)
+          # in exchange for deterministic parallelism.
+          SIGSTORE_NO_CACHE: "true"
