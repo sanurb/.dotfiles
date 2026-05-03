@@ -49,16 +49,24 @@ type command struct {
 func commands() map[string]command {
 	return map[string]command{
 		"install": {requiresWorkspace: false, run: func([]string) int {
-			// install is classified workspace-optional, but the wizard's
-			// adapters today still write state at the workspace root.
-			// Surface that gap with the same gate message rather than
-			// the cryptic "cannot locate workspace root" the constructor
-			// used to print. Decoupling the wizard from the workspace
-			// is tracked as separate follow-up work.
+			// Two-mode install: inside a workspace, the full wizard
+			// (form → scan → snapshot → realize). Outside, a thin
+			// form-only path that writes the profile to the user-config
+			// dir and stops there — none of scan/snapshot/realize are
+			// meaningful without the flake. The wizard's adapters and
+			// step machine are unchanged; the standalone path lives
+			// entirely in this package.
+			if _, err := workspace.Root(); err != nil {
+				code := runStandaloneInstall()
+				if code == 0 {
+					printInstallNextSteps()
+				}
+				return code
+			}
 			deps, err := newWizardDeps()
 			if err != nil {
-				fmt.Fprint(os.Stderr, workspaceRequiredMessage("install"))
-				return 2
+				fmt.Fprintln(os.Stderr, "install:", err)
+				return 1
 			}
 			code := ui.Run(ui.ModeInstall, deps)
 			if code == 0 {
