@@ -27,7 +27,8 @@ func runStandaloneInstall() int {
 	formShell := initial.Pillars.Shell
 	formTerminal := initial.Pillars.Terminal
 	formMultiplexer := initial.Pillars.Multiplexer
-	formExtras := initial.Capabilities.Extras()
+	formEditor := initial.Capabilities.Editor
+	formGit := initial.Capabilities.Git
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -37,8 +38,8 @@ func runStandaloneInstall() int {
 				Options(ui.HuhOptions(ui.TerminalOptions, 0)...).Value(&formTerminal),
 			huh.NewSelect[string]().Title("Multiplexer").
 				Options(ui.HuhOptions(ui.MultiplexerOptions, 0)...).Value(&formMultiplexer),
-			huh.NewMultiSelect[string]().Title("Capabilities").
-				Options(ui.HuhOptions(ui.CapabilityOptions, 0)...).Value(&formExtras),
+			ui.EditorConfirm(&formEditor),
+			ui.GitConfirm(&formGit),
 		),
 	).WithTheme(huh.ThemeCharm()).WithShowHelp(false)
 
@@ -60,8 +61,8 @@ func runStandaloneInstall() int {
 			Multiplexer: formMultiplexer,
 		},
 		Capabilities: state.Capabilities{
-			Editor: state.Contains(formExtras, "editor"),
-			Git:    state.Contains(formExtras, "git"),
+			Editor: formEditor,
+			Git:    formGit,
 		},
 	}
 

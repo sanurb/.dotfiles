@@ -112,9 +112,4 @@ var (
 		{Value: "tmux", Label: "Tmux", Description: "battle-tested, scriptable"},
 		{Value: "none", Label: "None", Description: "skip the multiplexer entirely"},
 	}
-
-	CapabilityOptions = []Option{
-		{Value: "editor", Label: "Neovim base", Description: "minimal init.lua + treesitter/ripgrep/fd"},
-		{Value: "git", Label: "Git defaults", Description: "global git config (identity stays external)"},
-	}
 )

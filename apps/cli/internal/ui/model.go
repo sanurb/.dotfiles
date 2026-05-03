@@ -52,7 +52,8 @@ type Model struct {
 	formShell       string
 	formTerminal    string
 	formMultiplexer string
-	formExtras      []string
+	formEditor      bool
+	formGit         bool
 	wantConfirm     bool // welcome / conflict confirmation
 	doSnapshot      bool
 
@@ -95,7 +96,8 @@ func New(mode Mode, deps Deps) *Model {
 		formShell:       initial.Pillars.Shell,
 		formTerminal:    initial.Pillars.Terminal,
 		formMultiplexer: initial.Pillars.Multiplexer,
-		formExtras:      initial.Capabilities.Extras(),
+		formEditor:      initial.Capabilities.Editor,
+		formGit:         initial.Capabilities.Git,
 	}
 	m.transition(stepWelcome)
 	return m
@@ -251,8 +253,8 @@ func (m Model) advanceFromForm() (tea.Model, tea.Cmd) {
 		m.state.Pillars.Shell = m.formShell
 		m.state.Pillars.Terminal = m.formTerminal
 		m.state.Pillars.Multiplexer = m.formMultiplexer
-		m.state.Capabilities.Editor = state.Contains(m.formExtras, "editor")
-		m.state.Capabilities.Git = state.Contains(m.formExtras, "git")
+		m.state.Capabilities.Editor = m.formEditor
+		m.state.Capabilities.Git = m.formGit
 		if m.deps.StatePersister != nil {
 			if err := m.deps.StatePersister.SaveState(m.state); err != nil {
 				m.err = fmt.Errorf("persist state: %w", err)
@@ -339,11 +341,10 @@ func (m *Model) welcomeForm() *huh.Form {
 	).WithTheme(huh.ThemeCharm()).WithShowHelp(false)
 }
 
-// capabilitiesForm collects the persona — three radio pillars plus an
-// optional-extras multiselect. Atuin/Zoxide/Starship are intentionally
-// absent: they are mandatory infrastructure (foundation.nix), not user
-// choices. The form is one huh.Form with four groups so the user gets
-// next/prev navigation across pillars.
+// capabilitiesForm collects the persona — three radio pillars plus
+// per-capability Yes/No confirms. Atuin/Zoxide/Starship are
+// intentionally absent: they are mandatory infrastructure
+// (foundation.nix), not user choices.
 func (m *Model) capabilitiesForm() *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
@@ -366,14 +367,29 @@ func (m *Model) capabilitiesForm() *huh.Form {
 				Options(HuhOptions(MultiplexerOptions, 22)...).
 				Value(&m.formMultiplexer),
 		),
-		huh.NewGroup(
-			huh.NewMultiSelect[string]().
-				Title("Optional capabilities").
-				Description("Toggleable extras. Editor and Git are independent of the persona pillars.").
-				Options(HuhOptions(CapabilityOptions, 14)...).
-				Value(&m.formExtras),
-		),
+		huh.NewGroup(EditorConfirm(&m.formEditor)),
+		huh.NewGroup(GitConfirm(&m.formGit)),
 	).WithTheme(huh.ThemeCharm())
+}
+
+// EditorConfirm and GitConfirm are exported so the standalone install
+// path in apps/cli/main can reuse the exact same copy as the wizard.
+func EditorConfirm(value *bool) *huh.Confirm {
+	return huh.NewConfirm().
+		Title("Neovim").
+		Description("Includes LSP, TreeSitter, and Sanurb Config").
+		Affirmative("Yes, install Neovim with config.").
+		Negative("No, skip Neovim").
+		Value(value)
+}
+
+func GitConfirm(value *bool) *huh.Confirm {
+	return huh.NewConfirm().
+		Title("Git defaults").
+		Description("Global git config (identity stays external)").
+		Affirmative("Yes, apply git defaults").
+		Negative("No, leave git untouched").
+		Value(value)
 }
 
 func (m *Model) conflictForm() *huh.Form {
