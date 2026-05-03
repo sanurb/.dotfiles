@@ -78,9 +78,12 @@
   # commit. Toolchain Collapse: Moon already hashes inputs and gates
   # tasks; routing hooks through `moon run` reuses that machinery.
   treefmt = {
-    projectRootFile = "flake.nix";
-    programs.gofumpt.enable = true;
-    programs.nixpkgs-fmt.enable = true;
+    enable = true;
+    config = {
+      projectRootFile = "flake.nix";
+      programs.gofumpt.enable = true;
+      programs.nixpkgs-fmt.enable = true;
+    };
   };
 
   env = {
