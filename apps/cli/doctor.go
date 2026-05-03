@@ -464,34 +464,59 @@ func readPrototools() (map[string]string, error) {
 	return out, sc.Err()
 }
 
+// hasHomeManagerActivated reports whether Home Manager has activated at
+// least once on this host. The standard XDG profile gcroot is created
+// by `home-manager switch` and by nh's equivalent; either is sufficient
+// proof that a deploy has completed.
+//
+// Pre-activation, foundation-tool checks must be informational, not
+// failures — otherwise cli:doctor blocks its own first invocation
+// forever, since the wizard writes .dots-state.toml BEFORE running
+// deploy. A state-file presence test is therefore not enough on its own.
+func hasHomeManagerActivated() bool {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	for _, p := range []string{
+		filepath.Join(home, ".local", "state", "nix", "profiles", "home-manager"),
+		filepath.Join(home, ".local", "state", "home-manager", "gcroots", "current-home"),
+	} {
+		if _, err := os.Lstat(p); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // checkPersona audits the realized environment against the user's
 // declared persona in .dots-state.toml. The deploy is the contract;
-// this is the verifier that the contract was honored. Three sections:
+// this is the verifier that the contract was honored.
 //
-//   - Foundation: atuin / zoxide / starship are mandatory infrastructure.
-//     Their absence means modules/home/foundation.nix didn't activate, which
-//     is a hard fail.
-//
-//   - State file: missing/unparseable file warns rather than fails so
-//     `dots doctor` remains useful before the first `dots install`.
-//
-//   - Pillar binaries: the selected shell/terminal/multiplexer must
-//     resolve on PATH. Drift here usually means the user edited the
-//     state file directly without re-running deploy, or a Home Manager
-//     activation regressed.
+// Bootstrap rule: pre-activation (Home Manager has never run on this
+// host), foundation and pillar binaries missing are SevWarn — the first
+// deploy installs them. Post-activation, the same absences are SevFail
+// (drift). Without this rule, `cli:doctor` blocks its own first run.
 func checkPersona() []Check {
 	const cat = "Persona (state-declared)"
 	var out []Check
 
-	// Foundation — non-negotiable, identical across every persona.
+	deployed := hasHomeManagerActivated()
+
+	missingSev := SevWarn
+	missingDetail := "first install — Home Manager not yet activated; deploy will install"
+	if deployed {
+		missingSev = SevFail
+		missingDetail = "foundation tool missing — `dots deploy` to realize"
+	}
 	for _, bin := range []string{"atuin", "zoxide", "starship"} {
 		c := Check{
-			Name: bin, Category: cat, Required: true,
+			Name: bin, Category: cat, Required: deployed,
 			Detail: "foundation — modules/home/foundation.nix",
 		}
 		if path, err := exec.LookPath(bin); err != nil {
-			c.Severity = SevFail
-			c.Detail = "foundation tool missing — `dots deploy` to realize"
+			c.Severity = missingSev
+			c.Detail = missingDetail
 		} else {
 			c.Severity = SevPass
 			c.Actual = path
@@ -565,8 +590,13 @@ func checkPersona() []Check {
 			continue
 		}
 		if path, err := exec.LookPath(p.bin); err != nil {
-			c.Severity = SevFail
-			c.Detail = p.bin + " not on PATH — `dots deploy` to realize persona"
+			c.Required = deployed
+			c.Severity = missingSev
+			if deployed {
+				c.Detail = p.bin + " not on PATH — `dots deploy` to realize persona"
+			} else {
+				c.Detail = p.bin + " not yet on PATH — first deploy will install"
+			}
 		} else {
 			c.Severity = SevPass
 			c.Actual = path
