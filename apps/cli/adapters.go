@@ -179,11 +179,17 @@ func loadInitialState(workspaceRoot string) state.State {
 	return s
 }
 
-func newWizardDeps() ui.Deps {
+// newWizardDeps wires the adapters that the install/sync wizard needs.
+// All three persist against the workspace root, so missing it is a hard
+// stop — but we surface it as an error rather than exiting from a
+// constructor so the dispatcher can apply the same workspace-required
+// message it uses for deploy/doctor/sync/scan/backup. This keeps a
+// single user-facing failure mode for "ran outside the workspace,"
+// regardless of which subcommand they invoked.
+func newWizardDeps() (ui.Deps, error) {
 	root, err := workspace.Root()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error: cannot locate workspace root:", err)
-		os.Exit(1)
+		return ui.Deps{}, err
 	}
 	session := &backupSession{}
 	return ui.Deps{
@@ -191,5 +197,5 @@ func newWizardDeps() ui.Deps {
 		Realizer:       moonRealizer{},
 		StatePersister: tomlPersister{workspaceRoot: root, session: session},
 		Initial:        loadInitialState(root),
-	}
+	}, nil
 }

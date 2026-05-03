@@ -49,7 +49,18 @@ type command struct {
 func commands() map[string]command {
 	return map[string]command{
 		"install": {requiresWorkspace: false, run: func([]string) int {
-			code := ui.Run(ui.ModeInstall, newWizardDeps())
+			// install is classified workspace-optional, but the wizard's
+			// adapters today still write state at the workspace root.
+			// Surface that gap with the same gate message rather than
+			// the cryptic "cannot locate workspace root" the constructor
+			// used to print. Decoupling the wizard from the workspace
+			// is tracked as separate follow-up work.
+			deps, err := newWizardDeps()
+			if err != nil {
+				fmt.Fprint(os.Stderr, workspaceRequiredMessage("install"))
+				return 2
+			}
+			code := ui.Run(ui.ModeInstall, deps)
 			if code == 0 {
 				printInstallNextSteps()
 			}
@@ -64,7 +75,16 @@ func commands() map[string]command {
 			// canonical `moon run` gates rather than a stale shim. Errors
 			// are non-fatal — see syncMoonHooksSilent for the rationale.
 			syncMoonHooksSilent()
-			return ui.Run(ui.ModeSync, newWizardDeps())
+			// Gate already verified workspace presence; newWizardDeps
+			// cannot fail here. Surface any unexpected error rather
+			// than panic — defense in depth against a future change
+			// that lets workspace.Root() fail post-gate.
+			deps, err := newWizardDeps()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "sync:", err)
+				return 1
+			}
+			return ui.Run(ui.ModeSync, deps)
 		}},
 		"scan":   {requiresWorkspace: true, run: func([]string) int { return runScan() }},
 		"backup": {requiresWorkspace: true, run: func([]string) int { return runBackup(false) }},
