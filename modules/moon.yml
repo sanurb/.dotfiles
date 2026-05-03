@@ -22,37 +22,54 @@ tasks:
     options:
       runFromWorkspaceRoot: true
 
-  # Cache disabled: home.nix reads .dots-state.toml at the workspace
-  # root (via builtins.fromTOML), and Moon doesn't include that file in
-  # its task hash. Nix's own evaluation cache handles the repeat-build
-  # case efficiently. --impure is required so home.nix can resolve
-  # $MOON_WORKSPACE_ROOT and read the gitignored state file outside the
-  # flake source filter.
-  #
-  # Routed through nom (nix-output-monitor): live build graph + clear
-  # signal when a derivation falls back to source-build instead of
-  # substituting from cache.nixos.org.
-  build:
-    command: "nom build --impure --accept-flake-config .#homeActivation -o .result-home"
-    inputs:
-      - "@globs(configs)"
-      - "/flake.nix"
-      - "/flake.lock"
-    outputs:
-      - "/.result-home"
-    options:
-      cache: false
-      runFromWorkspaceRoot: true
-
   # Hard gate: cli:check (the Go doctor) must pass before activation.
   # No drift in .prototools pins, no missing LSP from devenv.nix, no
   # missing core binary — or the deploy refuses to run. This is the
   # enforcement clause of "Declare, Don't Script."
+  #
+  # nh is the lifecycle driver: it runs `nix build` against the
+  # activationPackage and execs the resulting `./activate` script.
+  # nom (nix-output-monitor) is the build renderer; nh delegates to it
+  # automatically when nom is on $PATH (declared in devenv.nix).
+  #
+  # Flake-ref shape: nh requires the configuration name via the
+  # `-c|--configuration` flag, NOT a full attribute path. When the user
+  # supplies `.#homeConfigurations.<name>` directly, nh's toplevel_for()
+  # short-circuits and returns the attrpath verbatim — it does NOT
+  # extend with `.config.home.activationPackage`
+  # (crates/nh-home/src/home.rs:296-298), so `nix build` resolves the
+  # homeManagerConfiguration record (a set) instead of a derivation and
+  # the flake schema check trips on `homeConfigurations.<name>.type`.
+  # Using `-c <name> .` routes through the auto-detect path (line 332)
+  # which DOES append the activationPackage suffix.
+  #
+  # flake.nix keys homeConfigurations by <system> (aarch64-darwin,
+  # x86_64-linux, ...), so we resolve the current system at deploy time
+  # via `nix eval --impure`. The cleaner alternative — exposing
+  # `homeConfigurations.default` — is parked for PR 2 (flake-parts +
+  # per-tool pins) per Scope Discipline.
+  #
+  # `--impure --accept-flake-config` is forwarded to `nix build` via
+  # nh's `--` passthrough so home.nix can read MOON_WORKSPACE_ROOT and
+  # the .dots-state.toml outside the flake source filter.
+  # NH_SHOW_ACTIVATION_LOGS=1 restores activation diagnostics that
+  # nh-4.3.0 hides by default; a failed home-manager activation must
+  # remain legible.
+  #
+  # YAML scalar style: literal block (|-) over folded (>-) — folded
+  # scalars silently mutate under reformatters that don't preserve
+  # fold semantics; literal is reformatter-resistant.
   deploy:
-    command: "./.result-home/activate"
+    command: "bash"
+    args:
+      - "-c"
+      - |-
+        export NH_SHOW_ACTIVATION_LOGS=1
+        sys="$(nix eval --raw --impure --expr 'builtins.currentSystem')"
+        exec nh home switch -c "${sys}" . -- \
+          --impure --accept-flake-config
     deps:
       - "cli:check"
-      - "~:build"
     options:
       cache: false
       runFromWorkspaceRoot: true

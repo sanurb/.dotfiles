@@ -12,7 +12,25 @@
     # bypasses that entirely.
     proto
     direnv # required for shell integration; doctor checks for it
-    nix-output-monitor # `nom` — pretty live build graph; aliased over `nix`
+
+    # Realization-layer drivers. nh and nom sit at distinct layers and are
+    # composed via $PATH, never selected against each other:
+    #   - nh  : lifecycle driver. `dots deploy` shells out to `nh home switch`,
+    #           which invokes `activationPackage` directly via `nix build` and
+    #           execs the resulting `./activate` script. No `home-manager` CLI
+    #           required — verified against nh-4.3.x source at
+    #           crates/nh-home/src/home.rs (line 223:
+    #           Command::new(target_profile.join("activate")); no
+    #           Command::new("home-manager") anywhere in the crate).
+    #   - nom : build renderer. nh delegates automatically when nom is on $PATH;
+    #           absence falls back to plain `nix build` output, no crash.
+    # Floor: nh >= 4.3.0. The 4.3.0 release introduced
+    # `NH_SHOW_ACTIVATION_LOGS` / `--show-activation-logs` alongside a
+    # breaking change that hides activation output by default. The deploy
+    # task sets the env var so failures stay legible; the doctor enforces
+    # the floor.
+    nh
+    nix-output-monitor
 
     # Terminal stack. Ghostty has no aarch64-darwin nixpkgs build
     # (upstream needs Xcode/SwiftPM); on macOS install via Homebrew —

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -49,7 +50,24 @@ type Report struct {
 // the formatting check below depends on it; if the wrapper is missing
 // we want a single, clearly-attributed failure rather than a confusing
 // "format probe failed" downstream.
-var coreBinaries = []string{"nix", "nom", "moon", "proto", "gum", "direnv", "git", "treefmt"}
+//
+// `nh` and `nom` are intentionally NOT in this list. nh has its own
+// version-gated check (checkNh); nom is optional-but-recommended
+// (checkNom) — nh delegates to nom when present and falls back to
+// plain nix-build output when absent. Demoting nom to optional is the
+// doctor-side expression of the layering decision in modules/moon.yml.
+var coreBinaries = []string{"nix", "moon", "proto", "gum", "direnv", "git", "treefmt"}
+
+// nhMinVersion: nh 4.3.0 introduced NH_SHOW_ACTIVATION_LOGS /
+// `--show-activation-logs` alongside a breaking change that hides
+// home-manager activation output by default. modules/moon.yml's
+// deploy task sets the env var so failures stay legible; pinning
+// here ensures every dev shell has a binary that honors it.
+// First tag shipping `nh home switch <flake>#<name> -- <flags>` was
+// v4.0.0 (src/interface.rs:306-307), but the activation-log default
+// flipped at v4.3.0, so v4.3.0 is the floor.
+// Refs: viperML/nh CHANGELOG.md "4.3.0 → Changed".
+const nhMinVersion = "4.3.0"
 
 // Required LSPs — declared in devenv.nix's packages list. Keep in lock
 // step: every entry here MUST have a matching nixpkgs attribute. New
@@ -101,6 +119,8 @@ func runDoctor(jsonOut bool) int {
 	report := Report{}
 
 	report.appendAll(checkCore())
+	report.appendAll(checkNh())
+	report.appendAll(checkNom())
 	report.appendAll(checkRuntimes())
 	report.appendAll(checkLSPs())
 	report.appendAll(checkFormatting())
@@ -250,6 +270,92 @@ func checkFormatting() []Check {
 	c.Severity = SevPass
 	c.Actual = "clean"
 	return []Check{c}
+}
+
+// checkNh: nh is the lifecycle driver `dots deploy` shells out to.
+// Required + version-gated (nhMinVersion). Failure modes that map to
+// SevFail: missing binary, --version exec failure, unparseable output,
+// version below the floor.
+func checkNh() []Check {
+	c := Check{
+		Name:     "nh",
+		Category: "Realization (lifecycle driver)",
+		Required: true,
+		Pinned:   ">=" + nhMinVersion,
+	}
+	if _, err := exec.LookPath("nh"); err != nil {
+		c.Severity = SevFail
+		c.Detail = "missing — declared in devenv.nix; rerun `direnv reload`"
+		return []Check{c}
+	}
+	out, err := exec.Command("nh", "--version").CombinedOutput()
+	if err != nil {
+		c.Severity = SevFail
+		c.Detail = "`nh --version` failed: " + err.Error()
+		return []Check{c}
+	}
+	raw := strings.TrimSpace(string(out))
+	c.Actual = raw
+	ver := extractSemver(raw)
+	if ver == "" {
+		c.Severity = SevFail
+		c.Detail = "could not parse semver from: " + raw
+		return []Check{c}
+	}
+	if !semverGTE(ver, nhMinVersion) {
+		c.Severity = SevFail
+		c.Detail = "below floor — deploy requires `--show-activation-logs` semantics"
+		return []Check{c}
+	}
+	c.Severity = SevPass
+	return []Check{c}
+}
+
+// checkNom: nh delegates build rendering to nom when nom is on $PATH.
+// Optional-but-recommended — absence is SevWarn (deploy still works,
+// just renders plain `nix build` output). Never SevFail by design;
+// this is the doctor-side expression of the layering decision.
+func checkNom() []Check {
+	c := Check{
+		Name:     "nom",
+		Category: "Realization (build renderer, optional)",
+		Required: false,
+	}
+	path, err := exec.LookPath("nom")
+	if err != nil {
+		c.Severity = SevWarn
+		c.Detail = "absent — nh will fall back to plain `nix build` output"
+		return []Check{c}
+	}
+	c.Severity = SevPass
+	c.Actual = path
+	c.Detail = "nh will delegate build rendering to nom"
+	return []Check{c}
+}
+
+var semverRe = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+
+func extractSemver(s string) string {
+	m := semverRe.FindStringSubmatch(s)
+	if m == nil {
+		return ""
+	}
+	return m[1] + "." + m[2] + "." + m[3]
+}
+
+// semverGTE: strict 3-part numeric comparison. Equal is GTE.
+// Pre-release suffixes are not considered (the floor is a release).
+func semverGTE(a, b string) bool {
+	pa := strings.Split(a, ".")
+	pb := strings.Split(b, ".")
+	for i := 0; i < 3; i++ {
+		ai, _ := strconv.Atoi(pa[i])
+		bi, _ := strconv.Atoi(pb[i])
+		if ai != bi {
+			return ai > bi
+		}
+	}
+	return true
 }
 
 func checkRuntimes() []Check {
