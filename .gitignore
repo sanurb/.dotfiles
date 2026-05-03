@@ -29,6 +29,10 @@ dist/
 # .dots-state.toml.example documents the schema; the live file is local.
 .dots-state.toml
 
+# devenv-root override sentinel — written by .envrc, holds $PWD so
+# flake.nix can resolve the workspace at eval time. Per-machine.
+.devenv-root
+
 # Claude Code (per-session state, hooks, transcripts)
 .claude/
 

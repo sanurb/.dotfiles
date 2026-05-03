@@ -15,6 +15,22 @@
 
     devenv.url = "github:cachix/devenv";
 
+    # Workspace-root sentinel for devenv's eval-time `devenv.root` option.
+    # devenv.lib.mkShell asserts a known project directory; in pure eval,
+    # `./.` resolves to the immutable nix store path (write fails at build
+    # time), so we need an *external* file containing the absolute workspace
+    # path. The .envrc rewrites .devenv-root with $PWD before invoking
+    # `nix develop --override-input devenv-root file+file://$PWD/.devenv-root`,
+    # capturing the right value for the active checkout. Without the
+    # override (e.g., a fresh `nix flake check` in CI), this defaults to
+    # /dev/null → empty content → the devShell falls back to a no-op shell
+    # so eval/build still succeeds. This is the canonical pattern from
+    # https://devenv.sh/guides/using-with-flakes/.
+    devenv-root = {
+      url = "file+file:///dev/null";
+      flake = false;
+    };
+
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -52,49 +68,88 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       inherit systems;
 
-      perSystem = { system, ... }: let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in {
-        devShells.default = devenv.lib.mkShell {
-          inherit inputs pkgs;
-          modules = [
-            # Bind the project directory so `nix develop` works from a
-            # non-direnv shell. https://devenv.sh/guides/using-with-flakes/
-            { devenv.root = builtins.toString ./.; }
-            ./devenv.nix
-          ];
-        };
+      perSystem = { system, ... }:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
 
-        packages = {
-          homeActivation = (mkHome system).activationPackage;
-          home-manager = home-manager.packages.${system}.default;
-        };
+          # Read the workspace path from the `devenv-root` flake input.
+          # Empty content (the /dev/null default) means: no override was
+          # supplied, so fall back to a no-op shell that still lets the
+          # gate pass without devenv eval/build. The .envrc supplies the
+          # override for interactive entry.
+          devenvRootContent = builtins.readFile inputs.devenv-root.outPath;
+          devenvRoot = nixpkgs.lib.removeSuffix "\n" devenvRootContent;
+          haveDevenvRoot = devenvRoot != "";
+        in
+        {
+          devShells.default =
+            if haveDevenvRoot then
+              devenv.lib.mkShell
+                {
+                  inherit inputs pkgs;
+                  modules = [
+                    { devenv.root = devenvRoot; }
+                    ./devenv.nix
+                  ];
+                }
+            else
+            # Fallback so `nix flake check` from a non-direnv shell
+            # still passes. `nix develop` against this output prints
+            # actionable guidance and exits non-zero rather than
+            # silently dropping the user into a barebones shell.
+              pkgs.mkShellNoCC {
+                name = "dots-shell-no-devenv-root";
+                shellHook = ''
+                  cat <<'MSG' >&2
+                  ERROR: devenv-root override missing.
 
-        # `nix flake check` runs every entry here. Keep them cheap — the
-        # gate is only useful if it fits in the verification budget.
-        checks = {
-          # Schema parity is structural: Go embeds the SCHEMA_VERSION file,
-          # Nix reads the same file. This check just guards the file's
-          # well-formedness so a bad commit fails fast rather than panicking
-          # the Go binary at startup or throwing during Nix eval.
-          schema-version-wellformed = pkgs.runCommand "schema-version-wellformed" { } ''
-            ver=$(${pkgs.coreutils}/bin/cat ${./apps/cli/internal/state/SCHEMA_VERSION} | ${pkgs.coreutils}/bin/tr -d '[:space:]')
-            case "$ver" in
-              ""|*[!0-9]*)
-                echo "SCHEMA_VERSION must be a positive integer, got: '$ver'" >&2
+                  The dots dev shell needs an absolute path to the workspace
+                  so devenv can write its state under \$DEVENV_ROOT/.devenv.
+                  Enter the workspace via 'direnv allow' (the .envrc supplies
+                  the override automatically), or invoke nix develop manually:
+
+                    nix develop --impure --accept-flake-config \
+                      --override-input devenv-root \
+                      "file+file://$(pwd)/.devenv-root" \
+                      -c <command>
+
+                  ('.devenv-root' must contain the absolute workspace path; the
+                  .envrc maintains this file for you when direnv is enabled.)
+                  MSG
+                  exit 1
+                '';
+              };
+
+          packages = {
+            homeActivation = (mkHome system).activationPackage;
+            home-manager = home-manager.packages.${system}.default;
+          };
+
+          # `nix flake check` runs every entry here. Keep them cheap — the
+          # gate is only useful if it fits in the verification budget.
+          checks = {
+            # Schema parity is structural: Go embeds the SCHEMA_VERSION file,
+            # Nix reads the same file. This check just guards the file's
+            # well-formedness so a bad commit fails fast rather than panicking
+            # the Go binary at startup or throwing during Nix eval.
+            schema-version-wellformed = pkgs.runCommand "schema-version-wellformed" { } ''
+              ver=$(${pkgs.coreutils}/bin/cat ${./apps/cli/internal/state/SCHEMA_VERSION} | ${pkgs.coreutils}/bin/tr -d '[:space:]')
+              case "$ver" in
+                ""|*[!0-9]*)
+                  echo "SCHEMA_VERSION must be a positive integer, got: '$ver'" >&2
+                  exit 1
+                  ;;
+              esac
+              if [ "$ver" -lt 1 ]; then
+                echo "SCHEMA_VERSION must be >= 1, got: $ver" >&2
                 exit 1
-                ;;
-            esac
-            if [ "$ver" -lt 1 ]; then
-              echo "SCHEMA_VERSION must be >= 1, got: $ver" >&2
-              exit 1
-            fi
-            echo "ok schema_version=$ver" > $out
-          '';
-        };
+              fi
+              echo "ok schema_version=$ver" > $out
+            '';
+          };
 
-        formatter = pkgs.nixpkgs-fmt;
-      };
+          formatter = pkgs.nixpkgs-fmt;
+        };
 
       # Each value must BE a homeConfiguration (carrying `.activationPackage`
       # directly) — `nix flake check` walks this attrset and inspects each
