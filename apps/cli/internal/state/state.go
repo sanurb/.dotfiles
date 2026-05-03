@@ -11,21 +11,36 @@
 package state
 
 import (
+	_ "embed"
 	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
-const (
-	// FileName is the canonical state file name, written at the workspace root.
-	FileName = ".dots-state.toml"
+// SCHEMA_VERSION is the single source of truth shared between Go (this
+// package, via go:embed) and Nix (modules/profiles/home.nix, via
+// builtins.readFile). Bumping requires editing exactly one file; both
+// sides pick the new value up automatically. Drift between Go and Nix
+// is impossible by construction.
+//
+//go:embed SCHEMA_VERSION
+var schemaVersionRaw string
 
-	// SchemaVersion bumps when the file shape changes incompatibly.
-	SchemaVersion = 1
-)
+// FileName is the canonical state file name, written at the workspace root.
+const FileName = ".dots-state.toml"
+
+// SchemaVersion bumps when the file shape changes incompatibly.
+var SchemaVersion = func() int {
+	n, err := strconv.Atoi(strings.TrimSpace(schemaVersionRaw))
+	if err != nil {
+		panic("state: SCHEMA_VERSION must be an integer, got " + strconv.Quote(schemaVersionRaw))
+	}
+	return n
+}()
 
 type State struct {
 	SchemaVersion int

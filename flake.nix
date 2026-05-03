@@ -70,6 +70,29 @@
           home-manager = home-manager.packages.${system}.default;
         };
 
+        # `nix flake check` runs every entry here. Keep them cheap — the
+        # gate is only useful if it fits in the verification budget.
+        checks = {
+          # Schema parity is structural: Go embeds the SCHEMA_VERSION file,
+          # Nix reads the same file. This check just guards the file's
+          # well-formedness so a bad commit fails fast rather than panicking
+          # the Go binary at startup or throwing during Nix eval.
+          schema-version-wellformed = pkgs.runCommand "schema-version-wellformed" { } ''
+            ver=$(${pkgs.coreutils}/bin/cat ${./apps/cli/internal/state/SCHEMA_VERSION} | ${pkgs.coreutils}/bin/tr -d '[:space:]')
+            case "$ver" in
+              ""|*[!0-9]*)
+                echo "SCHEMA_VERSION must be a positive integer, got: '$ver'" >&2
+                exit 1
+                ;;
+            esac
+            if [ "$ver" -lt 1 ]; then
+              echo "SCHEMA_VERSION must be >= 1, got: $ver" >&2
+              exit 1
+            fi
+            echo "ok schema_version=$ver" > $out
+          '';
+        };
+
         formatter = pkgs.nixpkgs-fmt;
       };
 

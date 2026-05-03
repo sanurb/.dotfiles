@@ -23,8 +23,15 @@ let
   # filtering would hide a path-literal lookup. With --impure (already
   # in use for the build), readFile against an absolute string path
   # bypasses the source filter cleanly.
+  # Schema version is declared once at apps/cli/internal/state/SCHEMA_VERSION
+  # and read from there by both Go (go:embed) and Nix (this readFile). Drift
+  # between the two consumers is impossible by construction — there is no
+  # "Nix-side constant" to forget to bump.
+  schemaVersion = lib.toInt (lib.removeSuffix "\n"
+    (builtins.readFile ../../apps/cli/internal/state/SCHEMA_VERSION));
+
   defaultState = {
-    schema_version = 1;
+    schema_version = schemaVersion;
     pillars      = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
     capabilities = { editor = true; git = true; };
   };
