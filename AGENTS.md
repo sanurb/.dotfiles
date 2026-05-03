@@ -1,115 +1,148 @@
 # AGENTS.md
 
+This document defines what `dots` is, how it is structured, and the rules
+that govern changes to it. It has two audiences: humans onboarding to the
+repo, and agents (LLMs, CI checks, future contributors) who must follow
+the rules without rediscovering them. Both audiences must come away with
+the same model.
+
 ## Task Completion Requirements
 
-- All of `nix develop -c nix flake check`, `nix develop -c go build ./...`, and `nix develop -c go test ./...` must pass before considering tasks completed.
-- NEVER work around `nix develop` failing — surface it as a finding and fix the shell first. The canonical entry point is the canonical entry point.
-- NEVER hand-edit generated files (`flake.lock`, Cobra stubs, `teatest` snapshots, formatter output). Regenerate via `nix flake update`, `go generate ./...`, `go test -update`, or `nix fmt`.
+- All of `nix develop -c nix flake check`,
+  `nix develop -c go build ./apps/cli/...`, and
+  `nix develop -c go test ./apps/cli/...` must pass before considering
+  tasks completed.
+- NEVER work around `nix develop` failing — surface it as a finding and
+  fix the shell first. The canonical entry point is the canonical entry
+  point.
+- NEVER hand-edit generated files (`flake.lock`, Cobra stubs, `teatest`
+  snapshots, formatter output). Regenerate via `nix flake update`,
+  `go generate ./...`, `go test -update`, or `nix fmt`.
+
+## Scope Discipline
+
+Each task has a defined scope. Stay within it. Two exceptions only:
+
+1. **Strictly mechanical extensions.** If completing the task inevitably
+   touches a shared helper that needs a one-line update, do it and note
+   it in the commit body.
+2. **Small obvious refactors.** If you encounter duplicated logic
+   extractable in ≤30 lines unambiguously, extract it in a separate
+   commit immediately before or after the task's main commit. The
+   commit message starts with `refactor:`.
+
+Anything beyond these is a finding, not work. Surface and stop.
+
+A sweeping refactor silently bundled with feature work is unreviewable.
+Maintainability gains at the cost of reviewability are a net loss.
 
 ## Project Snapshot
 
-`dots` is a Nix-native dotfiles platform with two distinct components:
+`dots` is a Nix-native dotfiles platform with two components
+([ADR-0001](docs/adr/0001-two-components-one-product.md)):
 
-1. The TUI binary — distributed standalone (Homebrew tap, GitHub releases). Runs anywhere. Does not require Nix at runtime. Subcommands: `install`, `version`, `help`. Produces `~/.config/dots/selection.toml`.
-2. The realization layer — a Nix flake + Home Manager modules that consume `selection.toml` and realize the system. Requires the cloned workspace and Nix. Subcommands: `deploy`, `doctor`, `sync`, `scan`, `backup`.
+1. **The TUI binary** (`apps/cli`) — distributed standalone via Homebrew
+   tap, GitHub releases (curl-install fetcher), and `nix run`. Runs
+   anywhere a Go binary runs. Does not require Nix at runtime. Produces
+   `~/.config/dots/selection.toml`.
+2. **The realization layer** (`modules/`, `flake.nix`) — a Nix flake plus
+   Home Manager (and a reserved nix-darwin slot) that consume
+   `selection.toml` and realize the system. Requires Nix and the cloned
+   workspace.
 
-Two components, two distribution models, one product. The split is deliberate and load-bearing — it's the architectural answer to "what is `dots`?" and every decision in the repo should reinforce it.
+Components do not import each other across the split. The TUI knows
+nothing about Nix; the realization layer knows nothing about Go source
+beyond the schema-contract surface. 
+
+This repository is a VERY EARLY WIP. Proposing sweeping changes that improve long-term maintainability is encouraged.
+
+## Tooling Lanes
+
+Lanes prevent overlap from becoming ambiguity. Each tool owns one
+concern.
+
+| Lane | Tool | Owns |
+|---|---|---|
+| Dotfiles environment | Nix flake | Shell, terminal, editor, multiplexer, system utilities |
+| Per-project runtimes | Proto | Go, Bun, Node, language versions; `.prototools`-pinned. Proto's shims are first in `$PATH`. ([ADR-0004](docs/adr/0004-proto-owns-language-runtimes.md)) |
+| Build/test/lint DAG | Moon | Go DAG under `apps/` plus repo-root tasks (formatting, repo-wide gates) declared in top-level `moon.yml`. Does not orchestrate Nix. ([ADR-0005](docs/adr/0005-moon-owns-go-dag-never-nix.md)) |
+| Dev shell entry | Devenv (via `nix develop`) | Shell package set, treefmt integration, hooks. `languages.*` left empty by design. Direnv activates it. |
+| Formatting | treefmt | Multi-language formatter dispatch via `nix fmt`. |
+| Realization driver | `nh` (+ `nom` renderer) | `dots deploy` shells out to `nh home switch`; `nom` composed via `$PATH`. ([ADR-0006](docs/adr/0006-nh-deploy-driver-nom-build-renderer.md)) |
+| User-facing UX | `dots` binary | Reading and writing `selection.toml`. Never installs packages. Never calls `brew`, `curl \| sh`, or `pip install`. |
+
+`$PATH` priority, top to bottom: Proto shims → nix-darwin / NixOS system
+→ Home Manager profile → OS defaults. `dots doctor` verifies this order.
 
 ## Maintainability
 
 Long term maintainability is a core priority. If you add new functionality, first check if there is shared logic that can be extracted to a separate module. Duplicate logic across multiple files is a code smell and should be avoided. Don't be afraid to change existing code. Don't take shortcuts by just adding local logic to solve a problem.
 
-## Core Priorities
-
-Lexicographic. When two conflict, higher wins. Do not weigh them.
-
-1. Honesty. Distribution paths, error messages, and subcommand 
-   semantics reflect what the code actually does. No path promises 
-   more than it delivers.
-
-2. Reproducibility. Realization is declarative and Nix-resolved 
-   end-to-end. No procedural escape hatches.
-
-3. Maintainability. Shared logic is extracted before duplication 
-   accumulates. Existing code changes when the change improves the 
-   architecture.
-
-4. Velocity. `nix develop -c` enters in under one second after 
-   `nix-direnv` warm-up. `dots doctor` completes within its latency 
-   budget.
-
-5. Restraint. Subcommands, install paths, and config knobs are 
-   added only when justified proportionally to their footprint.
-
-If a tradeoff is required, choose architectural honesty and 
-reproducibility over short-term convenience.
-
-## Scope Discipline
-
-Each task has a defined scope. Stay within it. The two exceptions:
-
-1. Strictly mechanical extensions — if completing the task as specified inevitably touches a shared helper that needs a one-line update, do it and note it in the commit body.
-2. Small obvious refactors — if you encounter duplicated logic that can be extracted in under ~30 lines and the extraction is unambiguous, do it in a separate commit immediately before or after the task's main commit. Commit message starts with `refactor:` so the change is legible.
-
-Anything beyond these two exceptions is a finding, not work. Surface and stop.
-
-The reason scope discipline matters even when maintainability is a priority: a sweeping refactor silently bundled with feature work is unreviewable. Maintainability gains at the cost of reviewability are a net loss. Refactors that deserve to happen deserve their own scoped task.
-
-## Package Roles
-
-- `apps/cli` — the `dots` Go binary. Cobra-based CLI, Bubbletea TUI for `dots install`. Workspace-optional subcommands (TUI, version, help) run anywhere. Workspace-required subcommands (deploy, doctor, sync, scan, backup) check for workspace presence and exit with an actionable message if absent.
-
-## Tooling Lanes
-
-The stack has overlap between tools. The lanes prevent that overlap from becoming ambiguity:
-
-- Nix flake owns the dotfiles environment: shell, terminal, editor, multiplexer, system utilities, and any language runtime the dotfiles themselves depend on (e.g., the Go used to build `dots`). Pinned in `flake.lock`.
-- Proto owns per-project language runtimes (Node, Bun, Deno, project-specific Go/Rust versions) configured via `.prototools` files in projects *outside* this repo. Proto's shims must be first in `$PATH`.
-- Moon owns the Go CLI's build/test/lint DAG inside `apps/cli` and similar future packages. Does not orchestrate Nix.
-- `dots` binary is the user-facing UX layer. Never a package installer. Never calls `brew`, `curl | sh`, or `pip install`.
-
-The `$PATH` boundary, top to bottom in priority: Proto shims → nix-darwin / NixOS system → Home Manager profile → OS defaults. Verifying this order is part of `dots doctor`.
-
 ## Distribution Model
 
-Three install paths, in this order:
+The two components in §4 produce three entry points. *Entry point* (how
+the binary reaches the user) is orthogonal to *depth* (whether the user
+only writes a profile or also realizes it).
 
-1. Try the TUI — `brew install sanurb/tap/dots` then `dots install`. Produces `selection.toml`. Realization requires Path 2 or 3.
-2. Full install — Path 1 + clone the workspace + `dots deploy`.
-3. Nix-native — `nix run github:sanurb/.dotfiles -- install` then `nix run github:sanurb/.dotfiles -- deploy`. No Homebrew.
+### Entry points
 
-Paths 2 and 3 require Nix as a hard prerequisite.
+| Entry point | Command | Delivers |
+|---|---|---|
+| Homebrew | `brew install sanurb/tap/dots` | Persistent binary |
+| Curl install | `curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh \| sh` | Persistent binary in `$INSTALL_DIR` (default `~/.local/bin`) |
+| `nix run` | `nix run github:sanurb/.dotfiles -- <args>` | Ephemeral execution |
 
-The Homebrew tap (`sanurb/homebrew-tap`) ships only `dots`. Do not publish self-installer scripts, curl-installable bundles, or anything that creates the expectation of a self-contained installer. The TUI is genuinely useful standalone (it produces `selection.toml`); the *system configuration* is not, and the distribution must reflect that asymmetry.
+The Homebrew tap (`sanurb/homebrew-tap`) ships only `dots`. The
+curl-install fetcher is POSIX `sh`, always verifies SHA-256, and
+verifies the cosign signature when `cosign` is on `$PATH`; manual
+fetch + verify is documented in `RELEASING.md`. `nix run` requires Nix
+but no clone of the workspace.
 
-## References
+### Depth
 
-External writing that informs the architecture of this project. 
-Each entry includes the position it represents and how this 
-project relates to it.
+| Depth | What runs | Realizes system? | Requires Nix? | Requires workspace clone? |
+|---|---|---|---|---|
+| TUI only | `dots install` | No | No | No |
+| Full | `dots install` then `dots deploy` | Yes | Yes | Yes |
 
-### On scope of Nix
+The TUI's exit screen states which step is done and what remains; the
+asymmetry is communicated by binary output, not by gatekeeping channels.
 
-- [You don't have to use Nix to manage your dotfiles](https://jade.fyi/blog/use-nix-less/) 
-  — argues that Nix earns its place when it's solving the 
-  hermetic-package-management problem and gets in the way when 
-  stretched beyond it. This project takes that position 
-  seriously: Nix realizes the system; it does not distribute 
-  the TUI, manage per-project runtimes (Proto does), or wrap 
-  the Go build (Moon does). The lanes are deliberate.
+Whether the curl-install path stays as-is, gets deprecated, or gets
+blessed as a primary path is a **deferred** policy decision (§12) —
+this document describes the current state, not the target state.
 
-### On flake structure
+## Architectural Invariants
 
-- [Refactoring my infrastructure as code configurations](https://not-a-number.io/2025/refactoring-my-infrastructure-as-code-configurations/#flipping-the-configuration-matrix) 
-  — describes the dendritic / modular flake-parts approach.
-- [Dendrix](https://dendrix.oeiuwq.com/Dendritic.html) — 
-  framework articulation of the same approach.
+Properties that must never break. Each has a verification command.
 
-## Deferred decisions
+| # | Invariant | Verification |
+|---|---|---|
+| I1 | The TUI binary does not import any Nix-related Go modules | runnable — see block below |
+| I2 | The realization layer references the TUI tree only at the schema-contract surface | runnable — see block below |
+| I3 | `selection.toml` schema agrees between Go and Nix consumers | manual: PR review (automated parity check deferred — §12) |
+| I4 | `nix develop -c` is the only sanctioned execution surface for dev tooling | manual: PR review |
+| I5 | `flake.lock` is never hand-edited | runnable — see block below |
+| I6 | Every subcommand declares workspace-required vs workspace-optional | manual: review every new command in `apps/cli/` |
+| I7 | Modules under `modules/home/<category>/` are orthogonal — a shell module references no terminal symbols | manual: PR review (automated ortho-check deferred — §12) |
 
-- **`selection.toml` LSP.** Discussed and deferred. `selection.toml`
-  is machine-written by the TUI; users are directed to `dots install`
-  as the canonical input path. No documented user story for hand-editing
-  exists. Revisit only if a real user reports needing editor support;
-  do not pre-build `libs/`, `apps/lsp`, or schema-extraction
-  scaffolding speculatively.
+Runnable verifications (copy-paste from inside `nix develop`):
+
+```sh
+# I1 — TUI's import graph is Nix-free. Tests imports, not strings;
+# comments and exec-LookPath calls to `nh` are out of scope.
+go list -deps ./apps/cli/... | grep -iE 'nix|home-manager'   # expect: empty
+
+# I2 — only the schema-contract file is read across the split.
+grep -rE 'apps/cli' modules/ flake.nix | grep -v SCHEMA_VERSION   # expect: empty
+
+# I5 — flake.lock diffs look like `nix flake update` output.
+git log -p flake.lock   # manual visual check
+```
+
+## Architectural Decisions
+
+Index of recorded decisions. Each entry links to its ADR file under
+`docs/adr/`. Slot numbers are append-only — a vacant slot indicates a
+previously dropped decision and is not backfilled. Status defaults to
+accepted unless marked otherwise.
