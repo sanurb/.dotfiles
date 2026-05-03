@@ -5,7 +5,7 @@
   programs.git = {
     enable = true;
     package = pkgs.git;
-    userName  = identity.name;
+    userName = identity.name;
     userEmail = identity.email;
 
     extraConfig = {

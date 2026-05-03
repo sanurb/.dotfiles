@@ -11,8 +11,8 @@
 package state
 
 import (
-	_ "embed"
 	"bufio"
+	_ "embed"
 	"fmt"
 	"io"
 	"os"

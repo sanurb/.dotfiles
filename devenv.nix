@@ -11,7 +11,7 @@
     # toolchain (sdd-4.1.1 lifetime bug). Proto's prebuilt binary
     # bypasses that entirely.
     proto
-    direnv             # required for shell integration; doctor checks for it
+    direnv # required for shell integration; doctor checks for it
     nix-output-monitor # `nom` — pretty live build graph; aliased over `nix`
 
     # Terminal stack. Ghostty has no aarch64-darwin nixpkgs build
@@ -44,16 +44,16 @@
     # the workspace needs is materialized by entering the directory; no
     # imperative install step is permitted. The Go CLI's `dots doctor`
     # asserts these are reachable on $PATH and refuses deploy on miss.
-    gopls                          # Go
-    rust-analyzer                  # Rust
-    vtsls                          # TypeScript/JavaScript (Volar-based)
-    typescript                     # tsc — vtsls relies on it
+    gopls # Go
+    rust-analyzer # Rust
+    vtsls # TypeScript/JavaScript (Volar-based)
+    typescript # tsc — vtsls relies on it
     typescript-language-server
-    vscode-langservers-extracted   # HTML / CSS / JSON / ESLint
-    lua-language-server            # Lua (nvim config)
-    nixd                           # Nix
+    vscode-langservers-extracted # HTML / CSS / JSON / ESLint
+    lua-language-server # Lua (nvim config)
+    nixd # Nix
   ] ++ lib.optionals pkgs.stdenv.isLinux [
-    ghostty                        # Linux-only via nixpkgs; macOS uses Homebrew
+    ghostty # Linux-only via nixpkgs; macOS uses Homebrew
   ];
 
   # Nix tooling is fine — proto does not manage Nix.

@@ -5,7 +5,7 @@
       set -g fish_greeting ""
     '';
     shellAbbrs = {
-      g  = "git";
+      g = "git";
       ll = "eza -la";
       lt = "eza --tree";
     };
@@ -17,7 +17,7 @@
 
   # Foundation integrations — atuin/zoxide/starship are all enabled in
   # foundation.nix; here we just bind them into fish.
-  programs.atuin.enableFishIntegration    = true;
-  programs.zoxide.enableFishIntegration   = true;
+  programs.atuin.enableFishIntegration = true;
+  programs.zoxide.enableFishIntegration = true;
   programs.starship.enableFishIntegration = true;
 }

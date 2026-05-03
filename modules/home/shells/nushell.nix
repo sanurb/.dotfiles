@@ -15,12 +15,12 @@
 
     shellAliases = {
       nix = "nom";
-      g   = "git";
-      ll  = "eza -la";
+      g = "git";
+      ll = "eza -la";
     };
   };
 
-  programs.atuin.enableNushellIntegration    = true;
-  programs.zoxide.enableNushellIntegration   = true;
+  programs.atuin.enableNushellIntegration = true;
+  programs.zoxide.enableNushellIntegration = true;
   programs.starship.enableNushellIntegration = true;
 }

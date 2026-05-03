@@ -43,8 +43,8 @@ var (
 		Bold(true)
 
 	styError = lipgloss.NewStyle().
-		Foreground(colError).
-		Bold(true)
+			Foreground(colError).
+			Bold(true)
 
 	stySpinner = lipgloss.NewStyle().
 			Foreground(colAccent)

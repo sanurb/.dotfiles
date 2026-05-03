@@ -469,4 +469,3 @@ func multiplexerBinary(v string) string {
 	}
 	return v // tmux, zellij
 }
-

@@ -2,7 +2,7 @@
 let
   envUser = builtins.getEnv "USER";
   envHome = builtins.getEnv "HOME";
-  envWS   = builtins.getEnv "MOON_WORKSPACE_ROOT";
+  envWS = builtins.getEnv "MOON_WORKSPACE_ROOT";
   isDarwin = pkgs.stdenv.isDarwin;
   fallbackHome = if isDarwin then "/Users/dots" else "/home/dots";
 
@@ -32,7 +32,7 @@ let
 
   defaultState = {
     schema_version = schemaVersion;
-    pillars      = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
+    pillars = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
     capabilities = { editor = true; git = true; };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
@@ -42,7 +42,7 @@ let
     else defaultState;
 
   pillars = state.pillars or defaultState.pillars;
-  caps    = state.capabilities or defaultState.capabilities;
+  caps = state.capabilities or defaultState.capabilities;
 
   # Module discovery — the directory tree under ../home/ is the registry.
   # `homeModules.shells.fish` resolves to ../home/shells/fish.nix, and a
@@ -53,19 +53,20 @@ let
   # Pillar resolution — defensive `or` falls through to a sane default
   # rather than throwing on an unrecognized state value. Validation
   # lives in the CLI (state.Validate); this is the second line of defense.
-  shellModule       = homeModules.shells.${pillars.shell}        or homeModules.shells.fish;
-  terminalModule    = homeModules.terminals.${pillars.terminal}  or homeModules.terminals.ghostty;
+  shellModule = homeModules.shells.${pillars.shell}        or homeModules.shells.fish;
+  terminalModule = homeModules.terminals.${pillars.terminal}  or homeModules.terminals.ghostty;
   multiplexerModule = homeModules.multiplexers.${pillars.multiplexer} or null;
-in {
+in
+{
   imports =
     [ homeModules.foundation shellModule terminalModule ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
     ++ lib.optional (caps.editor or true) homeModules.editor
     ++ lib.optional (caps.git    or true) homeModules.git;
 
-  home.username      = if envUser != "" then envUser else "dots";
+  home.username = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;
-  home.stateVersion  = "26.05";
+  home.stateVersion = "26.05";
 
   programs.home-manager.enable = true;
 

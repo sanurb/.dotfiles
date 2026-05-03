@@ -93,12 +93,12 @@ type Row struct {
 // same slots in the same order so the user never re-learns the footer.
 // An empty string in any slot omits that footer entry.
 //
-//   Move      navigation keys, e.g. "↑/↓"
-//   Select    commit, e.g. "enter"
-//   Back      return to previous step, e.g. "esc"; "" on step 1
-//   Help      toggle help overlay, e.g. "?"
-//   Quit      exit the wizard, e.g. "q"
-//   SelectVerb overrides the "select" label (e.g. "confirm" on step 6)
+//	Move      navigation keys, e.g. "↑/↓"
+//	Select    commit, e.g. "enter"
+//	Back      return to previous step, e.g. "esc"; "" on step 1
+//	Help      toggle help overlay, e.g. "?"
+//	Quit      exit the wizard, e.g. "q"
+//	SelectVerb overrides the "select" label (e.g. "confirm" on step 6)
 type Keymap struct {
 	Move       string
 	Select     string

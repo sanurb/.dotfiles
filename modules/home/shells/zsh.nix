@@ -31,7 +31,7 @@
     shellAliases.nix = "nom";
   };
 
-  programs.atuin.enableZshIntegration    = true;
-  programs.zoxide.enableZshIntegration   = true;
+  programs.atuin.enableZshIntegration = true;
+  programs.zoxide.enableZshIntegration = true;
   programs.starship.enableZshIntegration = false;
 }
