@@ -14,7 +14,7 @@ projects:
   # invalidates exactly when something formattable actually changed.
   root: "."
   cli: "apps/cli"
-  dotfiles: "apps/dotfiles"
+  dotfiles: "modules"
 
 vcs:
   manager: "git"

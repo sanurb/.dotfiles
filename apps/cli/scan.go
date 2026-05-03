@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-// trackedPaths mirrors apps/dotfiles/scripts/backup.sh — keep in sync.
+// trackedPaths mirrors modules/scripts/backup.sh — keep in sync.
 // Each entry is relative to $HOME and represents a path that Home
 // Manager will project as a symlink.
 var trackedPaths = []string{
