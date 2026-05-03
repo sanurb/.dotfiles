@@ -1,9 +1,15 @@
-{ pkgs, lib, ... }: {
+{ pkgs, lib, pkgsPins, ... }: {
   programs.neovim = {
     enable = true;
     defaultEditor = true;
     viAlias = true;
     vimAlias = true;
+
+    # Pinned to `pkgsPins.edge` — the editor cycles upstream faster than
+    # nixos-unstable's hydra gating, and the lag has bitten plugin compat
+    # before. See docs/maintenance.md for the divergence log; collapse this
+    # back to `pkgs.neovim` if no divergence is recorded for 90 days.
+    package = pkgsPins.edge.neovim;
 
     extraPackages = with pkgs; [
       ripgrep

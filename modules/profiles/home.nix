@@ -37,31 +37,24 @@ let
   pillars = state.pillars or defaultState.pillars;
   caps    = state.capabilities or defaultState.capabilities;
 
-  # Pillar resolution — explicit if/else over a `${attrset.${key}}`
-  # subscript so an unrecognized state value falls through to a sane
-  # default rather than throwing during eval. Validation lives in the
-  # CLI (state.Validate); this is the second line of defense.
-  shellModule =
-    if pillars.shell == "zsh"     then ../home/shells/zsh.nix
-    else if pillars.shell == "nushell" then ../home/shells/nushell.nix
-    else ../home/shells/fish.nix;
+  # Module discovery — the directory tree under ../home/ is the registry.
+  # `homeModules.shells.fish` resolves to ../home/shells/fish.nix, and a
+  # new shell module appears here automatically the moment its file is
+  # created. Adding/removing modules touches no central import list.
+  homeModules = (import ../lib/discover.nix { inherit lib; }).discoverDir ../home;
 
-  terminalModule =
-    if pillars.terminal == "kitty"     then ../home/terminals/kitty.nix
-    else if pillars.terminal == "wezterm"   then ../home/terminals/wezterm.nix
-    else if pillars.terminal == "alacritty" then ../home/terminals/alacritty.nix
-    else ../home/terminals/ghostty.nix;
-
-  multiplexerModule =
-    if pillars.multiplexer == "tmux" then ../home/multiplexers/tmux.nix
-    else if pillars.multiplexer == "zellij" then ../home/multiplexers/zellij.nix
-    else null;  # "none" — no multiplexer module imported.
+  # Pillar resolution — defensive `or` falls through to a sane default
+  # rather than throwing on an unrecognized state value. Validation
+  # lives in the CLI (state.Validate); this is the second line of defense.
+  shellModule       = homeModules.shells.${pillars.shell}        or homeModules.shells.fish;
+  terminalModule    = homeModules.terminals.${pillars.terminal}  or homeModules.terminals.ghostty;
+  multiplexerModule = homeModules.multiplexers.${pillars.multiplexer} or null;
 in {
   imports =
-    [ ../home/foundation.nix shellModule terminalModule ]
+    [ homeModules.foundation shellModule terminalModule ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
-    ++ lib.optional (caps.editor or true) ../home/editor.nix
-    ++ lib.optional (caps.git    or true) ../home/git.nix;
+    ++ lib.optional (caps.editor or true) homeModules.editor
+    ++ lib.optional (caps.git    or true) homeModules.git;
 
   home.username      = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;

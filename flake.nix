@@ -3,67 +3,81 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # Per-tool aggressive pin. Modules whose upstream cycles faster than
+    # `nixos-unstable`'s hydra gating opt into this via `pkgsPins.edge`.
+    # See docs/maintenance.md for the divergence log; this pin collapses
+    # back to `nixpkgs` when no module depends on it for ≥ 90 days.
+    nixpkgs-edge.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+
     devenv.url = "github:cachix/devenv";
-    # devenv's treefmt module (current versions) sources the formatter
-    # set from treefmt-nix and refuses to evaluate without it. Pin and
-    # follow nixpkgs so gofumpt/nixpkgs-fmt stay on the same hash as
-    # the rest of the dev shell.
+
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, devenv, treefmt-nix, home-manager, ... } @ inputs:
+  outputs = inputs@{ self, nixpkgs, nixpkgs-edge, flake-parts, devenv, home-manager, ... }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
 
-      mkHome = system: home-manager.lib.homeManagerConfiguration {
+      # Single source of truth for the per-system Home Manager configuration.
+      # Used by both `homeConfigurations` (for `home-manager switch --flake`)
+      # and `packages.homeActivation` (for `moon run dotfiles:deploy`); the
+      # two outputs differ only in shape (config object vs activation drv),
+      # so factor here and avoid re-declaring extraSpecialArgs twice.
+      mkHome = system:
+        let pkgs = nixpkgs.legacyPackages.${system};
+        in home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          modules = [ ./modules/profiles/home.nix ];
+          extraSpecialArgs = {
+            inherit inputs system;
+            # Modules pull from `pkgsPins.<name>` when they need a different
+            # nixpkgs hash than the default. Adding a key here is the only
+            # supported way to introduce a per-tool pin — modules don't reach
+            # into inputs directly. Keeps the pin set discoverable in one
+            # place and keeps the maintenance log honest.
+            pkgsPins = {
+              edge = nixpkgs-edge.legacyPackages.${system};
+            };
+          };
+        };
+    in
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      inherit systems;
+
+      perSystem = { system, ... }: let
         pkgs = nixpkgs.legacyPackages.${system};
-        modules = [ ./modules/profiles/home.nix ];
-        extraSpecialArgs = { inherit inputs system; };
-      };
-    in {
-      devShells = forAllSystems (system: {
-        # `devenv.root` override unblocks `nix develop` from a non-direnv
-        # session: devenv.lib.mkShell asserts a known project directory and,
-        # without it, fails with "devenv was not able to determine the current
-        # directory." Binding the root inline here is the upstream-recommended
-        # fix for flake users who don't want to require --no-pure-eval.
-        # Trade-off: the flake becomes non-portable across machines (the path
-        # is baked into the eval), which is fine for a personal dotfiles repo
-        # but would matter for a published flake. Reference:
-        # https://devenv.sh/guides/using-with-flakes/
-        default = devenv.lib.mkShell {
-          inherit inputs;
-          pkgs = nixpkgs.legacyPackages.${system};
+      in {
+        devShells.default = devenv.lib.mkShell {
+          inherit inputs pkgs;
           modules = [
+            # Bind the project directory so `nix develop` works from a
+            # non-direnv shell. https://devenv.sh/guides/using-with-flakes/
             { devenv.root = builtins.toString ./.; }
             ./devenv.nix
           ];
         };
-      });
 
-      # Multi-system activation entrypoint. Moon invokes:
-      #   nix build --impure --accept-flake-config .#homeActivation
-      #   ./.result-home/activate
-      packages = forAllSystems (system: {
-        homeActivation = (mkHome system).activationPackage;
-        home-manager = home-manager.packages.${system}.default;
-      });
+        packages = {
+          homeActivation = (mkHome system).activationPackage;
+          home-manager = home-manager.packages.${system}.default;
+        };
 
-      # Each value must BE a homeConfiguration (carrying .activationPackage
+        formatter = pkgs.nixpkgs-fmt;
+      };
+
+      # Each value must BE a homeConfiguration (carrying `.activationPackage`
       # directly) — `nix flake check` walks this attrset and inspects each
-      # entry's .activationPackage.system. The previous shape nested under
-      # `<system>.default = …`, which left .activationPackage one level too
-      # deep and tripped the check. Keying by system gives:
+      # entry's `.activationPackage.system`. Keying by system gives:
       #   home-manager switch --flake .#aarch64-darwin
-      # while Moon's deploy keeps using packages.${system}.homeActivation.
-      homeConfigurations = nixpkgs.lib.genAttrs systems mkHome;
-
-      formatter = forAllSystems (system:
-        nixpkgs.legacyPackages.${system}.nixpkgs-fmt
-      );
+      # while Moon's deploy uses packages.${system}.homeActivation.
+      flake.homeConfigurations = nixpkgs.lib.genAttrs systems mkHome;
     };
 }
