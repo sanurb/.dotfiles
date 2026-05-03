@@ -94,8 +94,9 @@ func runDoctorCmd(rest []string) int {
 	// non-flag arg — `dots doctor --json` would silently drop the flag.
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	jsonOut := fs.Bool("json", false, "emit machine-readable JSON")
+	binaryOnly := fs.Bool("binary-only", false, "skip persona checks (CI mode — Home Manager activation not assumed)")
 	_ = fs.Parse(rest)
-	return runDoctor(*jsonOut)
+	return runDoctor(*jsonOut, *binaryOnly)
 }
 
 func main() {
@@ -180,7 +181,9 @@ Usage:
   dots scan                  Detect brownfield collisions in $HOME (non-interactive)
   dots backup                Move colliding files into ~/.dots_backups/<ts> (gum-confirmed)
   dots deploy                moon run modules:deploy (no wizard)
-  dots doctor [--json]       Validate every pinned runtime + LSP
+  dots doctor [--json] [--binary-only]
+                             Validate runtimes, LSPs, formatters; persona
+                             unless --binary-only (CI mode)
   dots version               Print binary version, commit, build date
 
 install/version/help run anywhere. The remaining subcommands realize the
@@ -188,6 +191,7 @@ workspace and require a clone of the dotfiles repo + Nix on PATH; outside
 a workspace they exit with an actionable message and code 2.
 
 Non-interactive automation: prefer moon directly (moon run modules:deploy).
-The deploy task is gated on cli:check, which runs the doctor — drift fails
-the deploy.
+Moon task split: cli:check runs 'dots doctor --binary-only' as a CI gate;
+cli:doctor runs the full doctor and gates modules:deploy. Drift in either
+fails its respective pipeline.
 `

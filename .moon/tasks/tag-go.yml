@@ -1,12 +1,8 @@
 $schema: "https://moonrepo.dev/schemas/tasks.json"
 
-# Inputs span /libs/**/*.go so a future libs/<pkg> change invalidates
-# the cache for every Go-tagged consumer (apps/cli, apps/lsp, …). See
-# docs/libs.md for the >=2-consumer discipline that gates libs/ growth.
 fileGroups:
   go-sources:
     - "**/*.go"
-    - "/libs/**/*.go"
 
 tasks:
   tidy:

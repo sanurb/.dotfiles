@@ -112,19 +112,33 @@ var (
 )
 
 // runDoctor is the canonical workspace-health gate, invoked by:
-//   - `dots doctor`         (interactive, lipgloss-styled)
-//   - `dots doctor --json`  (machine-readable, used in CI/agents)
-//   - `moon run cli:check`  (deploy-time gate; exit code is the contract)
-func runDoctor(jsonOut bool) int {
+//   - `dots doctor`               (interactive, lipgloss-styled)
+//   - `dots doctor --json`        (machine-readable, used in CI/agents)
+//   - `dots doctor --binary-only` (skips persona checks; CI mode — fresh
+//     hosts where Home Manager has not yet
+//     activated should still pass)
+//   - `moon run cli:check`        (CI gate — invokes --binary-only)
+//   - `moon run cli:doctor`       (deploy gate — full check, gates
+//     modules:deploy)
+func runDoctor(jsonOut, binaryOnly bool) int {
 	report := Report{}
 
+	// Binary-health checks: no Home Manager activation assumed. These
+	// are the only checks that should run in CI on a fresh runner.
 	report.appendAll(checkCore())
 	report.appendAll(checkNh())
 	report.appendAll(checkNom())
 	report.appendAll(checkRuntimes())
 	report.appendAll(checkLSPs())
 	report.appendAll(checkFormatting())
-	report.appendAll(checkPersona())
+
+	// Persona checks probe the realized environment (atuin, zoxide,
+	// starship, .dots-state.toml, pillar binaries). They REQUIRE that
+	// `dots deploy` has run on this host; without that, every fresh
+	// CI runner fails forever. Skipped under --binary-only.
+	if !binaryOnly {
+		report.appendAll(checkPersona())
+	}
 
 	for _, c := range report.Checks {
 		switch c.Severity {

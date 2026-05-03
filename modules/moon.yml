@@ -18,8 +18,9 @@ tasks:
     options:
       runFromWorkspaceRoot: true
 
-  # Hard gate: cli:check (the Go doctor) must pass before activation —
-  # the enforcement clause of "Declare, Don't Script."
+  # Hard gate: cli:doctor (full host probe — persona + binaries) must
+  # pass before activation. The lighter cli:check is for CI; deploys
+  # mutate $HOME and earn the heavier check.
   #
   # Flake-ref shape: pass the configuration name via `-c <name> .`, NOT
   # `.#homeConfigurations.<name>`. The latter short-circuits nh's
@@ -45,7 +46,7 @@ tasks:
         exec nh home switch -c "${sys}" . -- \
           --impure --accept-flake-config
     deps:
-      - "cli:check"
+      - "cli:doctor"
     local: true
     options:
       cache: false

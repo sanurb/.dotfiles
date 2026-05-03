@@ -104,3 +104,12 @@ project relates to it.
   — describes the dendritic / modular flake-parts approach.
 - [Dendrix](https://dendrix.oeiuwq.com/Dendritic.html) — 
   framework articulation of the same approach.
+
+## Deferred decisions
+
+- **`selection.toml` LSP.** Discussed and deferred. `selection.toml`
+  is machine-written by the TUI; users are directed to `dots install`
+  as the canonical input path. No documented user story for hand-editing
+  exists. Revisit only if a real user reports needing editor support;
+  do not pre-build `libs/`, `apps/lsp`, or schema-extraction
+  scaffolding speculatively.

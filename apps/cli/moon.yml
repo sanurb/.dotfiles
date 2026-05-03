@@ -25,15 +25,30 @@ tasks:
     options:
       cache: false
 
-  # Workspace health gate — built binary runs the doctor against the
-  # declared toolchain. NOT `local: true`: this is a CI gate AND the
-  # deploy precondition (modules:deploy depends on it).
+  # CI gate — binary health only. `--binary-only` skips persona checks
+  # (atuin/zoxide/starship/state file) which require an activated Home
+  # Manager. CI runs on fresh hosts; without the split, this gate fails
+  # forever on every new runner.
   check:
+    command: "./bin/dots doctor --binary-only"
+    deps:
+      - "~:build"
+    inputs:
+      - "/.prototools"
+      - "/devenv.nix"
+    options:
+      cache: false
+
+  # Deploy gate — full doctor including persona. `local: true` keeps it
+  # out of `moon ci` because it asserts host realization, not binary
+  # health. modules:deploy depends on this task, not on cli:check.
+  doctor:
     command: "./bin/dots doctor"
     deps:
       - "~:build"
     inputs:
       - "/.prototools"
       - "/devenv.nix"
+    local: true
     options:
       cache: false

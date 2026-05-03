@@ -6,7 +6,6 @@ $schema: "https://moonrepo.dev/schemas/workspace.json"
 projects:
   globs:
     - "apps/*"
-    - "libs/*"
     - "modules"
   sources:
     root: "."

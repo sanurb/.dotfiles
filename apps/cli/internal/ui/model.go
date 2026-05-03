@@ -317,7 +317,7 @@ func (m *Model) welcomeForm() *huh.Form {
 		"  • capture your shell / terminal / multiplexer persona",
 		"  • detect colliding paths under $HOME",
 		"  • offer to snapshot them into ~/.dots_backups/<ts>",
-		"  • run " + MoonRunDeploy + " (gated by cli:check)",
+		"  • run " + MoonRunDeploy + " (gated by cli:doctor)",
 	}, "\n")
 	if m.mode == ModeSync {
 		title = "dots sync"
