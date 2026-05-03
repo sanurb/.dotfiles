@@ -44,6 +44,22 @@ type Capabilities struct {
 	Git    bool
 }
 
+// Extras flattens Capabilities into the slice form the huh multiselect
+// widget expects. Keep the encoding ("editor", "git") aligned with
+// CapabilityOptions in internal/ui/deps.go — both forms (the wizard's
+// capabilitiesForm and the standalone install path) round-trip through
+// these strings.
+func (c Capabilities) Extras() []string {
+	out := []string{}
+	if c.Editor {
+		out = append(out, "editor")
+	}
+	if c.Git {
+		out = append(out, "git")
+	}
+	return out
+}
+
 // Allowed values per pillar — the TUI offers exactly these and the doctor
 // rejects anything outside the set. Foundation tools (atuin, zoxide,
 // starship) are intentionally absent: they are not user choices.

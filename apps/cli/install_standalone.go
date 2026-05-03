@@ -12,18 +12,10 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 )
 
-// runStandaloneInstall is the workspace-free install path. It runs the
-// pillar/capabilities form and writes state to the user-config dir —
-// no scan, no snapshot, no realize, since none of those are meaningful
-// without the flake. The full wizard's adapters and step machine are
-// untouched: this lives entirely in the main package and re-uses the
-// already-public Option lists from internal/ui (no port changes).
-//
-// Trade-off: a second use site for the pillar form definition. If a
-// pillar option set changes, both the wizard's capabilitiesForm and
-// this function need updating. The Option lists themselves (the
-// content) live in one place — internal/ui/deps.go — so the only
-// duplication is the four huh widgets below.
+// runStandaloneInstall captures a profile to ~/.config/dots/ when no
+// workspace is reachable. Skips scan/snapshot/realize since those need
+// the flake. Reuses ui.HuhOptions and Capabilities.Extras() so the
+// form here and the wizard's capabilitiesForm stay aligned.
 func runStandaloneInstall() int {
 	path, err := userConfigStatePath()
 	if err != nil {
@@ -35,23 +27,25 @@ func runStandaloneInstall() int {
 	formShell := initial.Pillars.Shell
 	formTerminal := initial.Pillars.Terminal
 	formMultiplexer := initial.Pillars.Multiplexer
-	formExtras := extrasFromState(initial.Capabilities)
+	formExtras := initial.Capabilities.Extras()
 
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().Title("Shell").
-				Options(huhOptions(ui.ShellOptions)...).Value(&formShell),
+				Options(ui.HuhOptions(ui.ShellOptions, 0)...).Value(&formShell),
 			huh.NewSelect[string]().Title("Terminal").
-				Options(huhOptions(ui.TerminalOptions)...).Value(&formTerminal),
+				Options(ui.HuhOptions(ui.TerminalOptions, 0)...).Value(&formTerminal),
 			huh.NewSelect[string]().Title("Multiplexer").
-				Options(huhOptions(ui.MultiplexerOptions)...).Value(&formMultiplexer),
+				Options(ui.HuhOptions(ui.MultiplexerOptions, 0)...).Value(&formMultiplexer),
 			huh.NewMultiSelect[string]().Title("Capabilities").
-				Options(huhOptions(ui.CapabilityOptions)...).Value(&formExtras),
+				Options(ui.HuhOptions(ui.CapabilityOptions, 0)...).Value(&formExtras),
 		),
 	).WithTheme(huh.ThemeCharm()).WithShowHelp(false)
 
 	if err := form.Run(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
+			// 130 = 128 + SIGINT, matching shell convention for Ctrl+C —
+			// also what ui.Run returns for stepAborted.
 			return 130
 		}
 		fmt.Fprintln(os.Stderr, "install:", err)
@@ -79,10 +73,9 @@ func runStandaloneInstall() int {
 }
 
 // userConfigStatePath is the standalone-install state location. Same
-// FileName as the workspace-resident copy so home.nix reading either
-// path sees the same schema, but kept under XDG_CONFIG_HOME (or its
-// fallback) so a user without the workspace has a writable home for
-// the profile.
+// FileName as the workspace-resident copy so the schema is identical,
+// just kept under XDG_CONFIG_HOME so a user without the workspace has
+// a writable home for the profile.
 func userConfigStatePath() (string, error) {
 	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
 		return filepath.Join(v, "dots", state.FileName), nil
@@ -94,32 +87,9 @@ func userConfigStatePath() (string, error) {
 	return filepath.Join(home, ".config", "dots", state.FileName), nil
 }
 
-// loadStandaloneInitial pre-seeds the form from the user-config copy if
-// one exists. Missing / unparseable file → defaults; never an error,
-// because the user's path forward is filling in the form anyway.
 func loadStandaloneInitial(path string) state.State {
-	s, _, err := state.Load(path)
-	if err != nil {
-		return state.Default()
+	if s, _, err := state.Load(path); err == nil {
+		return s
 	}
-	return s
-}
-
-func extrasFromState(c state.Capabilities) []string {
-	out := []string{}
-	if c.Editor {
-		out = append(out, "editor")
-	}
-	if c.Git {
-		out = append(out, "git")
-	}
-	return out
-}
-
-func huhOptions(opts []ui.Option) []huh.Option[string] {
-	out := make([]huh.Option[string], len(opts))
-	for i, o := range opts {
-		out[i] = huh.NewOption(fmt.Sprintf("%s — %s", o.Label, o.Description), o.Value)
-	}
-	return out
+	return state.Default()
 }

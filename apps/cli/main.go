@@ -34,79 +34,68 @@ const (
 	nixInstaller = "https://determinate.systems/nix-installer"
 )
 
-// command pairs a handler with its workspace requirement. The product
-// has two distribution stories: the TUI/version/help layer that runs
-// anywhere (a Homebrew-shippable binary), and the realization layer
-// (deploy/doctor/sync/scan/backup) that consumes the flake at the
-// workspace root and is meaningless outside it. The dispatcher uses
-// requiresWorkspace to gate the second category with an actionable
-// message instead of letting subcommand internals fail opaquely.
+// command pairs a handler with the dispatcher's workspace contract.
+// requiresWorkspace=true makes the gate fire with workspaceRequiredMessage
+// before the handler runs; the handler can assume workspace.Root() succeeds.
 type command struct {
 	requiresWorkspace bool
 	run               func(rest []string) int
 }
 
-func commands() map[string]command {
-	return map[string]command{
-		"install": {requiresWorkspace: false, run: func([]string) int {
-			// Two-mode install: inside a workspace, the full wizard
-			// (form → scan → snapshot → realize). Outside, a thin
-			// form-only path that writes the profile to the user-config
-			// dir and stops there — none of scan/snapshot/realize are
-			// meaningful without the flake. The wizard's adapters and
-			// step machine are unchanged; the standalone path lives
-			// entirely in this package.
-			if _, err := workspace.Root(); err != nil {
-				code := runStandaloneInstall()
-				if code == 0 {
-					printInstallNextSteps()
-				}
-				return code
-			}
-			deps, err := newWizardDeps()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "install:", err)
-				return 1
-			}
-			code := ui.Run(ui.ModeInstall, deps)
-			if code == 0 {
-				printInstallNextSteps()
-			}
-			return code
-		}},
-		"sync": {requiresWorkspace: true, run: func([]string) int {
-			// Reconcile .git/hooks with .moon/workspace.yml's `vcs.hooks`
-			// before the activation phase. A brownfield sync is the most
-			// likely entry point for a tree whose hooks predate the Moon
-			// migration (or were stomped by another tool); running the
-			// sync here means the next commit/push goes through the
-			// canonical `moon run` gates rather than a stale shim. Errors
-			// are non-fatal — see syncMoonHooksSilent for the rationale.
-			syncMoonHooksSilent()
-			// Gate already verified workspace presence; newWizardDeps
-			// cannot fail here. Surface any unexpected error rather
-			// than panic — defense in depth against a future change
-			// that lets workspace.Root() fail post-gate.
-			deps, err := newWizardDeps()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "sync:", err)
-				return 1
-			}
-			return ui.Run(ui.ModeSync, deps)
-		}},
-		"scan":   {requiresWorkspace: true, run: func([]string) int { return runScan() }},
-		"backup": {requiresWorkspace: true, run: func([]string) int { return runBackup(false) }},
-		"deploy": {requiresWorkspace: true, run: func([]string) int { return runDeploy() }},
-		"doctor": {requiresWorkspace: true, run: func(rest []string) int {
-			// Per-subcommand flag set: top-level flag.Parse() stops at the
-			// first non-flag arg, so `dots doctor --json` was silently
-			// dropping the flag. Local FlagSet captures it correctly.
-			fs := flag.NewFlagSet("doctor", flag.ExitOnError)
-			jsonOut := fs.Bool("json", false, "emit machine-readable JSON")
-			_ = fs.Parse(rest)
-			return runDoctor(*jsonOut)
-		}},
+var commands = map[string]command{
+	"install": {requiresWorkspace: false, run: runInstall},
+	"sync":    {requiresWorkspace: true, run: runSync},
+	"scan":    {requiresWorkspace: true, run: func([]string) int { return runScan() }},
+	"backup":  {requiresWorkspace: true, run: func([]string) int { return runBackup(false) }},
+	"deploy":  {requiresWorkspace: true, run: func([]string) int { return runDeploy() }},
+	"doctor":  {requiresWorkspace: true, run: runDoctorCmd},
+}
+
+func runInstall([]string) int {
+	// Two-mode install: inside a workspace, the full wizard (form →
+	// scan → snapshot → realize). Outside, a form-only path that
+	// writes the profile to the user-config dir and stops there.
+	if _, err := workspace.Root(); err != nil {
+		code := runStandaloneInstall()
+		if code == 0 {
+			printInstallNextSteps()
+		}
+		return code
 	}
+	deps, err := newWizardDeps()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "install:", err)
+		return 1
+	}
+	code := ui.Run(ui.ModeInstall, deps)
+	if code == 0 {
+		printInstallNextSteps()
+	}
+	return code
+}
+
+func runSync([]string) int {
+	// Reconcile .git/hooks with .moon/workspace.yml's `vcs.hooks` before
+	// the activation phase — a brownfield sync is the most likely entry
+	// point for a tree whose hooks predate the Moon migration.
+	syncMoonHooksSilent()
+	// Gate verified workspace presence; defense in depth in case a
+	// future change lets workspace.Root() fail post-gate.
+	deps, err := newWizardDeps()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "sync:", err)
+		return 1
+	}
+	return ui.Run(ui.ModeSync, deps)
+}
+
+func runDoctorCmd(rest []string) int {
+	// Local FlagSet because top-level flag.Parse stops at the first
+	// non-flag arg — `dots doctor --json` would silently drop the flag.
+	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+	jsonOut := fs.Bool("json", false, "emit machine-readable JSON")
+	_ = fs.Parse(rest)
+	return runDoctor(*jsonOut)
 }
 
 func main() {
@@ -129,7 +118,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	c, ok := commands()[name]
+	c, ok := commands[name]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", name, usage)
 		os.Exit(2)

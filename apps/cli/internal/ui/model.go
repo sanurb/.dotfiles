@@ -95,7 +95,7 @@ func New(mode Mode, deps Deps) *Model {
 		formShell:       initial.Pillars.Shell,
 		formTerminal:    initial.Pillars.Terminal,
 		formMultiplexer: initial.Pillars.Multiplexer,
-		formExtras:      extrasFromCapabilities(initial.Capabilities),
+		formExtras:      initial.Capabilities.Extras(),
 	}
 	m.transition(stepWelcome)
 	return m
@@ -350,27 +350,27 @@ func (m *Model) capabilitiesForm() *huh.Form {
 			huh.NewSelect[string]().
 				Title("Shell").
 				Description("One shell defines the persona. Atuin, Zoxide, and Starship are baked in regardless.").
-				Options(toHuhOptions(ShellOptions, 22)...).
+				Options(HuhOptions(ShellOptions, 22)...).
 				Value(&m.formShell),
 		),
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Terminal Emulator").
-				Options(toHuhOptions(TerminalOptions, 22)...).
+				Options(HuhOptions(TerminalOptions, 22)...).
 				Value(&m.formTerminal),
 		),
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Multiplexer").
 				Description("Pick one, or 'None' to skip.").
-				Options(toHuhOptions(MultiplexerOptions, 22)...).
+				Options(HuhOptions(MultiplexerOptions, 22)...).
 				Value(&m.formMultiplexer),
 		),
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
 				Title("Optional capabilities").
 				Description("Toggleable extras. Editor and Git are independent of the persona pillars.").
-				Options(toHuhOptions(CapabilityOptions, 14)...).
+				Options(HuhOptions(CapabilityOptions, 14)...).
 				Value(&m.formExtras),
 		),
 	).WithTheme(huh.ThemeCharm())
@@ -499,22 +499,16 @@ func (m Model) renderFailed() string {
 
 // -- helpers --------------------------------------------------------
 
-func toHuhOptions(opts []Option, labelWidth int) []huh.Option[string] {
+// HuhOptions renders Option labels for a huh select/multiselect.
+// labelWidth left-pads the label so the " — description" column lines
+// up across rows; pass 0 to skip padding (single-form, narrow layout).
+// Exported so the standalone install path in apps/cli/main can reuse
+// the same formatting as the wizard's capabilitiesForm.
+func HuhOptions(opts []Option, labelWidth int) []huh.Option[string] {
 	out := make([]huh.Option[string], len(opts))
 	for i, o := range opts {
 		label := fmt.Sprintf("%-*s — %s", labelWidth, o.Label, o.Description)
 		out[i] = huh.NewOption(label, o.Value)
-	}
-	return out
-}
-
-func extrasFromCapabilities(c state.Capabilities) []string {
-	out := []string{}
-	if c.Editor {
-		out = append(out, "editor")
-	}
-	if c.Git {
-		out = append(out, "git")
 	}
 	return out
 }

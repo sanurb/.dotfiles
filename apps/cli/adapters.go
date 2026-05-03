@@ -162,31 +162,25 @@ func (p tomlPersister) snapshotPriorState(statePath string) error {
 	return nil
 }
 
-// loadInitialState reads the existing persona at startup so the wizard
-// can pre-seed the radio forms. Resolution order:
-//
-//  1. workspace-resident <root>/.dots-state.toml (the canonical copy
-//     home.nix consumes via builtins.fromTOML).
-//  2. user-config copy at ~/.config/dots/.dots-state.toml (written by
-//     the standalone install path before the user had a workspace).
-//  3. state.Default() — opinionated defaults.
-//
-// The fallback preserves a user's selections across the standalone →
-// workspace transition: run `dots install` once on a Mac without the
-// flake, clone the repo later, run `dots install` inside it, and the
-// pillar form starts pre-seeded with the prior choices instead of a
-// blank slate. A parse error at either location is non-fatal — the
-// wizard is precisely how a user fixes a malformed file.
+// loadInitialState pre-seeds the wizard's pillar form. Resolution order:
+// workspace-resident state → user-config state (carried forward from a
+// prior standalone install) → state.Default(). A parse error is
+// non-fatal because the wizard is how a user fixes a malformed file.
 func loadInitialState(workspaceRoot string) state.State {
-	if s, found, err := state.Load(state.Path(workspaceRoot)); err == nil && found {
-		return s
-	} else if err != nil {
+	s, found, err := state.Load(state.Path(workspaceRoot))
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "warning: ignoring unreadable workspace state file:", err)
 	}
-	if path, err := userConfigStatePath(); err == nil {
-		if s, found, err := state.Load(path); err == nil && found {
-			return s
-		}
+	if found {
+		return s
+	}
+
+	path, err := userConfigStatePath()
+	if err != nil {
+		return state.Default()
+	}
+	if s, found, _ := state.Load(path); found {
+		return s
 	}
 	return state.Default()
 }

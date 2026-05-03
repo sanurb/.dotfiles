@@ -12,14 +12,31 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
-// Root walks up from the current working directory looking for the
-// `.prototools` marker. MOON_WORKSPACE_ROOT short-circuits the walk
-// when Moon already knows the answer (its tasks set this in their
-// subprocess env). Returns an error when no workspace is reachable —
-// callers decide whether to gate, fall back, or surface to the user.
+// Root resolves the workspace root and caches the result for the
+// process lifetime. The dispatcher gate, the install handler's
+// standalone-vs-wizard branch, the next-step message, and several
+// doctor checks all want the same answer; without caching, a single
+// `dots install` would walk the directory tree four or five times.
+//
+// MOON_WORKSPACE_ROOT short-circuits the walk when Moon already knows
+// the answer (its tasks set this in their subprocess env). An error
+// from Getwd is also cached — if cwd is unreadable once it is going
+// to be unreadable for the rest of this process.
 func Root() (string, error) {
+	once.Do(func() { cachedRoot, cachedErr = computeRoot() })
+	return cachedRoot, cachedErr
+}
+
+var (
+	once       sync.Once
+	cachedRoot string
+	cachedErr  error
+)
+
+func computeRoot() (string, error) {
 	if v := os.Getenv("MOON_WORKSPACE_ROOT"); v != "" {
 		return v, nil
 	}
