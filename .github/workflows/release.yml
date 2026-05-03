@@ -6,9 +6,10 @@ on:
       - "v*"
 
 permissions:
-  contents: write   # create the GitHub Release
-  id-token: write   # cosign keyless OIDC
-  packages: write   # future-proof if we publish containers
+  contents: write       # create the GitHub Release
+  id-token: write       # cosign keyless OIDC + SLSA provenance OIDC
+  packages: write       # future-proof if we publish containers
+  attestations: write   # actions/attest-build-provenance
 
 jobs:
   goreleaser:
@@ -60,3 +61,23 @@ jobs:
           # GITHUB_TOKEN cannot push to a separate repo, so this must be
           # configured before the first tagged release.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      # SLSA build provenance. Pairs cosign's blob signatures (proves
+      # *we* signed the artifact) with attestation claims about the
+      # build itself (which workflow ran, which commit it built from,
+      # the runner's identity). Stored at
+      # https://github.com/sanurb/.dotfiles/attestations and verifiable
+      # via `gh attestation verify <archive> --owner sanurb`.
+      #
+      # Subject paths cover everything GoReleaser drops in dist/ that
+      # users actually download — archives, the SHA256SUMS file, and
+      # the SBOMs. Signatures and certificates from cosign are
+      # intentionally excluded; attesting them is meaningless because
+      # they're already cryptographic statements about the archives.
+      - name: Generate build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+            dist/*.sbom.json
