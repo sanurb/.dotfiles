@@ -86,7 +86,7 @@ func (f fsSnapshotter) Snapshot(cs []ui.Collision) (ui.SnapshotResult, error) {
 }
 
 // moonRealizer implements ui.Realizer by shelling out to
-// `moon run dotfiles:deploy`, capturing stdout/stderr to a buffer so
+// `moon run modules:deploy`, capturing stdout/stderr to a buffer so
 // the TUI is not corrupted by interleaved deploy logs. On failure, the
 // captured output is folded into the error.
 //
@@ -97,7 +97,7 @@ type moonRealizer struct{}
 
 func (moonRealizer) Realize() (ui.RealizationResult, error) {
 	started := time.Now()
-	cmd := exec.Command("moon", "run", "dotfiles:deploy")
+	cmd := exec.Command("moon", "run", "modules:deploy")
 	cmd.Stdout = io.Discard
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -107,7 +107,7 @@ func (moonRealizer) Realize() (ui.RealizationResult, error) {
 		if len(tail) > 1000 {
 			tail = tail[len(tail)-1000:]
 		}
-		return ui.RealizationResult{}, fmt.Errorf("moon run dotfiles:deploy: %w\n%s", err, tail)
+		return ui.RealizationResult{}, fmt.Errorf("moon run modules:deploy: %w\n%s", err, tail)
 	}
 	return ui.RealizationResult{DurationMs: time.Since(started).Milliseconds()}, nil
 }

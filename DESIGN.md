@@ -79,7 +79,7 @@ typography:
     lipgloss: { bold: true, foreground: status.error }
   command-echo:
     lipgloss: { foreground: text.muted }
-    role: shows the actual command being run (e.g., "moon run dotfiles:deploy")
+    role: shows the actual command being run (e.g., "moon run modules:deploy")
 
 components:
   panel:
@@ -159,7 +159,7 @@ components:
     gradient: [accent.primary, status.success]
     width: min(60, terminal_width - 10)
     show_percentage: false
-    role: estimated-time progress for moon run dotfiles:deploy
+    role: estimated-time progress for moon run modules:deploy
 ---
 
 # DESIGN.md — dots
@@ -170,14 +170,14 @@ components:
 + Moon + Proto monorepo whose CLI **declares**, never scripts. The TUI is the
 human face of that contract: a wizard that captures persona pillars (shell /
 terminal / multiplexer), surfaces brownfield collisions, snapshots them, and
-hands realization to `moon run dotfiles:deploy`. Doctor hard-gates deploy.
+hands realization to `moon run modules:deploy`. Doctor hard-gates deploy.
 
 Visual identity follows from that posture:
 
 - **Calm and decisive.** A single panel at a time. One focal accent. The user
   is never asked to compare two equally weighted colors on the same screen.
 - **Honest about what it's doing.** Every long step echoes the underlying
-  command in muted text (`moon run dotfiles:deploy`). The TUI is a thin,
+  command in muted text (`moon run modules:deploy`). The TUI is a thin,
   legible shell over the declarative pipeline, not a replacement for it.
 - **Latency-budgeted.** Progress is shown when work crosses the
   perceptible-delay threshold (~250 ms tick); short work shows nothing. We do
@@ -342,7 +342,7 @@ screen claim primacy, neither feels primary.
 
 **Do echo the underlying command in `command-echo`** during long steps.
 The TUI is a face on a declarative pipeline; hiding `moon run
-dotfiles:deploy` makes the system feel magical and untrustable.
+modules:deploy` makes the system feel magical and untrustable.
 
 **Do degrade gracefully under `NO_COLOR` and 8-color terminals.** Every
 hex token has a `ansi256` fallback in the YAML; if a renderer drops to

@@ -44,7 +44,7 @@
 
       # Single source of truth for the per-system Home Manager configuration.
       # Used by both `homeConfigurations` (for `home-manager switch --flake`)
-      # and `packages.homeActivation` (for `moon run dotfiles:deploy`); the
+      # and `packages.homeActivation` (for `moon run modules:deploy`); the
       # two outputs differ only in shape (config object vs activation drv),
       # so factor here and avoid re-declaring extraSpecialArgs twice.
       mkHome = system:

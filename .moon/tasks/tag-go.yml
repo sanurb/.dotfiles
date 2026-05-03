@@ -1,0 +1,62 @@
+$schema: "https://moonrepo.dev/schemas/tasks.json"
+
+# Tasks inherited by every project tagged `go`.
+#
+# Justified under the ≥2-consumer rule: apps/cli (current) plus
+# apps/lsp (imminent — see libs/README.md). A single-consumer
+# inheritance file would be premature abstraction.
+#
+# Inputs span the workspace-root /libs/**/*.go so a future change in
+# libs/schema invalidates the cache for *every* Go-tagged project that
+# imports it — apps/cli AND apps/lsp. Project-local **/*.go is the
+# per-project diff layered on top; project-local go.mod / go.sum are
+# the per-module identifiers.
+
+fileGroups:
+  go-sources:
+    - "**/*.go"
+    - "/libs/**/*.go"
+
+tasks:
+  tidy:
+    command: "go mod tidy"
+    inputs:
+      - "go.mod"
+      - "go.sum"
+    options:
+      cache: false
+
+  lint:
+    command: "go vet ./..."
+    inputs:
+      - "@globs(go-sources)"
+      - "go.mod"
+      - "go.sum"
+    outputs: []
+
+  test:
+    command: "go test ./..."
+    inputs:
+      - "@globs(go-sources)"
+      - "go.mod"
+      - "go.sum"
+    outputs: []
+
+  # `bash -c` so `-ldflags='-s -w'` survives as a single shell-quoted
+  # token. Moon argv-splits naked YAML args on whitespace, which would
+  # hand `-w` to `go build` as a stray flag.
+  #
+  # Binary name defaults to the project directory's basename (cli, lsp,
+  # ...). Projects whose binary name differs from the directory (apps/cli
+  # ships as `dots`) override `args` and `outputs` in their moon.yml.
+  build:
+    command: "bash"
+    args:
+      - "-c"
+      - 'go build -trimpath -ldflags="-s -w" -o "bin/$(basename "$PWD")" .'
+    inputs:
+      - "@globs(go-sources)"
+      - "go.mod"
+      - "go.sum"
+    outputs:
+      - "bin/*"

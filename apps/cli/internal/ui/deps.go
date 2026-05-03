@@ -47,7 +47,7 @@ type Snapshotter interface {
 }
 
 // Realizer materializes the declared environment by invoking
-// `moon run dotfiles:deploy`. The state file at the workspace root is
+// `moon run modules:deploy`. The state file at the workspace root is
 // the input — this layer does not pass capabilities, env vars, or any
 // other config carrier (DOTS_CAPS is dead). The implementation is
 // responsible for not corrupting the TUI: capture stdout/stderr to a

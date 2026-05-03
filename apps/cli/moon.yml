@@ -1,54 +1,40 @@
 $schema: "https://moonrepo.dev/schemas/project.json"
 
+# Per "Orthogonality" (AGENTS.md): this project knows nothing about Nix
+# or Home Manager. It compiles, tests, and runs as a self-contained Go
+# binary. At runtime it shells out to `moon run modules:*` — that is the
+# only coupling, and it is one-way.
+#
+# `tags: [go]` pulls in tidy / lint / test / build from
+# .moon/tasks/tag-go.yml. Only project-specific tasks (`run`, `check`)
+# and project-specific overrides (binary name `dots`, not `cli`) live
+# here.
+#
+# `platform:` is intentionally absent — see comment in /moon.yml.
 type: application
 language: go
-platform: system
+tags:
+  - go
 
 project:
   name: cli
   description: "dots — interactive workspace frontend."
 
-# Per "Orthogonality": this project knows nothing about Nix or Home
-# Manager. It compiles, tests, and runs as a self-contained Go binary.
-# At runtime it shells out to `moon run dotfiles:*` — that is the only
-# coupling, and it is one-way.
 tasks:
-  tidy:
-    command: "go mod tidy"
-    inputs:
-      - "go.mod"
-      - "go.sum"
-    options:
-      cache: false
-
-  # Wrapped in `bash -c` so the `-ldflags='-s -w'` argument survives as a
-  # single shell-quoted token. Moon argv-splits naked YAML args on
-  # whitespace, which would hand `-w` to go build as a stray flag.
+  # Inherited build → bin/cli. We ship as `dots`, so override args and
+  # outputs. Both lists must use `replace` semantics: Moon's default
+  # merge for args/outputs is `append`, which would yield `bash -c <inh>
+  # -c <override>` (bash treats the second -c as $0 and bombs) and
+  # `outputs: [bin/*, bin/dots]` (harmless but noisy in graphs).
   build:
-    command: "bash"
     args:
       - "-c"
       - "go build -trimpath -ldflags='-s -w' -o bin/dots ."
-    inputs:
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
     outputs:
       - "bin/dots"
-
-  test:
-    command: "go test ./..."
-    inputs:
-      - "**/*.go"
-
-  # NOTE: per-project `fmt` is intentionally absent. Formatting is
-  # owned by the workspace-root `root:fmt` task (treefmt → gofumpt +
-  # nixpkgs-fmt) so there is exactly one verdict on style. Run
-  # `moon run root:fmt` from anywhere in the tree.
-  lint:
-    command: "go vet ./..."
-    inputs:
-      - "**/*.go"
+    options:
+      mergeArgs: "replace"
+      mergeOutputs: "replace"
 
   run:
     command: "go run ."
@@ -57,9 +43,12 @@ tasks:
       cache: false
 
   # Workspace health gate. Builds the binary, then runs `dots doctor`
-  # against .prototools + the declarative LSP set. Exit code is the deploy
-  # contract: drift here fails the entire pipeline. SOP: "Declare, Don't
-  # Script."
+  # against .prototools + the declarative LSP set. Exit code is the
+  # deploy contract: drift here fails the entire pipeline. SOP:
+  # "Declare, Don't Script."
+  #
+  # NOT marked `local: true` — this is a CI gate (`moon ci` must run
+  # it) AND the deploy precondition (modules:deploy depends on it).
   check:
     command: "./bin/dots doctor"
     deps:
@@ -70,3 +59,8 @@ tasks:
       - "/devenv.nix"
     options:
       cache: false
+
+  # NOTE: per-project `fmt` is intentionally absent. Formatting is owned
+  # by the workspace-root `root:fmt` task (treefmt → gofumpt +
+  # nixpkgs-fmt) so there is exactly one verdict on style. Run
+  # `moon run root:fmt` from anywhere in the tree.

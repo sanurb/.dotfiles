@@ -1,10 +1,10 @@
 $schema: "https://moonrepo.dev/schemas/tasks.json"
 
-# Inherited tasks shared across every project. Per-project moon.yml
-# files override or extend these.
+# Workspace-wide fileGroups. Keep this minimal — over-broad groups
+# (e.g. `sources: ["**/*"]`) invite whole-repo re-hashing.
+# Project-shape file groups belong in .moon/tasks/tag-*.yml; per-project
+# file groups belong in moon.yml.
 fileGroups:
-  sources:
-    - "**/*"
   configs:
     - "*.yml"
     - "*.yaml"

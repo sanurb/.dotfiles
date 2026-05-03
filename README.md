@@ -3,7 +3,7 @@
 Interactive frontend for a Nix-managed personal environment. The Go binary is
 the user-facing layer; Moon + Nix + Home Manager are the deterministic
 backend. `dots` never mutates `~/` directly — it scans, prompts, and delegates
-to `moon run dotfiles:<task>`.
+to `moon run modules:<task>`.
 
 ## Installation
 
@@ -79,7 +79,7 @@ direnv allow   # one-time
 # everything below works inside the shell that direnv just activated
 moon run cli:check
 moon run cli:test
-moon run dotfiles:deploy
+moon run modules:deploy
 ```
 
 See `DESIGN.md` for the architecture and `devenv.nix` for the declared

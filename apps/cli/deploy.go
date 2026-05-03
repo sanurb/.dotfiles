@@ -33,7 +33,7 @@ func syncMoonHooksSilent() {
 // (ui.Run with ModeInstall/ModeSync) is the user-facing path; this
 // function exists for `dots deploy` and CI.
 func runDeploy() int {
-	return run("moon", "run", "dotfiles:deploy")
+	return run("moon", "run", "modules:deploy")
 }
 
 func run(name string, args ...string) int {

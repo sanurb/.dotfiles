@@ -2,7 +2,7 @@
 # Brownfield-safe backup of pre-existing dotfiles. Quarantines real
 # files/dirs that would collide with home-manager-managed symlinks,
 # leaving existing symlinks (prior home-manager activations) untouched.
-# Invoked by `moon run dotfiles:backup`.
+# Invoked by `moon run modules:backup`.
 
 set -euo pipefail
 

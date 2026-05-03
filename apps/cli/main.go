@@ -1,7 +1,7 @@
 // dots — interactive frontend for the Nix-managed environment.
 // The Go binary is the user-facing layer; Moon + Nix are the deterministic
 // backend. The CLI never mutates ~/ directly: it scans, prompts, and
-// delegates to `moon run dotfiles:<task>`.
+// delegates to `moon run modules:<task>`.
 package main
 
 import (
@@ -179,7 +179,7 @@ Usage:
   dots sync                  Brownfield-safe wizard: conflicts → deploy
   dots scan                  Detect brownfield collisions in $HOME (non-interactive)
   dots backup                Move colliding files into ~/.dots_backups/<ts> (gum-confirmed)
-  dots deploy                moon run dotfiles:deploy (no wizard)
+  dots deploy                moon run modules:deploy (no wizard)
   dots doctor [--json]       Validate every pinned runtime + LSP
   dots version               Print binary version, commit, build date
 
@@ -187,7 +187,7 @@ install/version/help run anywhere. The remaining subcommands realize the
 workspace and require a clone of the dotfiles repo + Nix on PATH; outside
 a workspace they exit with an actionable message and code 2.
 
-Non-interactive automation: prefer moon directly (moon run dotfiles:deploy).
+Non-interactive automation: prefer moon directly (moon run modules:deploy).
 The deploy task is gated on cli:check, which runs the doctor — drift fails
 the deploy.
 `
