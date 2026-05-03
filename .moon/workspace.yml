@@ -1,18 +1,8 @@
 $schema: "https://moonrepo.dev/schemas/workspace.json"
 
-# Glob-based project discovery. Adding a new app or lib is `mkdir
-# apps/<name> && touch apps/<name>/moon.yml` — no edit to this file.
-# Each project is hashed independently, so a Ghostty color change
-# does not invalidate the Go binary cache.
-#
-# `root` is anchored at "." via the explicit `sources` map so monorepo-
-# spanning tasks (treefmt orchestration) hash a single key over every
-# formattable file — incremental cache invalidates exactly when something
-# formattable actually changed.
-#
-# Workspace-level concerns (toolchain validation, repo-wide checks)
-# live as code in apps/cli's doctor command — see SOP "Declare, Don't
-# Script". Imperative shell installers are forbidden.
+# Glob-based discovery. Onboarding a project = mkdir + moon.yml; no
+# edit here. Projects hash independently — a Ghostty color change does
+# not invalidate the Go binary cache.
 projects:
   globs:
     - "apps/*"
@@ -24,31 +14,18 @@ projects:
 vcs:
   manager: "git"
   defaultBranch: "main"
-  # Toolchain Collapse: git hooks are Moon tasks, not a separate Nix
-  # plugin and not a separate hook manager. Moon writes
-  # .git/hooks/{pre-commit,pre-push} from the entries below; both shell
-  # out to `moon run` so the verdict goes through the same content-hash
-  # cache as a regular task invocation. `--affected --status=staged`
-  # filters the task graph to projects whose declared inputs intersect
-  # the staged set — unchanged projects are a no-op cache hit, not a
-  # re-run.
+  # Hooks are Moon tasks. Both shell out to `moon run`, so the verdict
+  # uses the same content-hash cache as a regular task. `--affected
+  # --status=staged` filters to projects whose declared inputs intersect
+  # the staged set — unchanged projects are a cache hit, not a re-run.
   hooks:
     pre-commit:
-      # `root:fmt` is `treefmt --fail-on-change` over **/*.go + **/*.nix.
-      # Drift exits non-zero, aborting the commit; a clean staged tree
-      # short-circuits via Moon's hash cache.
       - "moon run root:fmt --affected --status=staged"
     pre-push:
-      # Tag selectors gate Go projects only. A future modules:lint
-      # (e.g. statix on .nix files) does NOT silently join the Go gate.
-      # Adding a new Go-tagged project automatically extends coverage —
-      # that is the inheritance payoff.
-      - "moon run '#go:lint' --affected"
-      - "moon run '#go:test' --affected"
-  # `dots sync` calls `moon sync hooks` explicitly; flipping this on
-  # makes any `moon run` also reconcile .git/hooks back to the spec
-  # above, so a fresh clone or a hand-edited hook self-heals on the
-  # next task invocation. Declarative, not advisory.
+      # One invocation, two tag selectors: Moon parallelizes targets
+      # within a single run, saving the second startup + project-graph
+      # hydration. A future modules:lint won't be picked up by `#go:*`.
+      - "moon run '#go:lint' '#go:test' --affected"
   syncHooks: true
 
 runner:

@@ -40,6 +40,14 @@ type RealizationResult struct {
 	DurationMs int64
 }
 
+// MoonDeployTask is the Moon target invoked by `dots deploy` and echoed
+// to the user during the wizard. Single source of truth: a project-ID
+// rename touches one line, not nine.
+const MoonDeployTask = "modules:deploy"
+
+// MoonRunDeploy is the rendered command-echo per DESIGN.md.
+const MoonRunDeploy = "moon run " + MoonDeployTask
+
 // Snapshotter takes "Safe Snapshots" — quarantines colliding paths.
 type Snapshotter interface {
 	Scan() ([]Collision, error)

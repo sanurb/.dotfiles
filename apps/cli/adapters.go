@@ -85,10 +85,10 @@ func (f fsSnapshotter) Snapshot(cs []ui.Collision) (ui.SnapshotResult, error) {
 	return ui.SnapshotResult{Count: len(cs), Path: dest}, nil
 }
 
-// moonRealizer implements ui.Realizer by shelling out to
-// `moon run modules:deploy`, capturing stdout/stderr to a buffer so
-// the TUI is not corrupted by interleaved deploy logs. On failure, the
-// captured output is folded into the error.
+// moonRealizer implements ui.Realizer by shelling out to the Moon
+// deploy task, capturing stdout/stderr to a buffer so the TUI is not
+// corrupted by interleaved deploy logs. On failure, the captured
+// output is folded into the error.
 //
 // DOTS_CAPS is dead. The realizer no longer carries any persona config:
 // the .dots-state.toml file at the workspace root is the input, read by
@@ -97,7 +97,7 @@ type moonRealizer struct{}
 
 func (moonRealizer) Realize() (ui.RealizationResult, error) {
 	started := time.Now()
-	cmd := exec.Command("moon", "run", "modules:deploy")
+	cmd := exec.Command("moon", "run", ui.MoonDeployTask)
 	cmd.Stdout = io.Discard
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -107,7 +107,7 @@ func (moonRealizer) Realize() (ui.RealizationResult, error) {
 		if len(tail) > 1000 {
 			tail = tail[len(tail)-1000:]
 		}
-		return ui.RealizationResult{}, fmt.Errorf("moon run modules:deploy: %w\n%s", err, tail)
+		return ui.RealizationResult{}, fmt.Errorf("%s: %w\n%s", ui.MoonRunDeploy, err, tail)
 	}
 	return ui.RealizationResult{DurationMs: time.Since(started).Milliseconds()}, nil
 }

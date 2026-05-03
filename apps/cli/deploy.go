@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+
+	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 )
 
 // syncMoonHooksSilent reconciles .git/hooks/{pre-commit,pre-push}
@@ -33,7 +35,7 @@ func syncMoonHooksSilent() {
 // (ui.Run with ModeInstall/ModeSync) is the user-facing path; this
 // function exists for `dots deploy` and CI.
 func runDeploy() int {
-	return run("moon", "run", "modules:deploy")
+	return run("moon", "run", ui.MoonDeployTask)
 }
 
 func run(name string, args ...string) int {

@@ -1,15 +1,5 @@
 $schema: "https://moonrepo.dev/schemas/project.json"
 
-# Home Manager projection. The Go CLI in apps/cli is the interactive
-# frontend; the tasks below are the cacheable, deterministic backend
-# that Moon (and CI) drive.
-#
-# Project ID is `modules` — matches the directory name (Honesty:
-# priority #1 in AGENTS.md). It was previously aliased as `dotfiles` in
-# the workspace map; the alias was a legacy hangover and has been
-# removed alongside the switch to glob-based discovery.
-#
-# `platform:` is intentionally absent — see comment in /moon.yml.
 type: configuration
 language: bash
 
@@ -32,25 +22,19 @@ tasks:
   # the enforcement clause of "Declare, Don't Script."
   #
   # Flake-ref shape: pass the configuration name via `-c <name> .`, NOT
-  # a full attribute path. `.#homeConfigurations.<name>` short-circuits
-  # nh's resolver and skips the `.config.home.activationPackage` suffix,
-  # so `nix build` ends up resolving the homeManagerConfiguration record
-  # (a set) and trips the flake schema check on `homeConfigurations.
-  # <name>.type`. The `-c` form goes through the auto-detect path which
-  # DOES append the suffix. flake.nix keys homeConfigurations by
-  # <system>; we resolve it at deploy time via `nix eval --impure`.
+  # `.#homeConfigurations.<name>`. The latter short-circuits nh's
+  # resolver and skips the `.config.home.activationPackage` suffix, so
+  # `nix build` resolves the homeManagerConfiguration record (a set)
+  # and trips the flake schema check on `homeConfigurations.<name>.type`.
+  # The `-c` form goes through auto-detect, which appends the suffix.
+  # flake.nix keys homeConfigurations by <system>; we resolve at deploy
+  # time via `nix eval --impure`.
   #
   # `--impure --accept-flake-config` forwards to `nix build` via nh's
   # `--` passthrough so home.nix can read MOON_WORKSPACE_ROOT and the
   # .dots-state.toml outside the flake source filter.
   # NH_SHOW_ACTIVATION_LOGS=1 keeps activation diagnostics visible
   # (nh >=4.3.0 hides them by default).
-  #
-  # Literal block scalar (|-): folded (>-) silently mutates under YAML
-  # reformatters that don't preserve fold semantics.
-  #
-  # `local: true` keeps deploy out of `moon ci` — it mutates $HOME and
-  # would be catastrophic in a CI environment.
   deploy:
     command: "bash"
     args:
@@ -67,8 +51,6 @@ tasks:
       cache: false
       runFromWorkspaceRoot: true
 
-  # Project-relative — backup is dotfiles-specific (collisions in $HOME
-  # are about Home Manager's projection surface, not the toolchain).
   backup:
     command: "bash scripts/backup.sh"
     inputs:
@@ -76,11 +58,6 @@ tasks:
     local: true
     options:
       cache: false
-
-  # Removed: `fmt` (was `nix fmt`). Workspace-root `root:fmt` is the
-  # canonical formatter entrypoint — running treefmt twice (once via
-  # `nix fmt`, once directly) produced two cache entries with two
-  # potentially divergent verdicts. Single source of truth wins.
 
   update:
     command: "nix flake update"

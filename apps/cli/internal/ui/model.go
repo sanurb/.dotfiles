@@ -193,7 +193,7 @@ func (m Model) View() string {
 			"",
 			m.progress.View(),
 			"",
-			styMuted.Render("moon run modules:deploy"),
+			styMuted.Render(MoonRunDeploy),
 		}, "\n"))
 	case stepDone:
 		return styPanel.Render(m.renderDone())
@@ -317,7 +317,7 @@ func (m *Model) welcomeForm() *huh.Form {
 		"  • capture your shell / terminal / multiplexer persona",
 		"  • detect colliding paths under $HOME",
 		"  • offer to snapshot them into ~/.dots_backups/<ts>",
-		"  • run moon run modules:deploy (gated by cli:check)",
+		"  • run " + MoonRunDeploy + " (gated by cli:check)",
 	}, "\n")
 	if m.mode == ModeSync {
 		title = "dots sync"
@@ -495,7 +495,7 @@ func (m Model) renderDone() string {
 		fmt.Sprintf("  %s deploy  %s %s",
 			styBadgeOK,
 			styMuted.Render("→"),
-			styBody.Render(fmt.Sprintf("moon run modules:deploy in %.1fs", float64(m.realizeResult.DurationMs)/1000.0))),
+			styBody.Render(fmt.Sprintf("%s in %.1fs", MoonRunDeploy, float64(m.realizeResult.DurationMs)/1000.0))),
 		"",
 		styMuted.Render("Open a new shell to pick up changes."),
 	)

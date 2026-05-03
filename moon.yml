@@ -1,14 +1,8 @@
 $schema: "https://moonrepo.dev/schemas/project.json"
 
-# Workspace-root project. Owns tasks that span every other project —
-# anything that walks the entire tree (treefmt, repo-wide gates) lives
-# here, because the inputs cross project boundaries and a per-project
-# task would either over- or under-hash.
-#
-# `platform:` is intentionally absent. Under Moon v2's toolchain plugin
-# model, platform is inferred from the registered language toolchains;
-# none are registered (Proto owns Go via .prototools — see
-# .moon/toolchain.yml), so it defaults to `system`.
+# Workspace-root project. Owns tasks whose inputs cross project
+# boundaries (treefmt, repo-wide gates) — anchored at "." so a single
+# hash key covers every formattable file.
 type: tool
 language: bash
 
@@ -17,18 +11,9 @@ project:
   description: "Workspace-root tasks (formatting, repo-wide gates)."
 
 tasks:
-  # Canonical formatter entrypoint. The treefmt binary is the wrapper
-  # built by devenv.nix's treefmt module — gofumpt for apps/cli Go
-  # sources, nixpkgs-fmt for every .nix file. `--fail-on-change` flips
-  # the exit code on drift, so this task is also the lint-clean
-  # assertion used by CI and `dots doctor`. Running it through Moon
-  # means the verdict is cached against the hash of every input below —
-  # re-running on an unchanged tree is a no-op cache hit, not a
-  # re-format.
-  #
-  # This is the *only* fmt task in the repo. modules/moon.yml previously
-  # shipped a duplicate `fmt` (running `nix fmt`); two cache entries for
-  # the same formatter was a Honesty violation and has been removed.
+  # Canonical formatter — treefmt wraps gofumpt (Go) + nixpkgs-fmt (Nix)
+  # via devenv.nix. `--fail-on-change` makes this both formatter and
+  # lint-clean assertion; CI and `dots doctor` consume the exit code.
   fmt:
     command: "treefmt"
     args:
@@ -39,6 +24,4 @@ tasks:
       - "/devenv.nix"
       - "/flake.nix"
     options:
-      # Treefmt's own cache lives under .devenv/state; Moon's content
-      # hash is the authoritative dedupe layer above it.
       cache: true
