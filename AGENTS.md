@@ -2,10 +2,9 @@
 
 ## Task Completion Requirements
 
-- `nix develop -c nix flake check`, `nix develop -c go build ./...`, and `nix develop -c go test ./...` must all pass before considering tasks completed.
-- NEVER work around `nix develop` failing. If `nix develop -c` does not work in the current state of the repo, that is itself a finding to surface — do not substitute a different invocation (`nix shell nixpkgs#go -c`, raw host Go, devenv, etc.). The canonical entry point is the canonical entry point.
-- NEVER hand-edit `flake.lock`. Use `nix flake update` (full) or `nix flake update <input>` (single input).
-- NEVER hand-edit generated files (Cobra command stubs, Bubbletea snapshots, formatter output). Regenerate via the documented mechanism.
+- All of `nix develop -c nix flake check`, `nix develop -c go build ./...`, and `nix develop -c go test ./...` must pass before considering tasks completed.
+- NEVER work around `nix develop` failing — surface it as a finding and fix the shell first. The canonical entry point is the canonical entry point.
+- NEVER hand-edit generated files (`flake.lock`, Cobra stubs, `teatest` snapshots, formatter output). Regenerate via `nix flake update`, `go generate ./...`, `go test -update`, or `nix fmt`.
 
 ## Project Snapshot
 
@@ -59,13 +58,6 @@ The reason scope discipline matters even when maintainability is a priority: a s
 ## Package Roles
 
 - `apps/cli` — the `dots` Go binary. Cobra-based CLI, Bubbletea TUI for `dots install`. Workspace-optional subcommands (TUI, version, help) run anywhere. Workspace-required subcommands (deploy, doctor, sync, scan, backup) check for workspace presence and exit with an actionable message if absent.
-- `apps/cli/internal/state` — `selection.toml` schema, validation, IO. The Go-side authority on the schema. Schema parity with Nix is enforced via `flake.checks`.
-- `apps/cli/internal/tui` — Bubbletea wizard. Visual contract lives in `DESIGN.md` at repo root.
-- `apps/cli/internal/workspace` — workspace detection and the workspace-required gate. Single source of truth for "am I in a workspace?"
-- `modules/` — the realization layer, sibling to `apps/`. The two-component split (Go binary in `apps/cli`, Nix modules in `modules/`) is enforced by location, not just by convention.
-- `modules/home/` — Home Manager modules, one per dimension of the selection (terminal, shell, multiplexer, editor). Modules are orthogonal: a shell module does not know about the terminal. Cross-cutting concerns live in `modules/home/theme/`.
-- `modules/darwin/` — nix-darwin modules for macOS system-level configuration (defaults, dock, services). Nothing a user could do without sudo belongs here.
-- `flake.nix` — pins all inputs, exposes `homeConfigurations`, `darwinConfigurations`, `devShells`, `checks`, `formatter`. The single source of toolchain truth for the dotfiles environment.
 
 ## Tooling Lanes
 
