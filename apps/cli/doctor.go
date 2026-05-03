@@ -349,7 +349,7 @@ func readPrototools() (map[string]string, error) {
 // this is the verifier that the contract was honored. Three sections:
 //
 //   - Foundation: atuin / zoxide / starship are mandatory infrastructure.
-//     Their absence means modules/foundation.nix didn't activate, which
+//     Their absence means modules/home/foundation.nix didn't activate, which
 //     is a hard fail.
 //
 //   - State file: missing/unparseable file warns rather than fails so
@@ -367,7 +367,7 @@ func checkPersona() []Check {
 	for _, bin := range []string{"atuin", "zoxide", "starship"} {
 		c := Check{
 			Name: bin, Category: cat, Required: true,
-			Detail: "foundation — modules/foundation.nix",
+			Detail: "foundation — modules/home/foundation.nix",
 		}
 		if path, err := exec.LookPath(bin); err != nil {
 			c.Severity = SevFail

@@ -42,26 +42,26 @@ let
   # default rather than throwing during eval. Validation lives in the
   # CLI (state.Validate); this is the second line of defense.
   shellModule =
-    if pillars.shell == "zsh"     then ./modules/shells/zsh.nix
-    else if pillars.shell == "nushell" then ./modules/shells/nushell.nix
-    else ./modules/shells/fish.nix;
+    if pillars.shell == "zsh"     then ../../modules/home/shells/zsh.nix
+    else if pillars.shell == "nushell" then ../../modules/home/shells/nushell.nix
+    else ../../modules/home/shells/fish.nix;
 
   terminalModule =
-    if pillars.terminal == "kitty"     then ./modules/terminals/kitty.nix
-    else if pillars.terminal == "wezterm"   then ./modules/terminals/wezterm.nix
-    else if pillars.terminal == "alacritty" then ./modules/terminals/alacritty.nix
-    else ./modules/terminals/ghostty.nix;
+    if pillars.terminal == "kitty"     then ../../modules/home/terminals/kitty.nix
+    else if pillars.terminal == "wezterm"   then ../../modules/home/terminals/wezterm.nix
+    else if pillars.terminal == "alacritty" then ../../modules/home/terminals/alacritty.nix
+    else ../../modules/home/terminals/ghostty.nix;
 
   multiplexerModule =
-    if pillars.multiplexer == "tmux" then ./modules/multiplexers/tmux.nix
-    else if pillars.multiplexer == "zellij" then ./modules/multiplexers/zellij.nix
+    if pillars.multiplexer == "tmux" then ../../modules/home/multiplexers/tmux.nix
+    else if pillars.multiplexer == "zellij" then ../../modules/home/multiplexers/zellij.nix
     else null;  # "none" — no multiplexer module imported.
 in {
   imports =
-    [ ./modules/foundation.nix shellModule terminalModule ]
+    [ ../../modules/home/foundation.nix shellModule terminalModule ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
-    ++ lib.optional (caps.editor or true) ./modules/editor.nix
-    ++ lib.optional (caps.git    or true) ./modules/git.nix;
+    ++ lib.optional (caps.editor or true) ../../modules/home/editor.nix
+    ++ lib.optional (caps.git    or true) ../../modules/home/git.nix;
 
   home.username      = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;

@@ -207,7 +207,7 @@ func emit(w io.Writer, s State) error {
 # This file is the single source of truth for the environment's persona:
 # shell, terminal, multiplexer. home.nix reads it via builtins.fromTOML.
 # Mandatory infrastructure (atuin, zoxide, starship) is not represented
-# here — those are non-negotiable and live in modules/foundation.nix.
+# here — those are non-negotiable and live in modules/home/foundation.nix.
 
 schema_version = %d
 

@@ -44,7 +44,7 @@
   # programs.starship.enableZshIntegration = false so Powerlevel10k owns
   # the prompt — starship still ships its config but doesn't bind.
   programs.starship.enable = true;
-  xdg.configFile."starship.toml".source = ../assets/starship.toml;
+  xdg.configFile."starship.toml".source = ./assets/starship.toml;
 
   # direnv + fzf live here because they're persona-agnostic baseline
   # ergonomics, the same way the previous home.nix kept them at the top.

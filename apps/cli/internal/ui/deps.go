@@ -91,7 +91,7 @@ type Option struct {
 
 // ShellOptions / TerminalOptions / MultiplexerOptions / CapabilityOptions —
 // the closed sets the TUI offers. Adding a new option here without a
-// matching nix module under modules/{shells,terminals,multiplexers}/ is
+// matching nix module under modules/home/{shells,terminals,multiplexers}/ is
 // a code smell — home.nix may silently fall through to a default.
 var (
 	ShellOptions = []Option{
