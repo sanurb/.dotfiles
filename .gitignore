@@ -29,6 +29,9 @@ dist/
 # .dots-state.toml.example documents the schema; the live file is local.
 .dots-state.toml
 
+# Claude Code (per-session state, hooks, transcripts)
+.claude/
+
 # OS
 .DS_Store
 

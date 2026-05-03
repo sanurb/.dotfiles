@@ -21,15 +21,27 @@
 
       mkHome = system: home-manager.lib.homeManagerConfiguration {
         pkgs = nixpkgs.legacyPackages.${system};
-        modules = [ ./apps/dotfiles/home.nix ];
+        modules = [ ./modules/profiles/home.nix ];
         extraSpecialArgs = { inherit inputs system; };
       };
     in {
       devShells = forAllSystems (system: {
+        # `devenv.root` override unblocks `nix develop` from a non-direnv
+        # session: devenv.lib.mkShell asserts a known project directory and,
+        # without it, fails with "devenv was not able to determine the current
+        # directory." Binding the root inline here is the upstream-recommended
+        # fix for flake users who don't want to require --no-pure-eval.
+        # Trade-off: the flake becomes non-portable across machines (the path
+        # is baked into the eval), which is fine for a personal dotfiles repo
+        # but would matter for a published flake. Reference:
+        # https://devenv.sh/guides/using-with-flakes/
         default = devenv.lib.mkShell {
           inherit inputs;
           pkgs = nixpkgs.legacyPackages.${system};
-          modules = [ ./devenv.nix ];
+          modules = [
+            { devenv.root = builtins.toString ./.; }
+            ./devenv.nix
+          ];
         };
       });
 
