@@ -20,36 +20,47 @@ brew install sanurb/tap/dots
 dots install
 ```
 
-Walks you through the wizard and writes the profile to disk. Realization
-(`dots deploy`) needs Nix and the workspace; without those, the TUI is
-still a valid way to see what a profile looks like. Continue with Path 2
-or 3 when you're ready to apply it.
+Outside a workspace, `dots install` runs in standalone mode: it walks
+the wizard and writes `~/.config/dots/selection.toml`, then prints next
+steps. Realization (`dots deploy`) needs Nix and the workspace; without
+those, the TUI is still a valid way to capture a profile. Continue with
+Path 2 or 3 when you're ready to apply it.
 
 ### Path 2 — Full install (recommended)
 
 ```sh
 brew install sanurb/tap/dots
-dots install                                # configure profile via TUI
+dots install                                # captures profile via TUI
 # Install Nix if you don't have it: https://determinate.systems/nix-installer
 git clone https://github.com/sanurb/.dotfiles ~/.dotfiles
 cd ~/.dotfiles
-dots deploy                                 # realize the profile
+nix develop -c dots deploy                  # realize the profile
 ```
 
-The Homebrew binary handles the interactive bits; the clone + Nix handle
-realization. Re-run `dots deploy` after editing your profile or pulling
-upstream changes.
+`dots deploy` shells out to Moon, which is provisioned by the dev
+shell. The `nix develop -c` prefix enters that shell for the single
+command. For the canonical UX (auto-activated shell on `cd` into the
+repo), install [direnv][] (`brew install direnv`, hook it into your
+shell, then `direnv allow`); after that, `dots deploy` works without
+the prefix.
 
-### Path 3 — Nix-native (no Homebrew)
+Re-run `dots deploy` after editing your profile or pulling upstream
+changes.
+
+### Path 3 — Curl-install (no Homebrew)
 
 ```sh
-# Requires Nix installed already.
-nix run github:sanurb/.dotfiles -- install
-nix run github:sanurb/.dotfiles -- deploy
+curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh | sh
 ```
 
-Builds `dots` from source against the Nix store. Useful on hosts without
-Homebrew or where you want one fewer package manager in the loop.
+Drops the binary at `~/.local/bin/dots` (override with `INSTALL_DIR=`).
+The fetcher is POSIX `sh`, always verifies SHA-256 against the
+published `SHA256SUMS`, and verifies the cosign signature when
+`cosign` is on `$PATH`. Manual fetch + verify is documented in
+[RELEASING.md](./RELEASING.md#verifying-a-downloaded-release).
+
+This delivers only the binary. Realization is the same as Path 2 —
+clone, enter the dev shell, `dots deploy`.
 
 ### Prerequisites
 
@@ -57,9 +68,10 @@ Homebrew or where you want one fewer package manager in the loop.
 |-------------|:------:|:------:|:------:|
 | Homebrew    | ✓      | ✓      |        |
 | Nix         |        | ✓      | ✓      |
-| Repo clone  |        | ✓      |        |
+| Repo clone  |        | ✓      | ✓      |
 
-Nix installer: https://determinate.systems/nix-installer.
+Nix is required for `dots deploy` regardless of how the binary
+arrived. Nix installer: https://determinate.systems/nix-installer.
 
 ## Verifying a release
 
@@ -85,4 +97,5 @@ moon run modules:deploy
 See `DESIGN.md` for the architecture and `devenv.nix` for the declared
 toolchain.
 
+[direnv]: https://direnv.net/
 [tap]: https://github.com/sanurb/homebrew-tap
