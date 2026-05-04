@@ -21,6 +21,7 @@ func TestApply(t *testing.T) {
 		want := []string{
 			"home", "switch",
 			"--show-activation-logs",
+			"--backup-extension", "backup",
 			"-c", expectedNixSystem(), ".",
 			"--", "--impure", "--accept-flake-config",
 		}

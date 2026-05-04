@@ -341,8 +341,23 @@ func snapshotConflicts(rels []string) error {
 // source of truth — runHomeActivation execs it; emitActivationCommand
 // prints it. Drift between the two would mean --print-command lies
 // about what apply actually runs.
+//
+// `--backup-extension backup` is the structural brownfield safety
+// net: any $HOME path Home Manager wants to symlink that already
+// exists as a regular file is renamed to `<file>.backup` instead of
+// aborting the activation script. The dots scan/snapshot flow
+// (apps/cli/scan.go) is the user-visible "Honesty" surface for
+// known-tracked paths; this flag is the catch-all for everything
+// else (e.g., `.profile`, future hm-session-vars files), so an
+// activation never fails opaquely on a path the tracked-list missed.
 func activationArgs(sys string) []string {
-	return []string{"home", "switch", "--show-activation-logs", "-c", sys, ".", "--", "--impure", "--accept-flake-config"}
+	return []string{
+		"home", "switch",
+		"--show-activation-logs",
+		"--backup-extension", "backup",
+		"-c", sys, ".",
+		"--", "--impure", "--accept-flake-config",
+	}
 }
 
 // emitActivationCommand handles `dots apply --print-command`. Prints
@@ -411,6 +426,7 @@ func runHomeActivation(profile string) int {
 	}
 	if code, ok := nix.IsExit(runErr); ok {
 		fmt.Fprintf(os.Stderr, "apply: `nh home switch -c %s .` exited %d\n", sys, code)
+		renderActivationHints(os.Stderr)
 		return code
 	}
 	fmt.Fprintln(os.Stderr, "apply: nh exec failed:")
@@ -418,6 +434,21 @@ func runHomeActivation(profile string) int {
 	fmt.Fprintf(os.Stderr, "  why:  %v\n", runErr)
 	fmt.Fprintln(os.Stderr, "  next: run `dots doctor` to diagnose the toolchain")
 	return exitcode.Failure
+}
+
+// renderActivationHints writes the common-failure-mode pointers to w
+// when nh has exited non-zero. nh's own log usually shows the cause
+// when --show-activation-logs is honored; this block exists for the
+// case where the activation script aborts BEFORE nh starts streaming
+// (e.g., HM's checkNewGenCollision exits 1 before any user-visible
+// activation log fires). Keep these short and actionable.
+func renderActivationHints(w io.Writer) {
+	fmt.Fprintln(w, "  hints:")
+	fmt.Fprintln(w, "    • $HOME collision: a regular file existed where HM wanted a symlink.")
+	fmt.Fprintln(w, "      Look for *.backup files; HM auto-renamed conflicts. `dots scan` lists known paths.")
+	fmt.Fprintln(w, "    • macOS App Management TCC: System Settings → Privacy & Security → App Management.")
+	fmt.Fprintln(w, "      HM activation needs this when touching system-managed apps.")
+	fmt.Fprintln(w, "    • Toolchain: run `dots doctor` to validate nh, nix, and dev-shell tooling.")
 }
 
 // renderPreflightFailures writes the apply-specific framing around a

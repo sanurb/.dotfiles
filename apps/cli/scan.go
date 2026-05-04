@@ -74,12 +74,17 @@ func runScan() int {
 		return 1
 	}
 	if len(cs) == 0 {
-		fmt.Println("✓ No brownfield collisions. Safe to deploy.")
+		fmt.Println("✓ No brownfield collisions on tracked paths. Safe to deploy.")
+		fmt.Println("  Untracked HM-managed paths fall back to home-manager's --backup-extension")
+		fmt.Println("  (renamed `<file>.backup` next to the original) so activation never aborts.")
 		return 0
 	}
 	fmt.Printf("Found %d collision(s):\n", len(cs))
 	for _, c := range cs {
 		fmt.Printf("  • [%s] %s\n", c.kind, c.rel)
 	}
+	fmt.Println()
+	fmt.Println("Run `dots backup` to quarantine these to ~/.dots_backups/<ts>/, or")
+	fmt.Println("`dots apply` (snapshots them automatically as a plan step).")
 	return 0
 }
