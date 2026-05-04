@@ -36,5 +36,13 @@ if [ -z "$sys" ]; then
   exit 1
 fi
 
-exec nh home switch -c "$sys" . -- \
+# --show-activation-logs is the FLAG form of NH_SHOW_ACTIVATION_LOGS=1.
+# Both are set: the env var covers nh's check before activation; the
+# flag ensures the home-manager activation script's stderr reaches the
+# user even if moon's env policy strips NH_-prefixed vars on the way
+# in. Without one of these, an activation failure surfaces as a bare
+# "Activation failed (exit status 1)" with the actual error message
+# from the activation-script swallowed by nh's progress UI.
+export NH_SHOW_ACTIVATION_LOGS=1
+exec nh home switch --show-activation-logs -c "$sys" . -- \
   --impure --accept-flake-config

@@ -17,9 +17,22 @@
       tree-sitter
     ];
 
+    # Disable remote-provider integrations. With any of withRuby /
+    # withPython3 / withNodeJs true, home-manager's neovim wrapper
+    # invokes `nvim --headless +UpdateRemotePlugins` during build,
+    # which `touch`es `$out/rplugin.vim`. On nixpkgs neovim 0.12.2
+    # that step runs after $out is sealed read-only and the build
+    # fails with "Permission denied". We do not currently use any
+    # remote plugins, so disabling these is both a fix and a
+    # principled "Declare, Don't Script" minimum-surface choice.
+    withNodeJs = false;
+    withPython3 = false;
+    withRuby = false;
+
     # Minimal base. Plugin orchestration is left to an in-tree
-    # lazy.nvim/nixvim layer if/when the user opts in.
-    extraLuaConfig = ''
+    # lazy.nvim/nixvim layer if/when the user opts in. The option
+    # name changed in home-manager: extraLuaConfig → initLua.
+    initLua = ''
       vim.opt.number = true
       vim.opt.relativenumber = true
       vim.opt.expandtab = true

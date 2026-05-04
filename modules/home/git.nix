@@ -5,10 +5,17 @@
   programs.git = {
     enable = true;
     package = pkgs.git;
-    userName = identity.name;
-    userEmail = identity.email;
 
-    extraConfig = {
+    # home-manager unified git configuration under programs.git.settings
+    # in 2026.x — userName / userEmail / extraConfig / aliases all moved
+    # under settings.{user.name,user.email,*,alias}. Eval emits warnings
+    # when the old names are still used; the deploy on the user's host
+    # surfaced six of them. Migrating to the new names silences eval and
+    # protects against the imminent removal of the deprecated aliases.
+    settings = {
+      user.name = identity.name;
+      user.email = identity.email;
+
       init.defaultBranch = "main";
       pull.rebase = true;
       push.autoSetupRemote = true;
@@ -17,13 +24,13 @@
       merge.conflictStyle = "zdiff3";
       core.fsmonitor = true;
       fetch.prune = true;
-    };
 
-    aliases = {
-      st = "status -sb";
-      lg = "log --oneline --graph --decorate --all";
-      co = "checkout";
-      cm = "commit -m";
+      alias = {
+        st = "status -sb";
+        lg = "log --oneline --graph --decorate --all";
+        co = "checkout";
+        cm = "commit -m";
+      };
     };
   };
 }
