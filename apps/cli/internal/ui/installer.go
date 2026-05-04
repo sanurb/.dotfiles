@@ -9,16 +9,10 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/tui/theme"
 )
 
-// Result is what Run returns to the dispatcher in main.go.
-//
-// Code maps onto the dots CLI exit-code convention: 0 on the user's
-// success path, 1 on a wizard-internal failure, 130 on user-aborted
-// (SIGINT-ish).
-//
-// RealizeRequested signals to main that the user picked "Yes" on the
-// post-confirm "Realize now?" prompt. main is responsible for invoking
-// `dots deploy` as a subprocess; the wizard never realizes the system
-// itself. See ADR-0009 for the rationale.
+// Result is what Run returns. Code follows the dots exit-code convention
+// (0 success, 1 internal failure, 130 user abort). RealizeRequested
+// signals "user opted in on the Realize-now prompt" — main.go invokes
+// `dots deploy` as a subprocess on that signal (ADR-0009).
 type Result struct {
 	Code             int
 	RealizeRequested bool

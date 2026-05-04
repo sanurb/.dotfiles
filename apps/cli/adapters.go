@@ -82,11 +82,6 @@ func (f fsSnapshotter) Snapshot(cs []ui.Collision) (ui.SnapshotResult, error) {
 	return ui.SnapshotResult{Count: len(cs), Path: dest}, nil
 }
 
-// Realization is no longer a wizard concern. The wizard signals
-// consent via ui.Result.RealizeRequested and exits; main re-invokes
-// `dots deploy` as a subprocess so nh's output renders against the
-// real terminal. ADR-0009 records the rationale.
-
 // tomlPersister snapshots the existing .dots-state.toml into the dots
 // backup directory before atomically writing the new one. It is the
 // only path by which the persona file should ever be mutated — direct

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/tui/components/screen"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/tui/theme"
 )
@@ -120,20 +121,8 @@ func pillarCopy(s stepID) (title, desc string) {
 
 func (m Model) confirmLayout() screen.Layout {
 	idx := stepperIndex(stepConfirm)
-	persona := fmt.Sprintf("%s · %s · %s",
-		m.state.Pillars.Shell, m.state.Pillars.Terminal, m.state.Pillars.Multiplexer)
-	caps := []string{}
-	if m.state.Capabilities.Editor {
-		caps = append(caps, "neovim")
-	}
-	if m.state.Capabilities.Git {
-		caps = append(caps, "git")
-	}
-	capsLine := "(none)"
-	if len(caps) > 0 {
-		capsLine = strings.Join(caps, ", ")
-	}
-	desc := fmt.Sprintf("persona: %s   capabilities: %s", persona, capsLine)
+	desc := fmt.Sprintf("persona: %s   capabilities: %s",
+		m.personaLine(), confirmCapabilities(m.state.Capabilities))
 
 	km := screen.DefaultKeymap(true)
 	km.SelectVerb = "confirm"
@@ -342,4 +331,22 @@ func realizePromptOptions() []wizardOption {
 		{Label: "Yes, run dots deploy now"},
 		{Label: "No, exit — I'll run dots deploy myself"},
 	}
+}
+
+// confirmCapabilities renders the capability list for stepConfirm's
+// description. Uses "neovim" rather than the renderDoneSummary "editor"
+// label because the Confirm screen is showing the user the *choice*
+// they made on stepEditor, where the label was "Neovim".
+func confirmCapabilities(c state.Capabilities) string {
+	var picks []string
+	if c.Editor {
+		picks = append(picks, "neovim")
+	}
+	if c.Git {
+		picks = append(picks, "git")
+	}
+	if len(picks) == 0 {
+		return "(none)"
+	}
+	return strings.Join(picks, ", ")
 }

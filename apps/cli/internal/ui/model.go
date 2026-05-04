@@ -66,10 +66,8 @@ type Model struct {
 	snapshotResult   SnapshotResult
 	realizeRequested bool
 
-	err error
-
-	width  int
-	height int
+	err   error
+	width int
 }
 
 // New returns a fully wired model ready for tea.NewProgram.
@@ -99,19 +97,16 @@ func New(mode Mode, deps Deps) *Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	switch m.step {
-	case stepScanning:
+	if m.step == stepScanning {
 		return tea.Batch(m.spinner.Tick, m.scanCmd())
-	default:
-		return m.spinner.Tick
 	}
+	return m.spinner.Tick
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.height = msg.Height
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -128,7 +123,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case scanCompleteMsg:
 		m.collisions = msg.collisions
 		if len(m.collisions) == 0 {
-			return m.afterSnapshotOrSkip()
+			return m.routeAfterScan()
 		}
 		return m.transition(stepConflict), nil
 
@@ -138,7 +133,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case snapshotCompleteMsg:
 		m.snapshotResult = SnapshotResult(msg)
-		return m.afterSnapshotOrSkip()
+		return m.routeAfterScan()
 
 	case snapshotFailedMsg:
 		m.err = msg.err
@@ -231,34 +226,31 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 
 	switch m.step {
 	case stepWelcome:
-		if m.cursor == 1 {
-			m.step = stepAborted
-			return m, tea.Quit
-		}
-		if m.mode == ModeSync {
-			return m.startScan()
-		}
-		return m.transition(stepShell), nil
-
+		return m.commitOrAbort(func() (tea.Model, tea.Cmd) {
+			if m.mode == ModeSync {
+				return m.startScan()
+			}
+			return m.transition(stepShell), nil
+		})
 	case stepConfirm:
-		if m.cursor != 0 {
-			m.step = stepAborted
-			return m, tea.Quit
-		}
-		return m.persistAndAdvance()
-
+		return m.commitOrAbort(m.persistAndAdvance)
 	case stepConflict:
-		if m.cursor != 0 {
-			m.step = stepAborted
-			return m, tea.Quit
-		}
-		return m.startSnapshot()
-
+		return m.commitOrAbort(m.startSnapshot)
 	case stepRealizePrompt:
 		m.realizeRequested = m.cursor == 0
 		return m.transition(stepDone), tea.Quit
 	}
 	return m, nil
+}
+
+// commitOrAbort is the shape every binary-prompt step shares: row 0
+// confirms and runs action; any other row aborts the wizard.
+func (m Model) commitOrAbort(action func() (tea.Model, tea.Cmd)) (tea.Model, tea.Cmd) {
+	if m.cursor != 0 {
+		m.step = stepAborted
+		return m, tea.Quit
+	}
+	return action()
 }
 
 // previousStep is the Esc target for each step that supports it. Steps
@@ -333,18 +325,15 @@ func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
 	return m.startScan()
 }
 
-// afterSnapshotOrSkip is the post-scan / post-snapshot fork. Sync mode
-// auto-realizes (the user invoked `dots sync` precisely to re-realize,
-// re-prompting is friction); install mode asks one more time before
-// mutating the system.
-func (m Model) afterSnapshotOrSkip() (tea.Model, tea.Cmd) {
-	switch m.mode {
-	case ModeSync:
+// routeAfterScan is the post-scan / post-snapshot fork: install asks
+// the user one more time on stepRealizePrompt; sync auto-realizes
+// because the user invoked `dots sync` precisely to re-realize.
+func (m Model) routeAfterScan() (tea.Model, tea.Cmd) {
+	if m.mode == ModeSync {
 		m.realizeRequested = true
 		return m.transition(stepDone), tea.Quit
-	default:
-		return m.transition(stepRealizePrompt), nil
 	}
+	return m.transition(stepRealizePrompt), nil
 }
 
 func (m Model) startScan() (tea.Model, tea.Cmd) {
@@ -399,51 +388,60 @@ func indexOf(opts []Option, value string) int {
 }
 
 // renderDoneSummary builds the post-wizard "what just happened" block
-// for stepDone (the only screen wrapped in OutcomePanel). The deploy
-// status is reported by main.go after the subprocess returns — this
-// function only summarizes what the wizard itself decided.
+// for stepDone. The deploy status is what the wizard *decided*; the
+// subprocess outcome is reported by main.go after control returns.
 func (m Model) renderDoneSummary() string {
-	var b strings.Builder
+	rows := make([]string, 0, 4)
 	if m.snapshotResult.Count > 0 {
-		fmt.Fprintf(&b, "  %s snapshot %s %s\n",
-			theme.BadgeOK,
-			theme.Muted.Render("→"),
-			theme.Body.Render(fmt.Sprintf("%d path(s) → %s", m.snapshotResult.Count, m.snapshotResult.Path)))
+		rows = append(rows, summaryRow(theme.BadgeOK, "snapshot",
+			theme.Body.Render(fmt.Sprintf("%d path(s) → %s",
+				m.snapshotResult.Count, m.snapshotResult.Path))))
 	}
+	rows = append(rows,
+		summaryRow(theme.BadgeOK, "persona", theme.Body.Render(m.personaLine())),
+		summaryRow(theme.BadgeOK, "extras ", theme.Body.Render(m.extrasLine())),
+		m.deployRow(),
+	)
+	return strings.Join(rows, "\n")
+}
 
-	persona := fmt.Sprintf("%s · %s · %s",
+func (m Model) personaLine() string {
+	return fmt.Sprintf("%s · %s · %s",
 		m.state.Pillars.Shell, m.state.Pillars.Terminal, m.state.Pillars.Multiplexer)
-	extras := []string{}
+}
+
+func (m Model) extrasLine() string {
+	var picks []string
 	if m.state.Capabilities.Editor {
-		extras = append(extras, "editor")
+		picks = append(picks, "editor")
 	}
 	if m.state.Capabilities.Git {
-		extras = append(extras, "git")
+		picks = append(picks, "git")
 	}
-	extrasLine := "(none)"
-	if len(extras) > 0 {
-		extrasLine = strings.Join(extras, ", ")
+	if len(picks) == 0 {
+		return "(none)"
 	}
+	return strings.Join(picks, ", ")
+}
 
-	fmt.Fprintf(&b, "  %s persona %s %s\n",
-		theme.BadgeOK, theme.Muted.Render("→"), theme.Body.Render(persona))
-	fmt.Fprintf(&b, "  %s extras  %s %s\n",
-		theme.BadgeOK, theme.Muted.Render("→"), theme.Body.Render(extrasLine))
-
+// deployRow renders the wizard's deploy-row outcome. Text is always
+// muted because main.go owns the authoritative deploy result; the row
+// here only reports what the wizard *decided*.
+func (m Model) deployRow() string {
+	badge, text := theme.BadgeWarn, "deferred — run `dots deploy` when ready"
 	switch {
 	case m.mode == ModeStandalone:
-		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
-			theme.BadgeWarn, theme.Muted.Render("→"),
-			theme.Muted.Render("not run (no workspace)"))
+		text = "not run (no workspace)"
 	case m.realizeRequested:
-		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
-			theme.BadgeOK, theme.Muted.Render("→"),
-			theme.Muted.Render("running "+MoonRunDeploy+"…"))
-	default:
-		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
-			theme.BadgeWarn, theme.Muted.Render("→"),
-			theme.Muted.Render("deferred — run `dots deploy` when ready"))
+		badge, text = theme.BadgeOK, "running "+MoonRunDeploy+"…"
 	}
+	return summaryRow(badge, "deploy ", theme.Muted.Render(text))
+}
 
-	return strings.TrimRight(b.String(), "\n")
+// summaryRow lays out one outcome row: badge, label, → arrow, then a
+// pre-rendered value. The caller picks the value's typography (body vs
+// muted) so the helper stays unaware of semantic styling.
+func summaryRow(badge fmt.Stringer, label, renderedValue string) string {
+	return fmt.Sprintf("  %s %s %s %s",
+		badge, label, theme.Muted.Render("→"), renderedValue)
 }

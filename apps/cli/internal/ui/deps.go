@@ -11,26 +11,14 @@ import "github.com/sanurb/.dotfiles/apps/cli/internal/state"
 // and because the alternative (UI calls main package directly) creates
 // an import cycle.
 
-// Mode discriminates the wizard's flow.
-//
-// Install is the full first-run experience: pillar selection → scan →
-// optional snapshot → realize prompt. The user's "Yes" on the prompt
-// surfaces as Result.RealizeRequested; main.go runs `dots deploy` as a
-// subprocess so nh's output renders against the real terminal. The
-// wizard never realizes the system itself.
-//
-// Sync skips the pillar selection (the persona is preserved) and
-// auto-confirms realization — the user invoked `dots sync` precisely
-// to re-realize, so an extra prompt is friction.
-//
-// Standalone has no workspace and therefore no realization step at all;
-// the wizard captures the persona to ~/.config/dots and exits.
+// Mode discriminates the wizard's flow. Realization is never run from
+// inside the wizard regardless of mode (ADR-0009).
 type Mode int
 
 const (
-	ModeInstall Mode = iota
-	ModeSync
-	ModeStandalone
+	ModeInstall    Mode = iota // pillars → scan → snapshot? → realize prompt
+	ModeSync                   // skip pillars → scan → snapshot? → auto-yes
+	ModeStandalone             // no workspace: pillars → persist; never realizes
 )
 
 // Collision is a path under $HOME that exists as a real file or dir
