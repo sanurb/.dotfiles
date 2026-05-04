@@ -170,10 +170,16 @@ func runStatus(rest []string) int {
 	// computePlan failure (e.g., $HOME unreadable) maps to driftUnknown
 	// so status stays informational — drift is supplementary, not
 	// load-bearing.
+	//
+	// ConvergedHash (not Hash) is the right signal here: prerequisite
+	// steps (snapshot, bootstrap, clone) appear in the work plan but
+	// don't describe the desired state. Comparing full Hashes flips to
+	// "stale" the moment a snapshot/bootstrap completes — the very
+	// thing apply just resolved.
 	freshPlan, freshErr := computePlan("")
 	freshHash := ""
 	if freshErr == nil {
-		freshHash = freshPlan.Hash
+		freshHash = freshPlan.ConvergedHash()
 	}
 	drift := classifyDrift(lastPtr, freshHash, freshErr)
 	driftPtr := &statusDriftJSON{

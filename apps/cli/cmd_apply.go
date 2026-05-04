@@ -164,17 +164,20 @@ func runApply(rest []string) int {
 
 	// Success — write the applied receipt. Failures here are reported
 	// but do not flip the exit code: the system has converged, and the
-	// receipt is for status/diff, not for correctness.
+	// receipt is for status/diff, not for correctness. ConvergedHash
+	// (not Hash) is recorded so the receipt remains valid after
+	// prerequisite steps (snapshot, bootstrap) drop out of subsequent
+	// fresh plans.
 	if path, err := applied.DefaultPath(); err == nil {
 		_ = applied.Save(path, applied.State{
 			SchemaVersion: applied.SchemaVersion,
-			PlanHash:      p.Hash,
+			PlanHash:      p.ConvergedHash(),
 			Profile:       p.Profile,
 			AppliedAt:     time.Now().UTC(),
 		})
 	}
 
-	fmt.Fprintf(os.Stderr, "✓ applied plan %s (%d step(s))\n", short(p.Hash), len(p.Steps))
+	fmt.Fprintf(os.Stderr, "✓ applied plan %s (%d step(s))\n", short(p.ConvergedHash()), len(p.Steps))
 	return exitcode.Success
 }
 
@@ -290,9 +293,12 @@ func emitPlan(p plan.Plan, common cliflags.Common) {
 	renderPlan(os.Stdout, p, !common.NoColor)
 }
 
-// isAlreadyApplied checks the applied.toml receipt for a hash match.
-// A missing or unreadable receipt is treated as "not applied" — the
-// safe default.
+// isAlreadyApplied checks the applied.toml receipt for a converged-
+// state match. Uses ConvergedHash (not Hash) so a plan with a
+// just-completed prerequisite step (snapshot, bootstrap) still
+// recognizes the previous receipt — the work changed shape but the
+// desired state did not. A missing or unreadable receipt is treated
+// as "not applied" — the safe default.
 func isAlreadyApplied(p plan.Plan) bool {
 	path, err := applied.DefaultPath()
 	if err != nil {
@@ -302,7 +308,7 @@ func isAlreadyApplied(p plan.Plan) bool {
 	if err != nil || !found {
 		return false
 	}
-	return st.PlanHash != "" && st.PlanHash == p.Hash
+	return st.PlanHash != "" && st.PlanHash == p.ConvergedHash()
 }
 
 // snapshotConflicts performs the in-process equivalent of `dots backup`

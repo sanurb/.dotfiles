@@ -99,3 +99,71 @@ func TestPlanIsNoOp(t *testing.T) {
 		t.Errorf("plan with steps should not be no-op")
 	}
 }
+
+func TestConvergedHashIgnoresPrerequisiteSteps(t *testing.T) {
+	base := Plan{
+		SchemaVersion: SchemaVersion,
+		Profile:       "fish",
+		Host:          Host{OS: "darwin", Arch: "arm64"},
+		Steps: []Step{
+			{ID: "s1", Kind: KindApplyProfile, Action: "+", Command: "nh home switch -c aarch64-darwin ."},
+		},
+	}
+	withPrereqs := Plan{
+		SchemaVersion: SchemaVersion,
+		Profile:       "fish",
+		Host:          Host{OS: "darwin", Arch: "arm64"},
+		Steps: []Step{
+			{ID: "s1", Kind: KindBootstrapNix, Action: "+", Summary: "install Nix"},
+			{ID: "s2", Kind: KindSnapshotConflicts, Action: "~", Effects: []string{".profile"}},
+			{ID: "s3", Kind: KindApplyProfile, Action: "~", Command: "nh home switch -c aarch64-darwin ."},
+		},
+	}
+	if base.ConvergedHash() != withPrereqs.ConvergedHash() {
+		t.Errorf("ConvergedHash should ignore prerequisite steps; got %s vs %s",
+			base.ConvergedHash(), withPrereqs.ConvergedHash())
+	}
+}
+
+func TestConvergedHashSensitiveToProfileHostCommand(t *testing.T) {
+	base := Plan{
+		SchemaVersion: SchemaVersion, Profile: "fish",
+		Host:  Host{OS: "darwin", Arch: "arm64"},
+		Steps: []Step{{Kind: KindApplyProfile, Command: "nh home switch -c aarch64-darwin ."}},
+	}
+	cases := []struct {
+		name string
+		mut  func(*Plan)
+	}{
+		{"different profile", func(p *Plan) { p.Profile = "zsh" }},
+		{"different host arch", func(p *Plan) { p.Host = Host{OS: "linux", Arch: "amd64"} }},
+		{"different command", func(p *Plan) { p.Steps[0].Command = "nh home switch -c x86_64-linux ." }},
+	}
+	baseHash := base.ConvergedHash()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cp := base
+			cp.Steps = append([]Step(nil), base.Steps...)
+			tc.mut(&cp)
+			if cp.ConvergedHash() == baseHash {
+				t.Errorf("ConvergedHash should change for %s but stayed %s", tc.name, baseHash)
+			}
+		})
+	}
+}
+
+func TestConvergedHashIgnoresStepIDsAndSummaries(t *testing.T) {
+	a := Plan{
+		SchemaVersion: SchemaVersion, Profile: "fish",
+		Host:  Host{OS: "darwin", Arch: "arm64"},
+		Steps: []Step{{ID: "s1", Kind: KindApplyProfile, Summary: "old summary", Command: "X"}},
+	}
+	b := Plan{
+		SchemaVersion: SchemaVersion, Profile: "fish",
+		Host:  Host{OS: "darwin", Arch: "arm64"},
+		Steps: []Step{{ID: "s99", Kind: KindApplyProfile, Summary: "new summary", Command: "X"}},
+	}
+	if a.ConvergedHash() != b.ConvergedHash() {
+		t.Errorf("ConvergedHash should ignore IDs/summaries")
+	}
+}

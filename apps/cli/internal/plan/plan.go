@@ -97,6 +97,12 @@ func (p *Plan) Seal() {
 // ComputeHash returns the canonical SHA-256 hex of the Plan's
 // content-bearing fields. Excludes Hash and GeneratedAt so the same
 // logical plan computed twice produces the same hash.
+//
+// Use Hash for plan-file integrity (`dots apply --plan FILE` requires
+// the saved plan to match a fresh recomputation byte-for-byte). For
+// drift detection and the already-applied no-op check, use
+// ConvergedHash — that one survives prerequisite steps (snapshot,
+// bootstrap, clone) appearing or disappearing across runs.
 func (p Plan) ComputeHash() string {
 	type canon struct {
 		SchemaVersion int    `json:"schemaVersion"`
@@ -105,6 +111,38 @@ func (p Plan) ComputeHash() string {
 		Steps         []Step `json:"steps"`
 	}
 	b, _ := json.Marshal(canon{p.SchemaVersion, p.Profile, p.Host, p.Steps})
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
+// ConvergedHash returns the hash of the *desired converged state*
+// described by this plan: profile, host, and the activation command
+// the apply-profile step would run. Stable across plans that differ
+// only in prerequisite work — bootstrap-nix, clone-workspace, and
+// snapshot-conflicts steps don't affect it, since those represent
+// "make the host ready," not "what state should the host be in."
+//
+// Used by:
+//   - applied.toml: `dots apply` records this so the receipt survives
+//     prerequisites being completed-and-then-gone.
+//   - dots status: drift comparison answers "is the current state the
+//     desired one?" rather than "is the work to get there identical?"
+//   - isAlreadyApplied no-op short-circuit, same reason.
+func (p Plan) ConvergedHash() string {
+	type canon struct {
+		SchemaVersion int    `json:"schemaVersion"`
+		Profile       string `json:"profile"`
+		Host          Host   `json:"host"`
+		Command       string `json:"command"`
+	}
+	var cmd string
+	for _, s := range p.Steps {
+		if s.Kind == KindApplyProfile {
+			cmd = s.Command
+			break
+		}
+	}
+	b, _ := json.Marshal(canon{p.SchemaVersion, p.Profile, p.Host, cmd})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
