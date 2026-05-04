@@ -1,4 +1,4 @@
-{ pkgs, lib, pkgsPins, ... }: {
+{ config, pkgs, lib, pkgsPins, workspaceRoot, ... }: {
   programs.neovim = {
     enable = true;
     defaultEditor = true;
@@ -32,20 +32,31 @@
     withPython3 = false;
     withRuby = false;
 
-    # Minimal base. Plugin orchestration is left to an in-tree
-    # lazy.nvim/nixvim layer if/when the user opts in. The option
-    # name changed in home-manager: extraLuaConfig → initLua.
+    # HM's wrapper bakes only a thin shim that defers to the
+    # live-editable user config at $XDG_CONFIG_HOME/nvim/init.lua
+    # (symlinked from the workspace by xdg.configFile below). Editing
+    # the lua takes effect on the next nvim launch — no flake rebuild,
+    # no `dots apply`. fs_stat guards the dofile so a missing or
+    # dangling symlink degrades to "no user config" instead of an
+    # error at startup.
     initLua = ''
-      vim.opt.number = true
-      vim.opt.relativenumber = true
-      vim.opt.expandtab = true
-      vim.opt.shiftwidth = 2
-      vim.opt.tabstop = 2
-      vim.opt.termguicolors = true
-      vim.opt.signcolumn = "yes"
-      vim.opt.undofile = true
-      vim.opt.clipboard = "unnamedplus"
-      vim.g.mapleader = " "
+      local user = vim.fn.stdpath("config") .. "/init.lua"
+      if vim.uv and vim.uv.fs_stat(user) then dofile(user) end
     '';
+  };
+
+  # Live-editable seam. mkOutOfStoreSymlink writes the symlink at
+  # activation time; the target path is not copied into the Nix store,
+  # so edits to config/nvim/init.lua in the workspace are visible
+  # immediately without rebuilding the activation derivation.
+  #
+  # When workspaceRoot is empty (DOTS_WORKSPACE_ROOT not exported,
+  # e.g. someone running home-manager directly outside `dots apply`),
+  # we skip the symlink rather than emit a dangling pointer to "/".
+  # Nvim falls back to its default empty-config behavior — visibly
+  # broken instead of silently wrong.
+  xdg.configFile."nvim/init.lua" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/nvim/init.lua";
   };
 }

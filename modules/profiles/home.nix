@@ -2,7 +2,12 @@
 let
   envUser = builtins.getEnv "USER";
   envHome = builtins.getEnv "HOME";
-  envWS = builtins.getEnv "MOON_WORKSPACE_ROOT";
+  # Workspace path. `dots apply` exports DOTS_WORKSPACE_ROOT into
+  # nh's env (apps/cli/internal/activation/env.go). Empty when run
+  # outside `dots apply` — modules that depend on it gate their
+  # output (mkOutOfStoreSymlink) so a missing workspace produces no
+  # symlink rather than a dangling pointer to "/".
+  envWS = builtins.getEnv "DOTS_WORKSPACE_ROOT";
   isDarwin = pkgs.stdenv.isDarwin;
   fallbackHome = if isDarwin then "/Users/dots" else "/home/dots";
 
@@ -18,11 +23,11 @@ let
   # Persona — the dots install TUI writes .dots-state.toml at the
   # workspace root; that file is the single source of truth for which
   # shell, terminal, and multiplexer this host gets. We resolve the
-  # path via $MOON_WORKSPACE_ROOT (already set by `moon run`) rather
-  # than a path literal because the file is gitignored — flake source
-  # filtering would hide a path-literal lookup. With --impure (already
-  # in use for the build), readFile against an absolute string path
-  # bypasses the source filter cleanly.
+  # path via envWS (DOTS_WORKSPACE_ROOT) rather than a path literal
+  # because the file is gitignored — flake source filtering would hide
+  # a path-literal lookup. With --impure (already in use for the build),
+  # readFile against an absolute string path bypasses the source filter
+  # cleanly.
   # Schema version is declared once at apps/cli/internal/state/SCHEMA_VERSION
   # and read from there by both Go (go:embed) and Nix (this readFile). Drift
   # between the two consumers is impossible by construction — there is no
@@ -71,4 +76,9 @@ in
   programs.home-manager.enable = true;
 
   _module.args.identity = identity;
+  # Modules that emit live-edit symlinks (mkOutOfStoreSymlink targets)
+  # consume workspaceRoot rather than calling builtins.getEnv themselves
+  # — one definition, one consumer, easy to grep when adding the next
+  # live-editable surface.
+  _module.args.workspaceRoot = envWS;
 }
