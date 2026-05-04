@@ -47,9 +47,15 @@ tasks:
     command: "bash"
     args:
       - "-c"
+      # set -eu so any future `$(...)` substitution that fails or any
+      # unset variable surfaces as a hard error instead of silently
+      # propagating empty values into nh's -c (the v0.4.0..v0.4.4
+      # incident class). pipefail is intentionally NOT set: nh writes
+      # progress to stdout that may legitimately produce broken pipes.
       - |-
+        set -eu
         export NH_SHOW_ACTIVATION_LOGS=1
-        sys="${DOTS_NIX_SYSTEM:-$(nix eval --raw --impure --expr 'builtins.currentSystem' 2>/dev/null)}"
+        sys="${DOTS_NIX_SYSTEM:-$(nix eval --raw --impure --expr 'builtins.currentSystem' 2>/dev/null || true)}"
         if [ -z "$sys" ]; then
           echo "modules:deploy: cannot resolve nix system identifier" >&2
           echo "  what: DOTS_NIX_SYSTEM is unset and 'nix eval' produced no output" >&2
@@ -65,14 +71,6 @@ tasks:
     options:
       cache: false
       runFromWorkspaceRoot: true
-
-  backup:
-    command: "bash scripts/backup.sh"
-    inputs:
-      - "scripts/backup.sh"
-    local: true
-    options:
-      cache: false
 
   update:
     command: "nix flake update"
