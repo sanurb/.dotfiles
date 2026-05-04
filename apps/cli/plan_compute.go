@@ -9,7 +9,6 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
-	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
 
@@ -104,7 +103,7 @@ func computePlan(profile string) (plan.Plan, error) {
 		Kind:    plan.KindApplyProfile,
 		Action:  action,
 		Summary: fmt.Sprintf("apply profile %s", planProfileLabel(resolved)),
-		Command: ui.MoonRunDeploy,
+		Command: applyProfileCommand(),
 	})
 
 	p.Seal()
@@ -126,6 +125,19 @@ func readProfileFromState() string {
 		return ""
 	}
 	return s.Pillars.Shell
+}
+
+// applyProfileCommand renders the exact subprocess invocation the
+// apply-profile step will run, for display in the plan. We compute it
+// here so `dots plan` and `dots apply`'s pre-confirm preview agree on
+// what the user is approving — no place in the code constructs nh's
+// argv differently from this string.
+func applyProfileCommand() string {
+	sys := plan.CurrentHost().NixIdent()
+	if sys == "" {
+		sys = "<unknown-system>"
+	}
+	return fmt.Sprintf("nh home switch --show-activation-logs -c %s . -- --impure --accept-flake-config", sys)
 }
 
 // planProfileLabel renders the profile slot of the apply summary so an

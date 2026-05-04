@@ -6,9 +6,13 @@ import (
 	"path/filepath"
 )
 
-// trackedPaths mirrors modules/scripts/backup.sh — keep in sync.
-// Each entry is relative to $HOME and represents a path that Home
-// Manager will project as a symlink.
+// trackedPaths is the canonical list of $HOME-relative paths that
+// Home Manager projects as symlinks; collisions with real files/dirs
+// at these locations need quarantining before activation. Each entry
+// must match a `home.file."..."` source in modules/. The duplicate
+// listing that previously lived in modules/scripts/backup.sh was
+// retired with ADR-0015 — `dots backup` is the only entry point now
+// and reads directly from this slice.
 var trackedPaths = []string{
 	".config/ghostty/config",
 	".config/zellij/config.kdl",

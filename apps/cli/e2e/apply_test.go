@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,55 +9,34 @@ import (
 )
 
 func TestApply(t *testing.T) {
-	t.Run("when user runs apply --yes from a bare shell, then moon receives PROTO_HOME pointing at the workspace .proto", func(t *testing.T) {
+	t.Run("when user runs apply --yes from a bare shell, then nh receives the right argv for this host", func(t *testing.T) {
 		h := newHarness(t).
 			withStub("nix", nixStubBody).
-			withMoonStub().
+			withNhStub().
 			withStateFile(buildStateTOML(stateOverrides{}))
 
-		h.run("apply", "--yes")
+		h.run("apply", "--yes", "--no-preflight")
 
-		env, _ := h.moonEnv()
-		assertEqual(t, env["PROTO_HOME"], filepath.Join(h.Workspace, ".proto"))
-	})
-
-	t.Run("when user runs apply --yes from a bare shell, then moon's PATH leads with proto shims and proto bin from the workspace", func(t *testing.T) {
-		h := newHarness(t).
-			withStub("nix", nixStubBody).
-			withMoonStub().
-			withStateFile(buildStateTOML(stateOverrides{}))
-
-		h.run("apply", "--yes")
-
-		env, _ := h.moonEnv()
+		args, ok := h.nhArgs()
 		want := []string{
-			filepath.Join(h.Workspace, ".proto", "shims"),
-			filepath.Join(h.Workspace, ".proto", "bin"),
+			"home", "switch",
+			"--show-activation-logs",
+			"-c", expectedNixSystem(), ".",
+			"--", "--impure", "--accept-flake-config",
 		}
-		assertPathLeading(t, env["PATH"], want)
+		assertEqual(t, ok, true)
+		assertEqual(t, args, want)
 	})
 
-	t.Run("when user runs apply --yes from a bare shell, then moon receives DOTS_NIX_SYSTEM matching the host architecture", func(t *testing.T) {
+	t.Run("when user runs apply --dry-run, then plan is rendered to stdout and nh is never invoked", func(t *testing.T) {
 		h := newHarness(t).
 			withStub("nix", nixStubBody).
-			withMoonStub().
-			withStateFile(buildStateTOML(stateOverrides{}))
-
-		h.run("apply", "--yes")
-
-		env, _ := h.moonEnv()
-		assertEqual(t, env["DOTS_NIX_SYSTEM"], expectedNixSystem())
-	})
-
-	t.Run("when user runs apply --dry-run, then plan is rendered to stdout and moon is never invoked", func(t *testing.T) {
-		h := newHarness(t).
-			withStub("nix", nixStubBody).
-			withMoonStub().
+			withNhStub().
 			withStateFile(buildStateTOML(stateOverrides{Shell: "zsh"}))
 
 		got := h.run("apply", "--dry-run")
 
-		_, invoked := h.moonEnv()
+		_, invoked := h.nhArgs()
 		assertEqual(t, got.ExitCode, 0)
 		assertContains(t, got.Stdout, "apply profile zsh")
 		assertEqual(t, invoked, false)
@@ -73,8 +51,7 @@ func expectedNixSystem() string {
 }
 
 // assertEqual is the package's single comparison primitive: deep
-// equality with full diff on failure. Tests stay flat by routing
-// every assertion through it.
+// equality with full diff on failure.
 func assertEqual(t *testing.T, got, want any) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {
@@ -89,19 +66,5 @@ func assertContains(t *testing.T, body, want string) {
 	t.Helper()
 	if !strings.Contains(body, want) {
 		t.Errorf("\n %q\nshould contain\n %q", body, want)
-	}
-}
-
-// assertPathLeading checks PATH starts with expected entries in order.
-// Single failure surface so a wrong order fails as one diff, not
-// per-entry.
-func assertPathLeading(t *testing.T, path string, want []string) {
-	t.Helper()
-	got := strings.Split(path, ":")
-	if len(got) >= len(want) {
-		got = got[:len(want)]
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("\n got:  %v\nwant: %v", got, want)
 	}
 }

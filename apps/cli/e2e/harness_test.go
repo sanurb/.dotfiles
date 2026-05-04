@@ -45,19 +45,21 @@ func dotsBin(t *testing.T) string {
 }
 
 // harness is the per-test fixture. Every Harness owns a workspace,
-// an isolated home, and a record path the moon stub writes its env
+// an isolated home, and a record path the nh stub writes its argv
 // to. t.TempDir handles cleanup automatically.
 type harness struct {
-	t          *testing.T
-	Workspace  string
-	Home       string
-	BinDir     string // workspace/_stubs — front of PATH
-	MoonRecord string // file the moon stub writes env to
+	t         *testing.T
+	Workspace string
+	Home      string
+	BinDir    string // workspace/_stubs — front of PATH
+	NhRecord  string // file the nh stub writes its argv to
 }
 
 // newHarness constructs a fresh fixture and lays down the workspace
-// markers (.prototools so workspace.Root resolves; the empty .proto
-// tree so layer 2 of resolveMoonCmd can place a moon stub).
+// markers (.prototools so workspace.Root resolves; .devenv/profile/bin
+// where withNhStub plants the nh stub — that's the path the dots
+// binary's activationEnv prepends, so a stub there gets picked up
+// without requiring nh on the test's bare PATH).
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	// EvalSymlinks resolves macOS's /var → /private/var indirection.
@@ -69,14 +71,14 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	mustWrite(t, filepath.Join(ws, ".prototools"), "# e2e fixture\n")
-	mustMkdir(t, filepath.Join(ws, ".proto", "bin"))
+	mustMkdir(t, filepath.Join(ws, ".devenv", "profile", "bin"))
 	mustMkdir(t, filepath.Join(ws, "_stubs"))
 	return &harness{
-		t:          t,
-		Workspace:  ws,
-		Home:       t.TempDir(),
-		BinDir:     filepath.Join(ws, "_stubs"),
-		MoonRecord: filepath.Join(t.TempDir(), "moon.env"),
+		t:         t,
+		Workspace: ws,
+		Home:      t.TempDir(),
+		BinDir:    filepath.Join(ws, "_stubs"),
+		NhRecord:  filepath.Join(t.TempDir(), "nh.argv"),
 	}
 }
 
@@ -90,21 +92,29 @@ func (h *harness) withStateFile(toml string) *harness {
 
 // installStub plants a POSIX shell script at the given absolute path
 // and marks it executable. Used by both withStub (PATH-front shims)
-// and withMoonStub (workspace-resolved moon binary).
+// and withNhStub (workspace-resolved nh binary).
 func (h *harness) installStub(path, body string) {
 	h.t.Helper()
 	mustWrite(h.t, path, body)
 	mustChmod(h.t, path, 0o755)
 }
 
-// withMoonStub plants a POSIX shell script at <ws>/.proto/bin/moon.
-// resolveMoonCmd's layer 2 picks it up because the test's PATH
-// (BinDir + /usr/bin:/bin) deliberately lacks moon. The stub writes
-// its received env to MoonRecord and exits 0.
-func (h *harness) withMoonStub() *harness {
+// withNhStub plants a POSIX shell script at <ws>/.devenv/profile/bin/nh.
+// dots's activationEnv prepends that directory to PATH (so nh is
+// reachable inside a workspace checkout without direnv), so the stub
+// wins ahead of any real nh on the test's bare /usr/bin:/bin PATH.
+// The stub records its argv to NH_RECORD and exits 0, simulating a
+// clean activation for the test.
+func (h *harness) withNhStub() *harness {
 	h.installStub(
-		filepath.Join(h.Workspace, ".proto", "bin", "moon"),
-		"#!/bin/sh\nenv > \"$STUB_MOON_RECORD\"\nexit 0\n",
+		filepath.Join(h.Workspace, ".devenv", "profile", "bin", "nh"),
+		`#!/bin/sh
+case "$1" in
+  --version) echo "nh 4.3.2-stub"; exit 0 ;;
+esac
+printf "%s\n" "$@" > "$NH_RECORD"
+exit 0
+`,
 	)
 	return h
 }
@@ -125,10 +135,10 @@ type result struct {
 }
 
 // run executes the dots binary against the harness's workspace under
-// a deliberately minimal env. The PATH leads with BinDir (test stubs)
-// then a bare system PATH — no .proto/bin, no .devenv/profile/bin.
-// That is the user's broken shell. It is also what every test below
-// asserts dots compensates for.
+// a deliberately minimal env. PATH leads with BinDir (test shims) then
+// a bare system PATH — no .devenv/profile/bin. dots's activationEnv
+// is what prepends the workspace-relative .devenv/profile/bin so the
+// nh stub becomes reachable; the test asserts that wiring works.
 func (h *harness) run(args ...string) result {
 	h.t.Helper()
 	cmd := exec.Command(dotsBin(h.t), args...)
@@ -136,7 +146,7 @@ func (h *harness) run(args ...string) result {
 	cmd.Env = []string{
 		"PATH=" + h.BinDir + ":/usr/bin:/bin",
 		"HOME=" + h.Home,
-		"STUB_MOON_RECORD=" + h.MoonRecord,
+		"NH_RECORD=" + h.NhRecord,
 	}
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
@@ -151,23 +161,18 @@ func (h *harness) run(args ...string) result {
 	return result{Stdout: stdout.String(), Stderr: stderr.String(), ExitCode: code}
 }
 
-// moonEnv reads the env dump the moon stub recorded. Returns
-// (env, true) when the stub ran, (nil, false) when it didn't —
-// the boolean is the binary-truth probe; the map is the contents.
-// One accessor over two methods keeps the test surface tight.
-func (h *harness) moonEnv() (map[string]string, bool) {
+// nhArgs reads the argv the nh stub recorded. Returns (args, true)
+// when the stub ran (one element per nh argument, in order),
+// (nil, false) when it didn't — the boolean is the binary-truth
+// probe. One accessor over two methods keeps the test surface tight.
+func (h *harness) nhArgs() ([]string, bool) {
 	h.t.Helper()
-	body, err := os.ReadFile(h.MoonRecord)
+	body, err := os.ReadFile(h.NhRecord)
 	if err != nil {
 		return nil, false
 	}
-	out := make(map[string]string)
-	for _, line := range strings.Split(string(body), "\n") {
-		if i := strings.IndexByte(line, '='); i > 0 {
-			out[line[:i]] = line[i+1:]
-		}
-	}
-	return out, true
+	lines := strings.Split(strings.TrimRight(string(body), "\n"), "\n")
+	return lines, true
 }
 
 // mustWrite/mustMkdir/mustChmod are the harness's bottle-feeder

@@ -35,13 +35,12 @@ type SnapshotResult struct {
 	Path  string // absolute backup directory
 }
 
-// MoonDeployTask is the Moon target invoked by `dots deploy` and echoed
-// to the user during the wizard. Single source of truth: a project-ID
-// rename touches one line, not nine.
-const MoonDeployTask = "modules:deploy"
-
-// MoonRunDeploy is the rendered command-echo per DESIGN.md.
-const MoonRunDeploy = "moon run " + MoonDeployTask
+// ApplyCommand is the user-facing label echoed in wizard surfaces
+// when the realize hand-off is about to run. Post-ADR-0015 the apply
+// path is dots-direct (no moon) so this is just a stable label, not
+// the literal subprocess command — the actual nh invocation is
+// composed at runtime in apps/cli/cmd_apply.go::runHomeActivation.
+const ApplyCommand = "dots apply"
 
 // Snapshotter takes "Safe Snapshots" — quarantines colliding paths.
 type Snapshotter interface {

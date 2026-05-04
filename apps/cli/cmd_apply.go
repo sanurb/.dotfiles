@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -15,21 +16,15 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
-	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
 
 const cmdApplySummary = "Apply the plan: bootstrap if needed, snapshot conflicts, realize the profile"
 
-// Env keys that compose moon's subprocess environment. Centralized so
-// renames are one-place edits and the contract is self-documenting.
-// The same identifiers appear in modules/moon.yml's deploy task —
-// changing any string here is a coordinated rename across Go + YAML.
-const (
-	envPath          = "PATH"
-	envProtoHome     = "PROTO_HOME"
-	envDotsNixSystem = "DOTS_NIX_SYSTEM"
-)
+// envPath is the only env key shared between activationEnv and
+// prependPathEntries. PROTO_HOME / DOTS_NIX_SYSTEM are gone now that
+// the deploy path no longer goes through moon (ADR-0015).
+const envPath = "PATH"
 
 // runApply implements `dots apply [profile] [--plan FILE] [--dry-run]
 // [--yes] [--non-interactive] [--json]`. It is the canonical converge
@@ -44,6 +39,9 @@ func runApply(rest []string) int {
 
 	var planPath string
 	fs.StringVar(&planPath, "plan", "", "execute plan from FILE (must match a fresh computePlan)")
+
+	var noPreflight bool
+	fs.BoolVar(&noPreflight, "no-preflight", false, "skip the doctor pre-flight check before activation")
 
 	if code, exit := cliflags.MapParseErr(fs.Parse(rest)); exit {
 		return code
@@ -134,7 +132,14 @@ func runApply(rest []string) int {
 				fmt.Fprintln(os.Stderr, "  next: rerun `dots apply` from inside the cloned workspace")
 				return exitcode.Failure
 			}
-			if code := runMoonDeploy(); code != exitcode.Success {
+			if !noPreflight {
+				if code := runDoctor(false, false); code != exitcode.Success {
+					fmt.Fprintln(os.Stderr, "apply: doctor pre-flight failed; aborting before activation")
+					fmt.Fprintln(os.Stderr, "  next: address the doctor failures above, or rerun with --no-preflight to bypass")
+					return exitcode.PreFlight
+				}
+			}
+			if code := runHomeActivation(p.Profile); code != exitcode.Success {
 				return code
 			}
 
@@ -325,36 +330,52 @@ func snapshotConflicts(rels []string) error {
 	return nil
 }
 
-// runMoonDeploy invokes `moon run modules:deploy` with stdio inherited
-// — the long-running activation phase needs to talk to the user
-// directly. The exit code is propagated verbatim so a moon failure
-// reads as a moon failure, not a generic dots error.
+// runHomeActivation execs `nh home switch -c <system> .` directly,
+// in-process from dots. Replaces the prior `moon run modules:deploy`
+// chain. ADR-0015 records the rationale: the deploy path was a
+// linear two-step sequence (doctor → activate); routing it through
+// moon added moon's task-graph indirection, argv interpolator, and
+// env-passthrough surface area without earning any of moon's
+// caching or graph value. Calling nh directly removes those layers.
 //
-// Resolves moon in three layers (see resolveMoonCmd) AND augments the
-// subprocess PATH with the workspace's proto + devenv bins. Without
-// the PATH augmentation a bare shell would still trip moon's task
-// subprocesses (`go: command not found`) even after we successfully
-// located moon itself. This recreates the activation direnv would do.
-func runMoonDeploy() int {
-	cmd, label := resolveMoonCmd()
-	if cmd == nil {
-		fmt.Fprintln(os.Stderr, "apply: moon not reachable:")
-		fmt.Fprintln(os.Stderr, "  what: cannot locate moon to run modules:deploy")
-		fmt.Fprintln(os.Stderr, "  why:  not on PATH, no <workspace>/.proto/bin/moon, and `nix` is also missing")
-		fmt.Fprintln(os.Stderr, "  next: enter the dev shell (direnv allow / `nix develop`) or run `dots doctor`")
+// `--show-activation-logs` is on by default so any home-manager
+// activation-script failure surfaces verbatim. Without it, nh
+// reports a bare "Activation failed (exit 1)" and swallows the
+// real cause.
+func runHomeActivation(profile string) int {
+	sys := plan.CurrentHost().NixIdent()
+	if sys == "" {
+		fmt.Fprintln(os.Stderr, "apply: cannot resolve nix system identifier")
+		fmt.Fprintf(os.Stderr, "  what: GOOS=%s GOARCH=%s is not in the supported set\n", runtime.GOOS, runtime.GOARCH)
+		fmt.Fprintln(os.Stderr, "  next: dots supports darwin/{arm64,amd64} and linux/{arm64,amd64} (ADR-0011)")
 		return exitcode.Failure
 	}
-	cmd.Env = moonEnv()
+
+	env := activationEnv()
+	nhPath, err := lookPathInEnv("nh", env)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "apply: nh not reachable:")
+		fmt.Fprintln(os.Stderr, "  what: nh executable not found")
+		fmt.Fprintln(os.Stderr, "  why:  not on PATH and not at <workspace>/.devenv/profile/bin/nh")
+		fmt.Fprintln(os.Stderr, "  next: install nh, or activate the dev shell (direnv allow / nix develop)")
+		return exitcode.Failure
+	}
+
+	cmd := exec.Command(nhPath, "home", "switch",
+		"--show-activation-logs",
+		"-c", sys, ".",
+		"--", "--impure", "--accept-flake-config")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = env
 	if err := cmd.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			fmt.Fprintf(os.Stderr, "apply: `%s` exited %d\n", label, ee.ExitCode())
+			fmt.Fprintf(os.Stderr, "apply: `nh home switch -c %s .` exited %d\n", sys, ee.ExitCode())
 			return ee.ExitCode()
 		}
-		fmt.Fprintln(os.Stderr, "apply: moon run failed:")
-		fmt.Fprintf(os.Stderr, "  what: could not execute `%s`\n", label)
+		fmt.Fprintln(os.Stderr, "apply: nh exec failed:")
+		fmt.Fprintln(os.Stderr, "  what: could not execute `nh home switch`")
 		fmt.Fprintf(os.Stderr, "  why:  %s\n", err)
 		fmt.Fprintln(os.Stderr, "  next: run `dots doctor` to diagnose the toolchain")
 		return exitcode.Failure
@@ -362,120 +383,60 @@ func runMoonDeploy() int {
 	return exitcode.Success
 }
 
-// moonProbe is the dependency surface resolveMoon needs from the
-// outside world. Injected so the resolver's layer-precedence logic
-// is unit-testable without exec or filesystem coupling.
-type moonProbe struct {
-	lookPath  func(name string) (string, error)
-	statFile  func(path string) error
-	workspace func() (string, error)
-}
-
-func defaultMoonProbe() moonProbe {
-	return moonProbe{
-		lookPath: exec.LookPath,
-		statFile: func(p string) error {
-			_, err := os.Stat(p)
-			return err
-		},
-		workspace: workspace.Root,
-	}
-}
-
-// resolveMoonCmd is the production entry point that wires the default
-// probe. Tests call resolveMoon directly with a stubbed probe.
-func resolveMoonCmd() (*exec.Cmd, string) {
-	return resolveMoon(defaultMoonProbe())
-}
-
-// resolveMoon builds a runnable *exec.Cmd for `moon run modules:deploy`.
-// Order of attempts:
-//
-//  1. moon on PATH — the dev-shell-activated case.
-//  2. <workspace>/.proto/bin/moon (then .proto/shims/moon) — proto's
-//     per-machine install. Works in a bare shell once direnv/devenv
-//     has populated .proto/.
-//  3. `nix develop -c moon run modules:deploy` — last resort. Slow
-//     (cold flake eval) but covers a fresh clone where .proto is empty.
-//
-// Returns (nil, "") only when every attempt is exhausted. The label
-// is used in error messages so a failure reads as the exact command
-// that was tried.
-func resolveMoon(p moonProbe) (*exec.Cmd, string) {
-	if _, err := p.lookPath("moon"); err == nil {
-		return exec.Command("moon", "run", ui.MoonDeployTask),
-			"moon run " + ui.MoonDeployTask
-	}
-	if root, err := p.workspace(); err == nil {
-		for _, sub := range []string{".proto/bin/moon", ".proto/shims/moon"} {
-			full := filepath.Join(root, sub)
-			if err := p.statFile(full); err == nil {
-				return exec.Command(full, "run", ui.MoonDeployTask),
-					full + " run " + ui.MoonDeployTask
-			}
+// lookPathInEnv resolves an executable name against the PATH found in
+// the given env slice (NOT this process's PATH). Necessary because
+// exec.Command uses the calling process's PATH at construction time;
+// when we hand the child a different PATH via cmd.Env, the binary
+// lookup must use that PATH explicitly. Returns the absolute path on
+// success.
+func lookPathInEnv(name string, env []string) (string, error) {
+	var pathValue string
+	prefix := envPath + "="
+	for _, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			pathValue = strings.TrimPrefix(e, prefix)
+			break
 		}
 	}
-	if _, err := p.lookPath("nix"); err == nil {
-		return exec.Command("nix", "develop", "-c", "moon", "run", ui.MoonDeployTask),
-			"nix develop -c moon run " + ui.MoonDeployTask
+	for _, dir := range filepath.SplitList(pathValue) {
+		if dir == "" {
+			continue
+		}
+		candidate := filepath.Join(dir, name)
+		if fi, err := os.Stat(candidate); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
+			return candidate, nil
+		}
 	}
-	return nil, ""
+	return "", exec.ErrNotFound
 }
 
-// moonEnv resolves the workspace, the home dir, and the current
-// environment, then delegates to buildMoonEnv (the pure function).
-// Split for testability — buildMoonEnv has no os/workspace coupling.
+// activationEnv returns os.Environ() with two additions: PATH-prepend
+// the workspace's .devenv/profile/bin (so nh resolves without direnv
+// activation when we're inside a workspace checkout), and
+// NH_SHOW_ACTIVATION_LOGS=1 (paired with --show-activation-logs in
+// runHomeActivation; either alone is sufficient, both is defense in
+// depth against an env-strip layer between dots and nh).
 //
-// The nix system identifier comes from plan.CurrentHost().NixIdent()
-// so dots and the e2e tests share the same formula; pre-computing it
-// here kills the bash task's nix-eval round-trip that was v0.4.3's
-// failure mode.
-func moonEnv() []string {
+// Split into pure (buildActivationEnv) + impure wrapper for unit
+// tests; the pure form takes the workspace root as a parameter so
+// tests don't need a real .prototools file.
+func activationEnv() []string {
 	env := os.Environ()
-	root, err := workspace.Root()
-	if err != nil {
-		return env
-	}
-	home, _ := os.UserHomeDir()
-	return buildMoonEnv(env, root, home, plan.CurrentHost().NixIdent())
+	root, _ := workspace.Root()
+	return buildActivationEnv(env, root)
 }
 
-// buildMoonEnv mirrors devenv.nix's enterShell so moon's task
-// subprocesses run with the same environment a direnv-activated
-// shell would give them. From devenv.nix:
-//
-//	export PROTO_HOME="$DEVENV_ROOT/.proto"
-//	export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$HOME/.cargo/bin:$PATH"
-//
-// Plus DOTS_NIX_SYSTEM (e.g., "aarch64-darwin"), pre-computed by dots
-// so modules:deploy's bash task does not have to round-trip through
-// `nix eval --raw --impure --expr 'builtins.currentSystem'` — that
-// eval is fragile and command-substitution-swallowed when nix is
-// missing or experimental features are off. The bash task uses
-// `${DOTS_NIX_SYSTEM:-<fallback>}` so direct `moon run` invocations
-// still work.
-//
-// Pure function: no os.Stat, no os.Getenv, no workspace.Root. The
-// caller (moonEnv) supplies them. Missing directories are NOT
-// filtered here — the caller may pass paths that don't yet exist
-// on a fresh clone, and that's fine: the resolver's nix-develop
-// layer covers that case. We skip empty homeDir though, because
-// `~/.cargo/bin` resolved from a missing $HOME would land at
-// `/.cargo/bin` and the noise on PATH is worse than the omission.
-func buildMoonEnv(env []string, workspaceRoot, homeDir, nixSys string) []string {
-	protoHome := filepath.Join(workspaceRoot, ".proto")
-	env = setEnvKey(env, envProtoHome, protoHome)
-	env = setEnvKey(env, envDotsNixSystem, nixSys)
-
-	extras := []string{
-		filepath.Join(protoHome, "shims"),
-		filepath.Join(protoHome, "bin"),
-		filepath.Join(workspaceRoot, ".devenv", "profile", "bin"),
+// buildActivationEnv is the pure half of activationEnv. workspaceRoot
+// may be empty — the call site handles "no workspace" by passing ""
+// rather than special-casing in two places.
+func buildActivationEnv(env []string, workspaceRoot string) []string {
+	env = setEnvKey(env, "NH_SHOW_ACTIVATION_LOGS", "1")
+	if workspaceRoot != "" {
+		env = prependPathEntries(env, []string{
+			filepath.Join(workspaceRoot, ".devenv", "profile", "bin"),
+		})
 	}
-	if homeDir != "" {
-		extras = append(extras, filepath.Join(homeDir, ".cargo", "bin"))
-	}
-	return prependPathEntries(env, extras)
+	return env
 }
 
 // setEnvKey returns env with key=val present (replaced or appended).

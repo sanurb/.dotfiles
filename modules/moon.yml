@@ -7,6 +7,13 @@ project:
   name: modules
   description: "Home Manager projection."
 
+# ADR-0015: the activation path (dots apply → nh home switch) is
+# dots-direct. Moon's only role here is the dev-side flake checks
+# and the input-update helper below. The previous `modules:deploy`
+# moon task and its scripts/deploy.sh helper were removed once the
+# Go binary started invoking nh in-process; the moon layer was
+# adding interpolation footguns and earning none of moon's caching
+# or graph value for a linear two-step sequence.
 tasks:
   check:
     command: "nix flake check --impure --accept-flake-config"
@@ -16,55 +23,6 @@ tasks:
       - "/flake.lock"
       - "/devenv.nix"
     options:
-      runFromWorkspaceRoot: true
-
-  # Hard gate: cli:doctor (full host probe — persona + binaries) must
-  # pass before activation. The lighter cli:check is for CI; deploys
-  # mutate $HOME and earn the heavier check.
-  #
-  # Flake-ref shape: pass the configuration name via `-c <name> .`, NOT
-  # `.#homeConfigurations.<name>`. The latter short-circuits nh's
-  # resolver and skips the `.config.home.activationPackage` suffix, so
-  # `nix build` resolves the homeManagerConfiguration record (a set)
-  # and trips the flake schema check on `homeConfigurations.<name>.type`.
-  # The `-c` form goes through auto-detect, which appends the suffix.
-  # flake.nix keys homeConfigurations by <system>.
-  #
-  # System resolution: `dots apply` pre-computes `DOTS_NIX_SYSTEM` from
-  # runtime.GOOS/GOARCH (see apps/cli/cmd_apply.go::nixSystem) and sets
-  # it in the moon subprocess env. We use it directly. The nix-eval
-  # fallback handles direct `moon run modules:deploy` invocations from
-  # an activated dev shell. v0.4.3 hit a bug where command substitution
-  # silently swallowed a failed `nix eval`, leaving sys="" and feeding
-  # nh an empty -c value — sidestepping the eval entirely is the fix.
-  #
-  # `--impure --accept-flake-config` forwards to `nix build` via nh's
-  # `--` passthrough so home.nix can read MOON_WORKSPACE_ROOT and the
-  # .dots-state.toml outside the flake source filter.
-  # NH_SHOW_ACTIVATION_LOGS=1 keeps activation diagnostics visible
-  # (nh >=4.3.0 hides them by default).
-  # The deploy script lives at modules/scripts/deploy.sh, NOT inline
-  # in this YAML. Reason: moon's task-arg interpolator rewrites every
-  # "$VAR" pattern in args at task-spawn time — including bash-local
-  # variables that look like $VAR. An inline body containing
-  # `sys=...; if [ -z "$sys" ]` becomes `sys=...; if [ -z "" ]` after
-  # moon substitutes the (undefined-in-moon-env) $sys with empty,
-  # defeating any non-trivial inline bash. Moving the body to a file
-  # removes it from moon's interpolation surface; moon only sees the
-  # script path and the standalone $DOTS_NIX_SYSTEM arg.
-  deploy:
-    command: "modules/scripts/deploy.sh"
-    args:
-      - "$DOTS_NIX_SYSTEM"
-    env:
-      NH_SHOW_ACTIVATION_LOGS: "1"
-    inputs:
-      - "modules/scripts/deploy.sh"
-    deps:
-      - "cli:doctor"
-    local: true
-    options:
-      cache: false
       runFromWorkspaceRoot: true
 
   update:

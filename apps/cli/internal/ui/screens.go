@@ -193,7 +193,7 @@ func (m Model) realizePromptLayout() screen.Layout {
 
 	return screen.Layout{
 		Title:       "Realize now?",
-		Description: fmt.Sprintf("Will run %s in a subprocess. Output streams to this terminal.", MoonRunDeploy),
+		Description: fmt.Sprintf("Will run %s in a subprocess. Output streams to this terminal.", ApplyCommand),
 		Content:     screen.RenderRows(m.currentRows()),
 		Keymap:      km,
 		Width:       m.width,

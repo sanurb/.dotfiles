@@ -426,7 +426,7 @@ func (m Model) extrasLine() string {
 func (m Model) deployRow() string {
 	badge, text := theme.BadgeWarn, "deferred — run `dots deploy` when ready"
 	if m.realizeRequested {
-		badge, text = theme.BadgeOK, "running "+MoonRunDeploy+"…"
+		badge, text = theme.BadgeOK, "running "+ApplyCommand+"…"
 	}
 	return summaryRow(badge, "deploy ", theme.Muted.Render(text))
 }
