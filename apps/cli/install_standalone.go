@@ -23,7 +23,10 @@ func runStandaloneInstall() int {
 		StatePersister: standalonePersister{path: path},
 		Initial:        loadStandaloneInitial(path),
 	}
-	return ui.Run(ui.ModeStandalone, deps)
+	// Standalone never realizes — there is no workspace — so we
+	// propagate Result.Code only; RealizeRequested is structurally
+	// false on this path.
+	return ui.Run(ui.ModeStandalone, deps).Code
 }
 
 // standalonePersister implements ui.StatePersister against a user-config

@@ -9,14 +9,22 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/tui/theme"
 )
 
-// Run launches the wizard. The returned exit code matches the dots
-// CLI convention: 0 on Done, 1 on Failed, 130 on Aborted (SIGINT-ish).
-// Callers (main.go) translate this to os.Exit.
-func Run(mode Mode, deps Deps) int {
+// Result is what Run returns. Code follows the dots exit-code convention
+// (0 success, 1 internal failure, 130 user abort). RealizeRequested
+// signals "user opted in on the Realize-now prompt" — main.go invokes
+// `dots deploy` as a subprocess on that signal (ADR-0009).
+type Result struct {
+	Code             int
+	RealizeRequested bool
+}
+
+// Run launches the wizard. Callers (main.go) translate Result into
+// either a direct os.Exit or a follow-on subprocess invocation.
+func Run(mode Mode, deps Deps) Result {
 	if mode != ModeStandalone {
-		if deps.Snapshotter == nil || deps.Realizer == nil || deps.StatePersister == nil {
+		if deps.Snapshotter == nil || deps.StatePersister == nil {
 			fmt.Println(theme.Error.Render("✗ wizard misconfigured: missing adapters"))
-			return 1
+			return Result{Code: 1}
 		}
 	}
 
@@ -24,7 +32,7 @@ func Run(mode Mode, deps Deps) int {
 	final, err := prog.Run()
 	if err != nil {
 		fmt.Println(theme.Error.Render("✗ tui error: " + err.Error()))
-		return 1
+		return Result{Code: 1}
 	}
 
 	m, ok := final.(Model)
@@ -32,21 +40,21 @@ func Run(mode Mode, deps Deps) int {
 		if pm, ok := final.(*Model); ok {
 			m = *pm
 		} else {
-			return 1
+			return Result{Code: 1}
 		}
 	}
 
 	switch m.step {
 	case stepDone:
-		return 0
+		return Result{Code: 0, RealizeRequested: m.realizeRequested}
 	case stepAborted:
-		return 130
+		return Result{Code: 130}
 	case stepFailed:
 		if m.err == nil {
 			m.err = errors.New("unspecified failure")
 		}
 		fmt.Println(theme.Error.Render("✗ " + m.err.Error()))
-		return 1
+		return Result{Code: 1}
 	}
-	return 1
+	return Result{Code: 1}
 }

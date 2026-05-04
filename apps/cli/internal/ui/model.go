@@ -3,14 +3,19 @@
 // the active step; the visual frame for every step is built from the
 // reusable primitives in internal/tui/components/screen and the tokens
 // in internal/tui/theme — no inline styling, no per-step layout.
+//
+// Realization (the `nh home switch` invocation) is NOT performed by
+// this wizard. After the user consents on stepRealizePrompt the wizard
+// exits with Result.RealizeRequested = true; main.go re-invokes the
+// dots binary as `dots deploy` so the realization driver renders
+// against the real terminal instead of inside an alt-screen TUI. See
+// ADR-0009.
 package ui
 
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -32,47 +37,37 @@ const (
 	stepScanning
 	stepConflict
 	stepSnapshotting
-	stepRealizing
+	stepRealizePrompt
 	stepDone
 	stepFailed
 	stepAborted
-)
-
-const (
-	realizeEstimateSec = 25
-	progressTickEvery  = 250 * time.Millisecond
 )
 
 // stepperLabels are the six labels shown in the top stepper during the
 // install flow (post-welcome, pre-scan).
 var stepperLabels = []string{"Shell", "Terminal", "Multiplexer", "Editor", "Git", "Confirm"}
 
-// Model is the wizard's bubbletea model.
+// Model is the wizard's bubbletea model. m.state is the single source
+// of truth for the persona — pillar selections write through it
+// directly; the on-disk file is only touched at persistAndAdvance.
+// Aborts (Esc, Cancel, Ctrl-C) discard the in-memory mutations because
+// the process exits.
 type Model struct {
 	mode Mode
 	deps Deps
 	step stepID
 
-	spinner  spinner.Model
-	progress progress.Model
+	spinner spinner.Model
 
-	state           state.State
-	formShell       string
-	formTerminal    string
-	formMultiplexer string
-	formEditor      bool
-	formGit         bool
-
+	state  state.State
 	cursor int
 
-	collisions     []Collision
-	snapshotResult SnapshotResult
-	realizeResult  RealizationResult
-	err            error
+	collisions       []Collision
+	snapshotResult   SnapshotResult
+	realizeRequested bool
 
-	startedAt time.Time
-	width     int
-	height    int
+	err   error
+	width int
 }
 
 // New returns a fully wired model ready for tea.NewProgram.
@@ -80,34 +75,21 @@ func New(mode Mode, deps Deps) *Model {
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 	sp.Style = theme.Spinner
 
-	pr := progress.New(
-		progress.WithGradient(string(theme.ColAccent), string(theme.ColSuccess)),
-		progress.WithoutPercentage(),
-	)
-	pr.Width = 50
-
 	initial := deps.Initial
 	if initial.SchemaVersion == 0 {
 		initial = state.Default()
 	}
 
 	m := &Model{
-		mode:            mode,
-		deps:            deps,
-		spinner:         sp,
-		progress:        pr,
-		state:           initial,
-		formShell:       initial.Pillars.Shell,
-		formTerminal:    initial.Pillars.Terminal,
-		formMultiplexer: initial.Pillars.Multiplexer,
-		formEditor:      initial.Capabilities.Editor,
-		formGit:         initial.Capabilities.Git,
+		mode:    mode,
+		deps:    deps,
+		spinner: sp,
+		state:   initial,
 	}
 
-	switch mode {
-	case ModeSync:
+	if mode == ModeSync {
 		m.step = stepScanning
-	default:
+	} else {
 		m.step = stepWelcome
 	}
 	m.cursor = m.initialCursor(m.step)
@@ -115,20 +97,16 @@ func New(mode Mode, deps Deps) *Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	switch m.step {
-	case stepScanning:
+	if m.step == stepScanning {
 		return tea.Batch(m.spinner.Tick, m.scanCmd())
-	default:
-		return m.spinner.Tick
 	}
+	return m.spinner.Tick
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.height = msg.Height
-		m.progress.Width = min(60, msg.Width-10)
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -142,13 +120,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
-	case progressTickMsg:
-		return m.handleProgressTick()
-
 	case scanCompleteMsg:
 		m.collisions = msg.collisions
 		if len(m.collisions) == 0 {
-			return m.startRealize()
+			return m.routeAfterScan()
 		}
 		return m.transition(stepConflict), nil
 
@@ -158,26 +133,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case snapshotCompleteMsg:
 		m.snapshotResult = SnapshotResult(msg)
-		return m.startRealize()
+		return m.routeAfterScan()
 
 	case snapshotFailedMsg:
 		m.err = msg.err
 		return m.fail()
-
-	case realizeCompleteMsg:
-		m.realizeResult = RealizationResult(msg)
-		_ = m.progress.SetPercent(1.0)
-		return m.transition(stepDone), tea.Quit
-
-	case realizeFailedMsg:
-		m.err = msg.err
-		return m.fail()
-
-	case progress.FrameMsg:
-		newP, cmd := m.progress.Update(msg)
-		p, _ := newP.(progress.Model)
-		m.progress = p
-		return m, cmd
 	}
 
 	return m, nil
@@ -192,7 +152,7 @@ func (m Model) View() string {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.step {
 	case stepWelcome, stepShell, stepTerminal, stepMultiplexer,
-		stepEditor, stepGit, stepConfirm, stepConflict:
+		stepEditor, stepGit, stepConfirm, stepConflict, stepRealizePrompt:
 		return m.handleSelectKey(msg)
 
 	case stepDone, stepFailed, stepAborted:
@@ -226,72 +186,88 @@ func (m Model) handleSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// selectionStep describes a step that captures one piece of persona
+// state. apply mutates m.state from the cursor; next is the step the
+// commit advances to. One row per pillar/capability — adding a step
+// is a one-line table edit.
+type selectionStep struct {
+	apply func(s *state.State, cursor int)
+	next  stepID
+}
+
+var selectionSteps = map[stepID]selectionStep{
+	stepShell: {
+		apply: func(s *state.State, c int) { s.Pillars.Shell = ShellOptions[c].Value },
+		next:  stepTerminal,
+	},
+	stepTerminal: {
+		apply: func(s *state.State, c int) { s.Pillars.Terminal = TerminalOptions[c].Value },
+		next:  stepMultiplexer,
+	},
+	stepMultiplexer: {
+		apply: func(s *state.State, c int) { s.Pillars.Multiplexer = MultiplexerOptions[c].Value },
+		next:  stepEditor,
+	},
+	stepEditor: {
+		apply: func(s *state.State, c int) { s.Capabilities.Editor = c == 0 },
+		next:  stepGit,
+	},
+	stepGit: {
+		apply: func(s *state.State, c int) { s.Capabilities.Git = c == 0 },
+		next:  stepConfirm,
+	},
+}
+
 func (m Model) commit() (tea.Model, tea.Cmd) {
+	if def, ok := selectionSteps[m.step]; ok {
+		def.apply(&m.state, m.cursor)
+		return m.transition(def.next), nil
+	}
+
 	switch m.step {
 	case stepWelcome:
-		if m.cursor == 1 {
-			m.step = stepAborted
-			return m, tea.Quit
-		}
-		switch m.mode {
-		case ModeInstall, ModeStandalone:
+		return m.commitOrAbort(func() (tea.Model, tea.Cmd) {
+			if m.mode == ModeSync {
+				return m.startScan()
+			}
 			return m.transition(stepShell), nil
-		case ModeSync:
-			return m.startScan()
-		}
-
-	case stepShell:
-		m.formShell = ShellOptions[m.cursor].Value
-		return m.transition(stepTerminal), nil
-
-	case stepTerminal:
-		m.formTerminal = TerminalOptions[m.cursor].Value
-		return m.transition(stepMultiplexer), nil
-
-	case stepMultiplexer:
-		m.formMultiplexer = MultiplexerOptions[m.cursor].Value
-		return m.transition(stepEditor), nil
-
-	case stepEditor:
-		m.formEditor = m.cursor == 0
-		return m.transition(stepGit), nil
-
-	case stepGit:
-		m.formGit = m.cursor == 0
-		return m.transition(stepConfirm), nil
-
+		})
 	case stepConfirm:
-		if m.cursor != 0 {
-			m.step = stepAborted
-			return m, tea.Quit
-		}
-		return m.persistAndAdvance()
-
+		return m.commitOrAbort(m.persistAndAdvance)
 	case stepConflict:
-		if m.cursor != 0 {
-			m.step = stepAborted
-			return m, tea.Quit
-		}
-		return m.startSnapshot()
+		return m.commitOrAbort(m.startSnapshot)
+	case stepRealizePrompt:
+		m.realizeRequested = m.cursor == 0
+		return m.transition(stepDone), tea.Quit
 	}
 	return m, nil
 }
 
-// back returns to the previous step. Pillar selections persist in
-// formXxx fields independently of cursor; transition() reseeds cursor
-// from the captured value so the user sees their prior choice highlighted.
+// commitOrAbort is the shape every binary-prompt step shares: row 0
+// confirms and runs action; any other row aborts the wizard.
+func (m Model) commitOrAbort(action func() (tea.Model, tea.Cmd)) (tea.Model, tea.Cmd) {
+	if m.cursor != 0 {
+		m.step = stepAborted
+		return m, tea.Quit
+	}
+	return action()
+}
+
+// previousStep is the Esc target for each step that supports it. Steps
+// absent from the map have no back action. stepRealizePrompt is
+// intentionally absent: once the state file is persisted, the prompt
+// is a forward-only consent gate.
+var previousStep = map[stepID]stepID{
+	stepTerminal:    stepShell,
+	stepMultiplexer: stepTerminal,
+	stepEditor:      stepMultiplexer,
+	stepGit:         stepEditor,
+	stepConfirm:     stepGit,
+}
+
 func (m Model) back() (tea.Model, tea.Cmd) {
-	switch m.step {
-	case stepTerminal:
-		return m.transition(stepShell), nil
-	case stepMultiplexer:
-		return m.transition(stepTerminal), nil
-	case stepEditor:
-		return m.transition(stepMultiplexer), nil
-	case stepGit:
-		return m.transition(stepEditor), nil
-	case stepConfirm:
-		return m.transition(stepGit), nil
+	if prev, ok := previousStep[m.step]; ok {
+		return m.transition(prev), nil
 	}
 	return m, nil
 }
@@ -304,50 +280,60 @@ func (m Model) transition(s stepID) Model {
 	return m
 }
 
+// cursorSeeders restores the cursor to the row that matches the
+// current persona on entry to a selection step (or on Esc-back). Steps
+// absent from the map default to row 0, which is also the affirmative
+// row for prompt-style steps (welcome, confirm, conflict,
+// stepRealizePrompt).
+var cursorSeeders = map[stepID]func(Model) int{
+	stepShell:       func(m Model) int { return indexOf(ShellOptions, m.state.Pillars.Shell) },
+	stepTerminal:    func(m Model) int { return indexOf(TerminalOptions, m.state.Pillars.Terminal) },
+	stepMultiplexer: func(m Model) int { return indexOf(MultiplexerOptions, m.state.Pillars.Multiplexer) },
+	stepEditor:      func(m Model) int { return boolToCursor(m.state.Capabilities.Editor) },
+	stepGit:         func(m Model) int { return boolToCursor(m.state.Capabilities.Git) },
+}
+
 func (m Model) initialCursor(s stepID) int {
-	switch s {
-	case stepShell:
-		return indexOf(ShellOptions, m.formShell)
-	case stepTerminal:
-		return indexOf(TerminalOptions, m.formTerminal)
-	case stepMultiplexer:
-		return indexOf(MultiplexerOptions, m.formMultiplexer)
-	case stepEditor:
-		if m.formEditor {
-			return 0
-		}
-		return 1
-	case stepGit:
-		if m.formGit {
-			return 0
-		}
-		return 1
+	if f, ok := cursorSeeders[s]; ok {
+		return f(m)
 	}
 	return 0
 }
 
-// persistAndAdvance copies the captured persona into m.state, writes
-// it via StatePersister, and starts the scan. ModeStandalone short-
-// circuits to Done after writing — there is no workspace to scan or
-// realize against.
-func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
-	m.state.Pillars.Shell = m.formShell
-	m.state.Pillars.Terminal = m.formTerminal
-	m.state.Pillars.Multiplexer = m.formMultiplexer
-	m.state.Capabilities.Editor = m.formEditor
-	m.state.Capabilities.Git = m.formGit
+// boolToCursor maps the affirmative/negative value of a Yes/No
+// selection back to its row index. Yes = row 0; No = row 1.
+func boolToCursor(yes bool) int {
+	if yes {
+		return 0
+	}
+	return 1
+}
 
+// persistAndAdvance writes the in-memory persona to disk and starts
+// the scan. ModeStandalone short-circuits to Done — there is no
+// workspace to scan or realize against.
+func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
 	if m.deps.StatePersister != nil {
 		if err := m.deps.StatePersister.SaveState(m.state); err != nil {
 			m.err = fmt.Errorf("persist state: %w", err)
 			return m.fail()
 		}
 	}
-
 	if m.mode == ModeStandalone {
 		return m.transition(stepDone), tea.Quit
 	}
 	return m.startScan()
+}
+
+// routeAfterScan is the post-scan / post-snapshot fork: install asks
+// the user one more time on stepRealizePrompt; sync auto-realizes
+// because the user invoked `dots sync` precisely to re-realize.
+func (m Model) routeAfterScan() (tea.Model, tea.Cmd) {
+	if m.mode == ModeSync {
+		m.realizeRequested = true
+		return m.transition(stepDone), tea.Quit
+	}
+	return m.transition(stepRealizePrompt), nil
 }
 
 func (m Model) startScan() (tea.Model, tea.Cmd) {
@@ -358,29 +344,6 @@ func (m Model) startScan() (tea.Model, tea.Cmd) {
 func (m Model) startSnapshot() (tea.Model, tea.Cmd) {
 	next := m.transition(stepSnapshotting)
 	return next, tea.Batch(next.spinner.Tick, next.snapshotCmd())
-}
-
-func (m Model) startRealize() (tea.Model, tea.Cmd) {
-	next := m.transition(stepRealizing)
-	next.startedAt = time.Now()
-	return next, tea.Batch(
-		next.spinner.Tick,
-		next.realizeCmd(),
-		next.progressTickCmd(),
-	)
-}
-
-func (m Model) handleProgressTick() (tea.Model, tea.Cmd) {
-	if m.step != stepRealizing {
-		return m, nil
-	}
-	elapsed := time.Since(m.startedAt).Seconds()
-	pct := elapsed / float64(realizeEstimateSec)
-	if pct > 0.95 {
-		pct = 0.95
-	}
-	cmd := m.progress.SetPercent(pct)
-	return m, tea.Batch(cmd, m.progressTickCmd())
 }
 
 func (m Model) fail() (tea.Model, tea.Cmd) {
@@ -413,23 +376,6 @@ func (m Model) snapshotCmd() tea.Cmd {
 	}
 }
 
-func (m Model) realizeCmd() tea.Cmd {
-	deps := m.deps
-	return func() tea.Msg {
-		res, err := deps.Realizer.Realize()
-		if err != nil {
-			return realizeFailedMsg{err: err}
-		}
-		return realizeCompleteMsg(res)
-	}
-}
-
-func (m Model) progressTickCmd() tea.Cmd {
-	return tea.Tick(progressTickEvery, func(t time.Time) tea.Msg {
-		return progressTickMsg(t)
-	})
-}
-
 // -- helpers --------------------------------------------------------
 
 func indexOf(opts []Option, value string) int {
@@ -441,47 +387,61 @@ func indexOf(opts []Option, value string) int {
 	return 0
 }
 
-// renderDoneSummary builds the post-realize "what just happened" block
-// for stepDone (the only screen wrapped in OutcomePanel).
+// renderDoneSummary builds the post-wizard "what just happened" block
+// for stepDone. The deploy status is what the wizard *decided*; the
+// subprocess outcome is reported by main.go after control returns.
 func (m Model) renderDoneSummary() string {
-	var b strings.Builder
+	rows := make([]string, 0, 4)
 	if m.snapshotResult.Count > 0 {
-		fmt.Fprintf(&b, "  %s snapshot %s %s\n",
-			theme.BadgeOK,
-			theme.Muted.Render("→"),
-			theme.Body.Render(fmt.Sprintf("%d path(s) → %s", m.snapshotResult.Count, m.snapshotResult.Path)))
+		rows = append(rows, summaryRow(theme.BadgeOK, "snapshot",
+			theme.Body.Render(fmt.Sprintf("%d path(s) → %s",
+				m.snapshotResult.Count, m.snapshotResult.Path))))
 	}
+	rows = append(rows,
+		summaryRow(theme.BadgeOK, "persona", theme.Body.Render(m.personaLine())),
+		summaryRow(theme.BadgeOK, "extras ", theme.Body.Render(m.extrasLine())),
+		m.deployRow(),
+	)
+	return strings.Join(rows, "\n")
+}
 
-	persona := fmt.Sprintf("%s · %s · %s",
+func (m Model) personaLine() string {
+	return fmt.Sprintf("%s · %s · %s",
 		m.state.Pillars.Shell, m.state.Pillars.Terminal, m.state.Pillars.Multiplexer)
-	extras := []string{}
+}
+
+func (m Model) extrasLine() string {
+	var picks []string
 	if m.state.Capabilities.Editor {
-		extras = append(extras, "editor")
+		picks = append(picks, "editor")
 	}
 	if m.state.Capabilities.Git {
-		extras = append(extras, "git")
+		picks = append(picks, "git")
 	}
-	extrasLine := "(none)"
-	if len(extras) > 0 {
-		extrasLine = strings.Join(extras, ", ")
+	if len(picks) == 0 {
+		return "(none)"
 	}
+	return strings.Join(picks, ", ")
+}
 
-	fmt.Fprintf(&b, "  %s persona %s %s\n",
-		theme.BadgeOK, theme.Muted.Render("→"), theme.Body.Render(persona))
-	fmt.Fprintf(&b, "  %s extras  %s %s\n",
-		theme.BadgeOK, theme.Muted.Render("→"), theme.Body.Render(extrasLine))
-
-	if m.mode == ModeStandalone {
-		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
-			theme.BadgeWarn, theme.Muted.Render("→"), theme.Muted.Render("not run (no workspace)"))
-	} else {
-		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
-			theme.BadgeOK, theme.Muted.Render("→"),
-			theme.Body.Render(fmt.Sprintf("%s in %.1fs",
-				MoonRunDeploy, float64(m.realizeResult.DurationMs)/1000.0)))
+// deployRow renders the wizard's deploy-row outcome. Text is always
+// muted because main.go owns the authoritative deploy result; the row
+// here only reports what the wizard *decided*.
+func (m Model) deployRow() string {
+	badge, text := theme.BadgeWarn, "deferred — run `dots deploy` when ready"
+	switch {
+	case m.mode == ModeStandalone:
+		text = "not run (no workspace)"
+	case m.realizeRequested:
+		badge, text = theme.BadgeOK, "running "+MoonRunDeploy+"…"
 	}
+	return summaryRow(badge, "deploy ", theme.Muted.Render(text))
+}
 
-	b.WriteString("\n")
-	b.WriteString(theme.Muted.Render("Open a new shell to pick up changes."))
-	return b.String()
+// summaryRow lays out one outcome row: badge, label, → arrow, then a
+// pre-rendered value. The caller picks the value's typography (body vs
+// muted) so the helper stays unaware of semantic styling.
+func summaryRow(badge fmt.Stringer, label, renderedValue string) string {
+	return fmt.Sprintf("  %s %s %s %s",
+		badge, label, theme.Muted.Render("→"), renderedValue)
 }
