@@ -391,41 +391,84 @@ func resolveMoonCmd() (*exec.Cmd, string) {
 	return nil, ""
 }
 
-// moonEnv returns a copy of os.Environ() with the workspace's proto
-// shims, proto bin, and devenv profile bin prepended to PATH. Moon's
-// tasks (cli:build, modules:deploy → nh home switch, treefmt) are
-// orchestrators that spawn their own children — those children
-// inherit our subprocess PATH, not the user's interactive shell, so
-// without this prepend a non-direnv-activated shell ends in `go:
-// command not found` partway through deploy. This is intentionally
-// the same shape direnv's `use flake` produces, narrowed to the dirs
-// moon's tasks actually consume. Missing dirs are skipped silently:
-// on a truly fresh clone neither `.proto` nor `.devenv` exist yet,
-// and the resolver's nix-develop layer picks up the slack.
+// moonEnv resolves the workspace, the home dir, and the current
+// environment, then delegates to buildMoonEnv (the pure function).
+// Split for testability — buildMoonEnv has no os/workspace coupling.
 func moonEnv() []string {
 	env := os.Environ()
 	root, err := workspace.Root()
 	if err != nil {
 		return env
 	}
-	var extras []string
-	for _, sub := range []string{".proto/shims", ".proto/bin", ".devenv/profile/bin"} {
-		p := filepath.Join(root, sub)
-		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
-			extras = append(extras, p)
+	home, _ := os.UserHomeDir()
+	return buildMoonEnv(env, root, home)
+}
+
+// buildMoonEnv mirrors devenv.nix's enterShell so moon's task
+// subprocesses run with the same environment a direnv-activated
+// shell would give them. From devenv.nix:
+//
+//	export PROTO_HOME="$DEVENV_ROOT/.proto"
+//	export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$HOME/.cargo/bin:$PATH"
+//
+// Without PROTO_HOME, proto walks up to the user-level ~/.proto
+// install, where the workspace's pinned tool versions are NOT
+// installed — the user sees "this version has not been installed"
+// even though `<workspace>/.proto/tools/<tool>/<version>/` is right
+// there. v0.4.0–v0.4.2 each chipped at the symptoms; this function
+// recreates the full activation in one place so the regression is
+// caught at the unit level.
+//
+// Pure function: no os.Stat, no os.Getenv, no workspace.Root. The
+// caller (moonEnv) supplies them. Missing directories are NOT
+// filtered here — the caller may pass paths that don't yet exist
+// on a fresh clone, and that's fine: the resolver's nix-develop
+// layer covers that case. We do skip empty homeDir though, because
+// `~/.cargo/bin` resolved from a missing $HOME would land at
+// `/.cargo/bin` and the noise on PATH is worse than the omission.
+func buildMoonEnv(env []string, workspaceRoot, homeDir string) []string {
+	protoHome := filepath.Join(workspaceRoot, ".proto")
+	env = setEnvKey(env, "PROTO_HOME", protoHome)
+
+	extras := []string{
+		filepath.Join(protoHome, "shims"),
+		filepath.Join(protoHome, "bin"),
+		filepath.Join(workspaceRoot, ".devenv", "profile", "bin"),
+	}
+	if homeDir != "" {
+		extras = append(extras, filepath.Join(homeDir, ".cargo", "bin"))
+	}
+	return prependPathEntries(env, extras)
+}
+
+// setEnvKey returns env with key=val present (replaced or appended).
+func setEnvKey(env []string, key, val string) []string {
+	prefix := key + "="
+	for i, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			env[i] = prefix + val
+			return env
 		}
 	}
+	return append(env, prefix+val)
+}
+
+// prependPathEntries prepends extras (in given order) to env's PATH.
+// extras may be nil — env is returned unchanged. When env carries no
+// PATH, one is synthesized from extras alone.
+func prependPathEntries(env, extras []string) []string {
 	if len(extras) == 0 {
 		return env
 	}
 	sep := string(os.PathListSeparator)
+	prepend := strings.Join(extras, sep)
 	for i, e := range env {
 		if strings.HasPrefix(e, "PATH=") {
-			env[i] = "PATH=" + strings.Join(extras, sep) + sep + strings.TrimPrefix(e, "PATH=")
+			env[i] = "PATH=" + prepend + sep + strings.TrimPrefix(e, "PATH=")
 			return env
 		}
 	}
-	return append(env, "PATH="+strings.Join(extras, sep))
+	return append(env, "PATH="+prepend)
 }
 
 // short renders the first 12 hex chars of a hash for human surfaces.
