@@ -43,6 +43,66 @@ type statusDocJSON struct {
 	Workspace     string               `json:"workspace"`
 	Profile       *statusProfileJSON   `json:"profile"`
 	LastApply     *statusLastApplyJSON `json:"lastApply"`
+	Drift         *statusDriftJSON     `json:"drift"`
+}
+
+// statusDriftJSON reports whether the live receipt matches a fresh
+// plan computed against the current workspace. Drift is the cheap
+// signal — actual closure-level diffing requires a build, which
+// status declines to do. Pointers to the right next-step verb live
+// in the human renderer; JSON consumers branch on Kind.
+type statusDriftJSON struct {
+	// Kind is one of "converged", "stale", "no-receipt", "rollback",
+	// "unknown" (plan computation failed; e.g., no workspace).
+	Kind        string `json:"kind"`
+	FreshHash   string `json:"freshHash,omitempty"`
+	AppliedHash string `json:"appliedHash,omitempty"`
+}
+
+// driftKind is the typed verdict from comparing applied.toml against
+// a freshly computed plan. Order is intentional — status renders the
+// kinds left-to-right by ascending severity.
+type driftKind int
+
+const (
+	driftUnknown   driftKind = iota // could not compute a fresh plan
+	driftConverged                  // applied hash matches fresh hash
+	driftRollback                   // applied via `dots rollback`; receipt has no plan hash
+	driftNoReceipt                  // never applied on this host
+	driftStale                      // applied hash != fresh hash
+)
+
+func (k driftKind) String() string {
+	switch k {
+	case driftConverged:
+		return "converged"
+	case driftRollback:
+		return "rollback"
+	case driftNoReceipt:
+		return "no-receipt"
+	case driftStale:
+		return "stale"
+	default:
+		return "unknown"
+	}
+}
+
+// classifyDrift assembles the verdict from the inputs status already
+// has on hand. Pure: same inputs, same kind, regardless of host.
+func classifyDrift(last *statusLastApplyJSON, freshHash string, freshErr error) driftKind {
+	if freshErr != nil {
+		return driftUnknown
+	}
+	if last == nil {
+		return driftNoReceipt
+	}
+	if last.PlanHash == "" {
+		return driftRollback
+	}
+	if last.PlanHash == freshHash {
+		return driftConverged
+	}
+	return driftStale
 }
 
 // runStatus implements `dots status [--json]`. Read-only inspector;
@@ -106,17 +166,36 @@ func runStatus(rest []string) int {
 		appliedErr = err
 	}
 
+	// Drift: compare applied receipt against a freshly computed plan.
+	// computePlan failure (e.g., $HOME unreadable) maps to driftUnknown
+	// so status stays informational — drift is supplementary, not
+	// load-bearing.
+	freshPlan, freshErr := computePlan("")
+	freshHash := ""
+	if freshErr == nil {
+		freshHash = freshPlan.Hash
+	}
+	drift := classifyDrift(lastPtr, freshHash, freshErr)
+	driftPtr := &statusDriftJSON{
+		Kind:      drift.String(),
+		FreshHash: freshHash,
+	}
+	if lastPtr != nil {
+		driftPtr.AppliedHash = lastPtr.PlanHash
+	}
+
 	if common.JSON {
 		emitStatusJSON(statusDocJSON{
 			SchemaVersion: 1,
 			Workspace:     root,
 			Profile:       profilePtr,
 			LastApply:     lastPtr,
+			Drift:         driftPtr,
 		})
 		return exitcode.Success
 	}
 
-	renderStatusHuman(root, profilePtr, lastPtr, profileErr, appliedErr)
+	renderStatusHuman(root, profilePtr, lastPtr, profileErr, appliedErr, drift, freshHash)
 	return exitcode.Success
 }
 
@@ -137,6 +216,8 @@ func renderStatusHuman(
 	profile *statusProfileJSON,
 	last *statusLastApplyJSON,
 	profileErr, appliedErr error,
+	drift driftKind,
+	freshHash string,
 ) {
 	const labelWidth = "%-11s %s\n"
 	fmt.Printf(labelWidth, "workspace", root)
@@ -161,17 +242,36 @@ func renderStatusHuman(
 	case last == nil:
 		fmt.Printf(labelWidth, "applied", "never applied")
 	default:
-		hash := last.PlanHash
-		if len(hash) > 8 {
-			hash = hash[:8]
-		}
 		profileLabel := last.Profile
 		if profileLabel == "" {
 			profileLabel = "-"
 		}
 		fmt.Printf(labelWidth, "applied",
 			fmt.Sprintf("%s (plan %s) profile %s",
-				last.AppliedAt, hash, profileLabel))
+				last.AppliedAt, short(last.PlanHash), profileLabel))
+	}
+
+	fmt.Printf(labelWidth, "drift", driftLine(drift, last, freshHash))
+}
+
+// driftLine renders the drift verdict as a single line. The wording
+// names the next-step verb so a user reading status knows what to do.
+func driftLine(kind driftKind, last *statusLastApplyJSON, freshHash string) string {
+	switch kind {
+	case driftConverged:
+		return fmt.Sprintf("converged (plan %s)", short(freshHash))
+	case driftStale:
+		return fmt.Sprintf("stale: applied %s, fresh would be %s — run `dots apply`",
+			short(last.PlanHash), short(freshHash))
+	case driftNoReceipt:
+		if freshHash != "" {
+			return fmt.Sprintf("no receipt — run `dots apply` to land plan %s", short(freshHash))
+		}
+		return "no receipt — system has never been applied"
+	case driftRollback:
+		return fmt.Sprintf("rollback in effect; fresh plan would be %s", short(freshHash))
+	default:
+		return "unknown (could not compute fresh plan)"
 	}
 }
 
