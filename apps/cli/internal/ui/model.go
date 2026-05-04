@@ -1,8 +1,8 @@
-// Package ui hosts the dots install/sync/standalone wizard. The
-// dispatcher in this file owns wizard state and routes key events to
-// the active step; the visual frame for every step is built from the
-// reusable primitives in internal/tui/components/screen and the tokens
-// in internal/tui/theme — no inline styling, no per-step layout.
+// Package ui hosts the dots install/sync wizard. The dispatcher in
+// this file owns wizard state and routes key events to the active
+// step; the visual frame for every step is built from the reusable
+// primitives in internal/tui/components/screen and the tokens in
+// internal/tui/theme — no inline styling, no per-step layout.
 //
 // Realization (the `nh home switch` invocation) is NOT performed by
 // this wizard. After the user consents on stepRealizePrompt the wizard
@@ -310,17 +310,14 @@ func boolToCursor(yes bool) int {
 }
 
 // persistAndAdvance writes the in-memory persona to disk and starts
-// the scan. ModeStandalone short-circuits to Done — there is no
-// workspace to scan or realize against.
+// the scan. ADR-0012 removed the standalone short-circuit; every
+// wizard run is workspace-backed and proceeds to scan unconditionally.
 func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
 	if m.deps.StatePersister != nil {
 		if err := m.deps.StatePersister.SaveState(m.state); err != nil {
 			m.err = fmt.Errorf("persist state: %w", err)
 			return m.fail()
 		}
-	}
-	if m.mode == ModeStandalone {
-		return m.transition(stepDone), tea.Quit
 	}
 	return m.startScan()
 }
@@ -406,8 +403,7 @@ func (m Model) renderDoneSummary() string {
 }
 
 func (m Model) personaLine() string {
-	return fmt.Sprintf("%s · %s · %s",
-		m.state.Pillars.Shell, m.state.Pillars.Terminal, m.state.Pillars.Multiplexer)
+	return m.state.Pillars.Format()
 }
 
 func (m Model) extrasLine() string {
@@ -429,10 +425,7 @@ func (m Model) extrasLine() string {
 // here only reports what the wizard *decided*.
 func (m Model) deployRow() string {
 	badge, text := theme.BadgeWarn, "deferred — run `dots deploy` when ready"
-	switch {
-	case m.mode == ModeStandalone:
-		text = "not run (no workspace)"
-	case m.realizeRequested:
+	if m.realizeRequested {
 		badge, text = theme.BadgeOK, "running "+MoonRunDeploy+"…"
 	}
 	return summaryRow(badge, "deploy ", theme.Muted.Render(text))

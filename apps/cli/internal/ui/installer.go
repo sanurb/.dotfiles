@@ -21,11 +21,9 @@ type Result struct {
 // Run launches the wizard. Callers (main.go) translate Result into
 // either a direct os.Exit or a follow-on subprocess invocation.
 func Run(mode Mode, deps Deps) Result {
-	if mode != ModeStandalone {
-		if deps.Snapshotter == nil || deps.StatePersister == nil {
-			fmt.Println(theme.Error.Render("✗ wizard misconfigured: missing adapters"))
-			return Result{Code: 1}
-		}
+	if deps.Snapshotter == nil || deps.StatePersister == nil {
+		fmt.Println(theme.Error.Render("✗ wizard misconfigured: missing adapters"))
+		return Result{Code: 1}
 	}
 
 	prog := tea.NewProgram(New(mode, deps), tea.WithAltScreen())

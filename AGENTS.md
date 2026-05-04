@@ -43,12 +43,16 @@ Maintainability gains at the cost of reviewability are a net loss.
 
 1. **The TUI binary** (`apps/cli`) — distributed standalone via Homebrew
    tap, GitHub releases (curl-install fetcher), and `nix run`. Runs
-   anywhere a Go binary runs. Does not require Nix at runtime. Produces
-   `~/.config/dots/selection.toml`.
+   anywhere a Go binary runs. On a machine missing Nix or the workspace
+   clone it self-bootstraps both with explicit per-prereq consent
+   ([ADR-0010](docs/adr/0010-dots-deploy-self-bootstraps-prereqs.md),
+   [ADR-0012](docs/adr/0012-default-flow-converges-no-intermediate-artifact.md))
+   rather than producing a portable-profile artifact and stopping.
+   Writes the workspace state file (`.dots-state.toml`).
 2. **The realization layer** (`modules/`, `flake.nix`) — a Nix flake plus
    Home Manager (and a reserved nix-darwin slot) that consume
-   `selection.toml` and realize the system. Requires Nix and the cloned
-   workspace.
+   `.dots-state.toml` and realize the system. Requires Nix and the
+   cloned workspace.
 
 Components do not import each other across the split. The TUI knows
 nothing about Nix; the realization layer knows nothing about Go source
@@ -68,8 +72,8 @@ concern.
 | Build/test/lint DAG | Moon | Go DAG under `apps/` plus repo-root tasks (formatting, repo-wide gates) declared in top-level `moon.yml`. Does not orchestrate Nix. ([ADR-0005](docs/adr/0005-moon-owns-go-dag-never-nix.md)) |
 | Dev shell entry | Devenv (via `nix develop`) | Shell package set, treefmt integration, hooks. `languages.*` left empty by design. Direnv activates it. |
 | Formatting | treefmt | Multi-language formatter dispatch via `nix fmt`. |
-| Realization driver | `nh` (+ `nom` renderer) | `dots deploy` shells out to `nh home switch`; `nom` composed via `$PATH`. ([ADR-0006](docs/adr/0006-nh-deploy-driver-nom-build-renderer.md)) |
-| User-facing UX | `dots` binary | Reading and writing `selection.toml`. Never installs packages. Never calls `brew`, `curl \| sh`, or `pip install`. |
+| Realization driver | `nh` (+ `nom` renderer) | `dots apply` (alias `deploy`) shells out to `nh home switch` via `moon run modules:deploy`; `nom` composed via `$PATH`. ([ADR-0006](docs/adr/0006-nh-deploy-driver-nom-build-renderer.md)) |
+| User-facing UX | `dots` binary | Reading and writing `.dots-state.toml`. Bootstraps Nix and the workspace clone behind explicit consent (ADR-0010, ADR-0012). Never installs packages, never calls `brew` or `pip install`. |
 
 `$PATH` priority, top to bottom: Proto shims → nix-darwin / NixOS system
 → Home Manager profile → OS defaults. `dots doctor` verifies this order.
@@ -108,16 +112,30 @@ Nix but no clone of the workspace.
 
 ### Depth
 
-| Depth | What runs | Realizes system? | Requires Nix? | Requires workspace clone? |
-|---|---|---|---|---|
-| TUI only | `dots install` | No | No | No |
-| Full | `dots install` then `dots deploy` | Yes | Yes (offered on demand) | Yes (offered on demand) |
+After ADR-0012, depth collapses to one path: `dots init` (or its
+`dots install` alias, or bare `dots`) takes the user from a fresh
+machine to a configured system in a single invocation, gated only by
+per-prereq `[y/N]` prompts (ADR-0010). The wizard captures the
+profile, the post-wizard handoff calls `dots apply --yes` as a
+subprocess (ADR-0009), and apply walks the plan: install Nix → clone
+workspace → snapshot conflicts → realize. No "capture a profile and
+then do these three things by hand" intermediate.
 
-The TUI's exit screen states which step is done and what remains; the
-asymmetry is communicated by binary output, not by gatekeeping channels.
-`dots deploy` self-bootstraps both prereqs with explicit per-prereq
-consent (ADR-0010); a fresh machine reaches realization through prompts,
-not through a copy-and-paste recipe.
+| Verb (canonical) | Aliases | Side-effect class |
+|---|---|---|
+| `dots init` | `install`, bare `dots` | converge — bootstrap, wizard, apply |
+| `dots apply` | `deploy` | converge — realize the plan |
+| `dots update` | — | converge — `git pull --ff-only && dots apply` |
+| `dots rollback` | — | converge — switch Home Manager generation |
+| `dots sync` | — | converge — brownfield-safe wizard |
+| `dots status`, `plan`, `diff`, `doctor`, `why`, `explain`, `scan` | — | measure (read-only) |
+| `dots capture`, `profile`, `completion`, `backup` | — | power-user / composable |
+| `dots version`, `help` | — | meta |
+
+ADR-0013 records the verb grammar and the stable exit-code contract;
+ADR-0014 records the plan-as-artifact contract. `dots help <verb>`
+prints the per-verb summary; `dots explain <topic>` is the built-in
+topic browser shipped inside the binary.
 
 ## Architectural Invariants
 
@@ -127,7 +145,7 @@ Properties that must never break. Each has a verification command.
 |---|---|---|
 | I1 | The TUI binary does not import any Nix-related Go modules. Subprocess invocation of sibling subcommands (e.g. `dots install` exec-ing `dots deploy`) and external binaries (`nh`, `moon`, the Determinate Systems installer) is permitted — that is not an import, and the TUI does not encode Nix concepts beyond the existence of the sibling subcommand. ADR-0009 records the distinction. | runnable — see block below |
 | I2 | The realization layer references the TUI tree only at the schema-contract surface | runnable — see block below |
-| I3 | `selection.toml` schema agrees between Go and Nix consumers | manual: PR review (automated parity check deferred — §12) |
+| I3 | `.dots-state.toml` schema agrees between Go and Nix consumers | manual: PR review (automated parity check deferred — §12) |
 | I4 | `nix develop -c` is the only sanctioned execution surface for dev tooling | manual: PR review |
 | I5 | `flake.lock` is never hand-edited | runnable — see block below |
 | I6 | Every subcommand declares workspace-required vs workspace-optional | manual: review every new command in `apps/cli/` |
@@ -167,6 +185,9 @@ accepted unless marked otherwise.
 | 0006 | [`nh` is the deploy driver, `nom` the build renderer](docs/adr/0006-nh-deploy-driver-nom-build-renderer.md) |
 | 0007 | [`apps/` directory admission criteria](docs/adr/0007-apps-directory-admission-criteria.md) |
 | 0008 | [Per-tool nixpkgs pinning experiment](docs/adr/0008-per-tool-nixpkgs-pinning-experiment.md) |
-| 0009 | [The TUI invokes `dots deploy` via subprocess](docs/adr/0009-tui-invokes-deploy-via-subprocess.md) |
-| 0010 | [`dots deploy` self-bootstraps Nix and the workspace clone](docs/adr/0010-dots-deploy-self-bootstraps-prereqs.md) |
+| 0009 | [The TUI invokes `dots apply` via subprocess](docs/adr/0009-tui-invokes-deploy-via-subprocess.md) |
+| 0010 | [`dots apply` self-bootstraps Nix and the workspace clone](docs/adr/0010-dots-deploy-self-bootstraps-prereqs.md) |
+| 0012 | [The default flow converges; no intermediate artifact](docs/adr/0012-default-flow-converges-no-intermediate-artifact.md) |
+| 0013 | [Verb grammar and exit-code contract](docs/adr/0013-verb-grammar-and-exit-code-contract.md) |
+| 0014 | [Plan as a first-class artifact](docs/adr/0014-plan-as-first-class-artifact.md) |
 | 0011 | [Curl-install promoted to a peer of Homebrew and `nix run`](docs/adr/0011-curl-install-promoted-to-primary-path.md) |

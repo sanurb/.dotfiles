@@ -2,6 +2,12 @@
 // The Go binary is the user-facing layer; Moon + Nix are the deterministic
 // backend. The CLI never mutates ~/ directly: it scans, prompts, and
 // delegates to `moon run modules:<task>`.
+//
+// The verb grammar (ADR-0013) groups every subcommand by side-effect class:
+// converge (state-changing, idempotent), measure (read-only), power-user
+// (composable, off the golden path), and meta. The dispatcher in this file
+// owns name resolution, alias lookup, did-you-mean on misses, and the
+// workspace-required gate. Per-verb behavior lives in cmd_<name>.go.
 package main
 
 import (
@@ -10,7 +16,12 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
+	"strings"
 
+	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/dym"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
@@ -24,55 +35,192 @@ var (
 	date    = "unknown"
 )
 
-// User-facing strings reused by both the dispatcher gate and the
-// install next-step message. Single source of truth — drift between
-// the two would let a renamed repo or installer URL silently rot in
-// one message but not the other.
+// User-facing strings used by the dispatcher's workspace-required
+// gate. Single source of truth — drift between the dispatcher gate
+// and any other surface that mentions the same paths would let a
+// renamed repo silently rot in one message but not the other.
 const (
 	repoCloneURL = "https://github.com/sanurb/.dotfiles"
 	repoNixURL   = "github:sanurb/.dotfiles"
 	cloneTarget  = "~/.dotfiles"
-	nixInstaller = "https://determinate.systems/nix-installer"
 )
 
-// command pairs a handler with the dispatcher's workspace contract.
-// requiresWorkspace=true makes the gate fire with workspaceRequiredMessage
-// before the handler runs; the handler can assume workspace.Root() succeeds.
+// Group names for the usage table (ADR-0013). Stable strings — used as
+// section headings in --help output. Order in the help reflects
+// importance to a first-time user.
+const (
+	groupConverge = "converge"
+	groupMeasure  = "measure"
+	groupPower    = "power"
+	groupMeta     = "meta"
+)
+
+// command pairs a handler with the dispatcher contract: workspace
+// requirement (the dispatcher gate fires before the handler if true),
+// the human summary used in --help, the group it belongs to, and any
+// aliases. requiresWorkspace=false does NOT mean "ignores workspace";
+// some handlers (status, why, profile) do their own workspace probe
+// with a verb-appropriate exit code (0 for status's "nothing to
+// report", 4 for why/profile's "no workspace to inspect").
 type command struct {
 	requiresWorkspace bool
+	summary           string
+	group             string
+	aliases           []string
 	run               func(rest []string) int
 }
 
+// commands is the canonical registry. Aliases are resolved through
+// aliasIndex (built at init); direct lookup `commands[name]` returns
+// only canonical names.
 var commands = map[string]command{
-	"install": {requiresWorkspace: false, run: runInstall},
-	"sync":    {requiresWorkspace: true, run: runSync},
-	"scan":    {requiresWorkspace: true, run: func([]string) int { return runScan() }},
-	"backup":  {requiresWorkspace: true, run: func([]string) int { return runBackup(false) }},
-	// deploy auto-bootstraps Nix and the workspace clone (ADR-0010);
-	// the runDeploy entry point owns the missing-prereq UX itself.
-	"deploy": {requiresWorkspace: false, run: func([]string) int { return runDeploy() }},
-	"doctor": {requiresWorkspace: true, run: runDoctorCmd},
+	// Group B — converge (state-changing, idempotent)
+	"init": {
+		summary: "Bootstrap from anywhere: install Nix, clone repo, run the wizard, apply",
+		group:   groupConverge,
+		aliases: []string{"install"},
+		run:     runInstall,
+	},
+	"apply": {
+		summary: cmdApplySummary,
+		group:   groupConverge,
+		aliases: []string{"deploy"},
+		run:     runApply,
+	},
+	"update": {
+		requiresWorkspace: true,
+		summary:           cmdUpdateSummary,
+		group:             groupConverge,
+		run:               runUpdate,
+	},
+	"rollback": {
+		requiresWorkspace: true,
+		summary:           cmdRollbackSummary,
+		group:             groupConverge,
+		run:               runRollback,
+	},
+	"sync": {
+		requiresWorkspace: true,
+		summary:           "Brownfield-safe wizard: scan → snapshot → apply",
+		group:             groupConverge,
+		run:               runSync,
+	},
+
+	// Group A — measure (read-only)
+	"status":  {summary: cmdStatusSummary, group: groupMeasure, run: runStatus},
+	"plan":    {summary: cmdPlanSummary, group: groupMeasure, run: runPlan},
+	"diff":    {summary: cmdDiffSummary, group: groupMeasure, run: runDiff},
+	"why":     {summary: cmdWhySummary, group: groupMeasure, run: runWhy},
+	"explain": {summary: cmdExplainSummary, group: groupMeasure, run: runExplain},
+	"doctor": {
+		requiresWorkspace: true,
+		summary:           "Validate runtimes, LSPs, formatters; persona unless --binary-only",
+		group:             groupMeasure,
+		run:               runDoctorCmd,
+	},
+	"scan": {
+		requiresWorkspace: true,
+		summary:           "Detect brownfield collisions in $HOME (non-interactive)",
+		group:             groupMeasure,
+		run:               func([]string) int { return runScan() },
+	},
+
+	// Group C — power-user / composable
+	"capture":    {summary: cmdCaptureSummary, group: groupPower, run: runCapture},
+	"profile":    {summary: cmdProfileSummary, group: groupPower, run: runProfile},
+	"completion": {summary: cmdCompletionSummary, group: groupPower, run: runCompletion},
+	"backup": {
+		requiresWorkspace: true,
+		summary:           "Move colliding $HOME files into ~/.dots_backups/<ts> (gum-confirmed)",
+		group:             groupPower,
+		run:               func([]string) int { return runBackup(false) },
+	},
+}
+
+// aliasIndex maps every accepted name (canonical + alias) to its
+// canonical key in commands. Built once at init so dispatch is a
+// single map lookup regardless of which spelling the user typed.
+var aliasIndex map[string]string
+
+func init() {
+	aliasIndex = make(map[string]string, len(commands)*2)
+	for name, c := range commands {
+		aliasIndex[name] = name
+		for _, a := range c.aliases {
+			aliasIndex[a] = name
+		}
+	}
+}
+
+// allKnownNames returns every accepted token (canonical + alias),
+// sorted. Used by did-you-mean and the completion fallback.
+func allKnownNames() []string {
+	out := make([]string, 0, len(aliasIndex)+2)
+	for name := range aliasIndex {
+		out = append(out, name)
+	}
+	out = append(out, "version", "help")
+	sort.Strings(out)
+	return out
 }
 
 func runInstall([]string) int {
-	// Two-mode install: inside a workspace, the full wizard (pillar
-	// selection → scan → optional snapshot → "Realize now?" prompt).
-	// Outside, a form-only path that writes the profile to the user-
-	// config dir and stops there. Realization is never run from inside
-	// the wizard — see ADR-0009 and runWithRealize below.
+	// One install path. If prereqs (Nix, workspace clone) are missing,
+	// they are bootstrapped here behind explicit per-prereq consent —
+	// the same Honesty-gated subprocess flow `dots apply` uses
+	// (ADR-0010, ADR-0012). The wizard then runs against a real
+	// workspace; ADR-0012 retired the previous "standalone" branch
+	// that produced a TOML artifact and three manual steps.
 	if _, err := workspace.Root(); err != nil {
-		code := runStandaloneInstall()
-		if code == 0 {
-			printInstallNextSteps(false)
+		if code, ok := bootstrapForInstall(); !ok {
+			return code
 		}
-		return code
 	}
 	deps, err := newWizardDeps()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "install:", err)
-		return 1
+		fmt.Fprintln(os.Stderr, "init:", err)
+		return exitcode.Failure
 	}
 	return runWithRealize(ui.ModeInstall, deps)
+}
+
+// bootstrapForInstall fulfills the missing prereqs for runInstall.
+// Returns (exitCode, ok). When ok is true the calling install can
+// proceed against the now-present workspace; the workspace cache has
+// been reset to reflect the post-chdir cwd.
+//
+// Nix-just-installed exits cleanly with Success (the new nix is not
+// on this process's PATH; user is told to open a new shell and
+// re-run). Declined consent maps to Declined (3), not Misuse (2):
+// the user knew what they were saying no to.
+func bootstrapForInstall() (int, bool) {
+	if !bootstrap.NixPresent() {
+		consented, err := bootstrap.OfferNixInstall(os.Stdout, os.Stdin)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "init:", err)
+			return exitcode.Failure, false
+		}
+		if !consented {
+			return exitcode.Declined, false
+		}
+		fmt.Println()
+		fmt.Println("Nix installed. Open a new shell and re-run `dots init` to continue.")
+		return exitcode.Success, false
+	}
+	path, err := bootstrap.OfferWorkspaceClone(os.Stdout, os.Stdin)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "init:", err)
+		return exitcode.Failure, false
+	}
+	if path == "" {
+		return exitcode.Declined, false
+	}
+	if err := os.Chdir(path); err != nil {
+		fmt.Fprintln(os.Stderr, "init: chdir to clone:", err)
+		return exitcode.Failure, false
+	}
+	workspace.Reset()
+	return exitcode.Success, true
 }
 
 func runSync([]string) int {
@@ -83,35 +231,40 @@ func runSync([]string) int {
 	deps, err := newWizardDeps()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sync:", err)
-		return 1
+		return exitcode.Failure
 	}
 	return runWithRealize(ui.ModeSync, deps)
 }
 
 // runWithRealize runs the wizard and, on consent, hands off to
-// `dots deploy` as a subprocess. ADR-0009 records the rationale.
+// `dots apply` as a subprocess. ADR-0009 records the rationale.
+//
+// The subprocess is invoked with --yes because the wizard's realize
+// prompt already obtained the user's consent; re-prompting in the
+// child would be a regression. The plan and "auto-approved" line
+// still print, so the user sees what's running.
 func runWithRealize(mode ui.Mode, deps ui.Deps) int {
 	r := ui.Run(mode, deps)
 	if r.Code != 0 {
 		return r.Code
 	}
 	if !r.RealizeRequested {
-		printInstallNextSteps(true)
-		return 0
+		printInstallNextSteps()
+		return exitcode.Success
 	}
 	self, err := resolveSelf()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "deploy:", err)
-		return 1
+		fmt.Fprintln(os.Stderr, "apply:", err)
+		return exitcode.Failure
 	}
-	return run(self, "deploy")
+	return run(self, "apply", "--yes")
 }
 
 // resolveSelf locates the running dots binary. os.Executable() is the
 // happy path; the LookPath fallback covers layouts where Executable()
 // returns a path the child process can't re-exec (some NixOS
 // /proc/self/exe cases) or where PATH was mutated between the install
-// and deploy phases.
+// and apply phases.
 func resolveSelf() (string, error) {
 	if self, err := os.Executable(); err == nil {
 		return self, nil
@@ -134,10 +287,12 @@ func runDoctorCmd(rest []string) int {
 }
 
 func main() {
-	// Default to the install wizard so `dots` (no args) is a single
-	// dispatch path, not a special-case branch that has to be kept in
-	// sync with the install handler.
-	name := "install"
+	// Bare `dots` → init wizard. Predictable: typing `dots` on a
+	// configured machine still re-runs init, which is idempotent (it
+	// detects existing Nix and existing workspace and proceeds to the
+	// wizard with no destructive action). ADR-0012 retired the
+	// no-workspace dead-end that used to terminate here.
+	name := "init"
 	var rest []string
 	if len(os.Args) >= 2 {
 		name, rest = os.Args[1], os.Args[2:]
@@ -145,58 +300,79 @@ func main() {
 
 	switch name {
 	case "-h", "--help", "help":
-		fmt.Fprint(os.Stderr, usage)
-		os.Exit(0)
+		runHelp(rest)
+		return
 	case "-V", "--version", "version":
 		fmt.Printf("dots %s (commit %s, built %s, %s/%s)\n",
 			version, commit, date, runtime.GOOS, runtime.GOARCH)
-		os.Exit(0)
+		return
 	}
 
-	c, ok := commands[name]
+	canonical, ok := aliasIndex[name]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", name, usage)
-		os.Exit(2)
+		fmt.Fprintf(os.Stderr, "dots: unknown command %q\n", name)
+		if suggestion, found := dym.Suggest(name, allKnownNames(), 3); found {
+			fmt.Fprintf(os.Stderr, "\nDid you mean `dots %s`?\n", suggestion)
+		}
+		fmt.Fprintln(os.Stderr, "\nRun `dots help` for the verb list.")
+		os.Exit(exitcode.Misuse)
 	}
+	c := commands[canonical]
 
 	if c.requiresWorkspace {
 		if _, err := workspace.Root(); err != nil {
-			fmt.Fprint(os.Stderr, workspaceRequiredMessage(name))
-			os.Exit(2)
+			fmt.Fprint(os.Stderr, workspaceRequiredMessage(canonical))
+			os.Exit(exitcode.Misuse)
 		}
 	}
 
 	os.Exit(c.run(rest))
 }
 
-// printInstallNextSteps tells the user what to do after a successful
-// install wizard run that DID NOT realize. The hasWorkspace flag
-// distinguishes the two cases: inside the workspace, "deferred — run
-// dots deploy" is enough; outside, the user needs Nix and a clone
-// first, so we keep the bootstrap recipe.
-//
-// On the realize-yes path, this function isn't called — `dots deploy`
-// has already run and printed its own outcome by the time control
-// returns to main, so any extra epilogue would just be noise.
-func printInstallNextSteps(hasWorkspace bool) {
-	if hasWorkspace {
-		fmt.Println()
-		fmt.Println("Profile saved. Run `dots deploy` when ready.")
+// runHelp renders either the top-level help (no arg) or per-verb help
+// (one arg). Per-verb help is intentionally lightweight — it prints
+// the summary line and points the user at `<verb> --help` for the
+// flag-level surface, since each verb owns its own flag set.
+func runHelp(rest []string) {
+	if len(rest) == 0 {
+		fmt.Fprint(os.Stderr, renderUsage())
 		return
 	}
-	fmt.Printf(`
-Profile saved.
+	name := rest[0]
+	canonical, ok := aliasIndex[name]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "dots help: unknown command %q\n", name)
+		if suggestion, found := dym.Suggest(name, allKnownNames(), 3); found {
+			fmt.Fprintf(os.Stderr, "Did you mean `%s`?\n", suggestion)
+		}
+		os.Exit(exitcode.Misuse)
+	}
+	c := commands[canonical]
+	fmt.Fprintf(os.Stderr, "dots %s — %s\n", canonical, c.summary)
+	if len(c.aliases) > 0 {
+		fmt.Fprintf(os.Stderr, "aliases: %s\n", strings.Join(c.aliases, ", "))
+	}
+	if c.requiresWorkspace {
+		fmt.Fprintln(os.Stderr, "\nRequires a cloned dotfiles workspace.")
+	}
+	fmt.Fprintf(os.Stderr, "\nFor flags, run: dots %s --help\n", canonical)
+}
 
-To realize this profile, you need the dotfiles workspace and Nix:
-  1. Install Nix:    %s
-  2. Clone the repo: git clone %s %s
-  3. Realize:        cd %s && dots deploy
-`, nixInstaller, repoCloneURL, cloneTarget, cloneTarget)
+// printInstallNextSteps tells the user what to do after a wizard run
+// where they declined the realize prompt. ADR-0012 retired the
+// no-workspace branch — the wizard always runs workspace-backed.
+//
+// On the realize-yes path, this function isn't called — `dots apply`
+// has already run and printed its own outcome by the time control
+// returns to main, so any extra epilogue would just be noise.
+func printInstallNextSteps() {
+	fmt.Println()
+	fmt.Println("Profile saved. Run `dots apply` when ready (alias: `dots deploy`).")
 }
 
 // workspaceRequiredMessage is the user-facing surface for the gate.
-// Exit code 2 (misuse / wrong context) and stderr — distinct from a
-// runtime error. The message is actionable: clone-and-run, or nix run.
+// Exit code Misuse and stderr — distinct from a runtime error. The
+// message is actionable: clone-and-run, or nix run.
 func workspaceRequiredMessage(name string) string {
 	return fmt.Sprintf(`dots %s: this command requires a workspace.
 
@@ -210,26 +386,70 @@ Or run via Nix without a persistent clone:
 `, name, repoCloneURL, cloneTarget, cloneTarget, name, repoNixURL, name)
 }
 
-const usage = `dots
+// renderUsage builds the grouped --help output. Order: converge,
+// measure, power, meta. Each row is `  dots <name>  <summary>` with
+// aliases parenthesized. Width is computed dynamically over the
+// longest name in each group.
+func renderUsage() string {
+	groups := []struct {
+		key   string
+		title string
+	}{
+		{groupConverge, "Converge (state-changing, idempotent)"},
+		{groupMeasure, "Measure (read-only)"},
+		{groupPower, "Power-user / composable"},
+	}
 
-Usage:
-  dots                       Open the install wizard (alias for 'dots install')
-  dots install               Multi-step wizard: capabilities → conflicts → deploy
-  dots sync                  Brownfield-safe wizard: conflicts → deploy
-  dots scan                  Detect brownfield collisions in $HOME (non-interactive)
-  dots backup                Move colliding files into ~/.dots_backups/<ts> (gum-confirmed)
-  dots deploy                moon run modules:deploy (no wizard)
-  dots doctor [--json] [--binary-only]
-                             Validate runtimes, LSPs, formatters; persona
-                             unless --binary-only (CI mode)
-  dots version               Print binary version, commit, build date
+	var b strings.Builder
+	b.WriteString("dots — Nix-native dotfiles platform\n\n")
+	b.WriteString("Usage:\n  dots [verb] [flags]\n\n")
+	b.WriteString("With no verb, `dots` runs the init wizard (alias: `dots init`).\n\n")
 
-install/version/help run anywhere. The remaining subcommands realize the
-workspace and require a clone of the dotfiles repo + Nix on PATH; outside
-a workspace they exit with an actionable message and code 2.
+	for _, g := range groups {
+		fmt.Fprintf(&b, "%s:\n", g.title)
+		var rows []string
+		for name, c := range commands {
+			if c.group != g.key {
+				continue
+			}
+			rows = append(rows, name)
+		}
+		sort.Strings(rows)
+		width := longest(rows)
+		for _, name := range rows {
+			c := commands[name]
+			line := fmt.Sprintf("  dots %-*s  %s", width, name, c.summary)
+			if len(c.aliases) > 0 {
+				line += fmt.Sprintf("  (alias: %s)", strings.Join(c.aliases, ", "))
+			}
+			b.WriteString(line + "\n")
+		}
+		b.WriteString("\n")
+	}
 
-Non-interactive automation: prefer moon directly (moon run modules:deploy).
-Moon task split: cli:check runs 'dots doctor --binary-only' as a CI gate;
-cli:doctor runs the full doctor and gates modules:deploy. Drift in either
-fails its respective pipeline.
-`
+	b.WriteString("Meta:\n")
+	b.WriteString("  dots version            Print binary version, commit, build date\n")
+	b.WriteString("  dots help [verb]        This help, or per-verb summary\n\n")
+
+	b.WriteString("Common flags (every state-changing verb):\n")
+	b.WriteString("  --dry-run, -y/--yes, --non-interactive, --json,\n")
+	b.WriteString("  -v/--verbose (repeatable), -q/--quiet, --no-color,\n")
+	b.WriteString("  --config PATH, --profile NAME\n\n")
+
+	b.WriteString("Documentation:\n")
+	b.WriteString("  dots explain plan         The plan/apply contract\n")
+	b.WriteString("  dots explain exit-codes   The stable exit-code table\n")
+	b.WriteString("  dots explain bootstrap    What `dots init` does on a fresh machine\n")
+	b.WriteString("  dots explain xdg          Where dots reads/writes config + state\n")
+	return b.String()
+}
+
+func longest(xs []string) int {
+	n := 0
+	for _, x := range xs {
+		if len(x) > n {
+			n = len(x)
+		}
+	}
+	return n
+}

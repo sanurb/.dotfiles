@@ -51,19 +51,34 @@ already; no clone required (Nix fetches the flake on demand).
 ### After install
 
 ```sh
-dots install   # walk the wizard, capture ~/.config/dots/selection.toml
-dots deploy    # realize the profile (workspace + Nix; offered if missing)
+dots                  # bare invocation runs the init wizard
+dots init             # explicit; same as bare `dots` (alias: install)
+dots plan             # show what `dots apply` would do — a saved plan can be
+dots plan --out p.json #   reviewed in CI and replayed with --plan
+dots apply            # realize the profile (alias: deploy)
+dots status           # profile + workspace + last-applied receipt
+dots update           # git pull --ff-only && dots apply
+dots rollback         # switch Home Manager to the prior generation
 ```
 
-`dots install` writes the profile and (inside a workspace) hands off to
-`dots deploy` for realization. `dots deploy` self-bootstraps Nix and the
-workspace clone with explicit consent prompts — a fresh machine reaches
-realization without manual prep, but every state-mutating step is
-shown verbatim before it runs (ADR-0010).
+`dots init` is the unified entry point. On a fresh machine it
+self-bootstraps Nix and the workspace clone behind per-prereq consent
+prompts (ADR-0010, ADR-0012), runs the wizard against the cloned
+workspace, then offers to realize. No intermediate artifact, no manual
+follow-up steps. Every state-mutating command is shown verbatim before
+it runs.
+
+The verb grammar (ADR-0013) groups every subcommand by side-effect
+class: **converge** (init, apply, update, rollback, sync), **measure**
+(status, plan, diff, doctor, why, explain, scan), and **power-user**
+(capture, profile, completion, backup). Run `dots help` for the full
+table or `dots help <verb>` for per-verb summary. `dots explain plan`
+documents the plan/apply contract; `dots explain exit-codes` documents
+the stable exit-code table.
 
 For the canonical day-to-day UX, install [direnv][] so that entering
 the cloned workspace activates the dev shell automatically; `dots
-deploy` then runs without a `nix develop -c` prefix.
+apply` then runs without a `nix develop -c` prefix.
 
 ## Verifying a release
 
@@ -83,7 +98,8 @@ direnv allow   # one-time
 # everything below works inside the shell that direnv just activated
 moon run cli:check
 moon run cli:test
-moon run modules:deploy
+dots plan          # see what apply would do
+dots apply         # realize the workspace
 ```
 
 See `DESIGN.md` for the architecture and `devenv.nix` for the declared

@@ -68,9 +68,6 @@ func (m Model) welcomeLayout() screen.Layout {
 		title = "dots sync"
 		desc = "Re-realize the workspace's Home Manager state. Persona is preserved."
 	}
-	if m.mode == ModeStandalone {
-		desc = "Capture a profile to ~/.config/dots. Realization requires the workspace clone + Nix."
-	}
 	return screen.Layout{
 		Title:       title,
 		Description: desc,
@@ -279,11 +276,8 @@ func optionRows(opts []wizardOption, cursor int) []screen.Row {
 
 func welcomeOptions(mode Mode) []wizardOption {
 	verb := "Continue"
-	switch mode {
-	case ModeSync:
+	if mode == ModeSync {
 		verb = "Re-realize"
-	case ModeStandalone:
-		verb = "Capture profile"
 	}
 	return []wizardOption{
 		{Label: verb},
@@ -305,16 +299,14 @@ func gitOptions() []wizardOption {
 	}
 }
 
-func confirmOptions(mode Mode) []wizardOption {
-	// Confirm now writes the profile only; realization is gated by a
+func confirmOptions(_ Mode) []wizardOption {
+	// Confirm writes the profile only; realization is gated by a
 	// separate prompt (stepRealizePrompt) so the persona-commit and
-	// system-mutation decisions stay distinct.
-	primary := "Yes, write profile"
-	if mode != ModeStandalone {
-		primary = "Yes, write profile and continue"
-	}
+	// system-mutation decisions stay distinct. The mode parameter is
+	// preserved on the signature so the dispatch table in stepOptions
+	// stays uniform with the other Mode-aware option builders.
 	return []wizardOption{
-		{Label: primary},
+		{Label: "Yes, write profile and continue"},
 		{Label: "No, cancel"},
 	}
 }

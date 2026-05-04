@@ -12,6 +12,28 @@ import (
 // what the user sees and approves.
 const determinateInstaller = `curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install`
 
+// NixInstallCommand returns the shell-safe Determinate Systems install
+// command. Exposed so the plan renderer can echo the exact invocation
+// that `bootstrap-nix` will run, keeping the plan and the consent
+// prompt in lockstep.
+func NixInstallCommand() string { return determinateInstaller }
+
+// InstallNix runs the Determinate Systems installer without asking for
+// consent. Callers (e.g. `dots apply --yes`) must have already obtained
+// approval via their own UX before invoking this. The just-installed
+// nix is NOT reachable in the calling process — same caveat as
+// OfferNixInstall.
+func InstallNix(out io.Writer, in io.Reader) error {
+	cmd := exec.Command("sh", "-c", determinateInstaller)
+	cmd.Stdin = in
+	cmd.Stdout = out
+	cmd.Stderr = out
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("nix installer: %w", err)
+	}
+	return nil
+}
+
 // NixPresent is true when `nix` is reachable on $PATH. The check is
 // presence-only; version-floor enforcement lives in `dots doctor`.
 func NixPresent() bool {

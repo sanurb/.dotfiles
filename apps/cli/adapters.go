@@ -132,24 +132,16 @@ func (p tomlPersister) snapshotPriorState(statePath string) error {
 	return nil
 }
 
-// loadInitialState pre-seeds the wizard's pillar form. Resolution order:
-// workspace-resident state → user-config state (carried forward from a
-// prior standalone install) → state.Default(). A parse error is
-// non-fatal because the wizard is how a user fixes a malformed file.
+// loadInitialState pre-seeds the wizard's pillar form. The wizard is
+// always workspace-backed (ADR-0012) so the lookup is single-source:
+// workspace state file or state.Default(). A parse error is non-fatal
+// because the wizard is how a user fixes a malformed file.
 func loadInitialState(workspaceRoot string) state.State {
 	s, found, err := state.Load(state.Path(workspaceRoot))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "warning: ignoring unreadable workspace state file:", err)
 	}
 	if found {
-		return s
-	}
-
-	path, err := userConfigStatePath()
-	if err != nil {
-		return state.Default()
-	}
-	if s, found, _ := state.Load(path); found {
 		return s
 	}
 	return state.Default()

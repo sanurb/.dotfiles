@@ -54,6 +54,13 @@ type Pillars struct {
 	Multiplexer string // "zellij" | "tmux" | "none"
 }
 
+// Format renders the persona one-liner used by `dots status`,
+// `dots profile`, and the wizard's done-summary. Single source so the
+// three surfaces never drift.
+func (p Pillars) Format() string {
+	return p.Shell + " · " + p.Terminal + " · " + p.Multiplexer
+}
+
 type Capabilities struct {
 	Editor bool
 	Git    bool

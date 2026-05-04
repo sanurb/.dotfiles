@@ -12,13 +12,14 @@ import "github.com/sanurb/.dotfiles/apps/cli/internal/state"
 // an import cycle.
 
 // Mode discriminates the wizard's flow. Realization is never run from
-// inside the wizard regardless of mode (ADR-0009).
+// inside the wizard regardless of mode (ADR-0009). The wizard always
+// runs against a real workspace — ADR-0012 retired the previous
+// "standalone" mode that produced an artifact-and-homework epilogue.
 type Mode int
 
 const (
-	ModeInstall    Mode = iota // pillars → scan → snapshot? → realize prompt
-	ModeSync                   // skip pillars → scan → snapshot? → auto-yes
-	ModeStandalone             // no workspace: pillars → persist; never realizes
+	ModeInstall Mode = iota // pillars → scan → snapshot? → realize prompt
+	ModeSync                // skip pillars → scan → snapshot? → auto-yes
 )
 
 // Collision is a path under $HOME that exists as a real file or dir
