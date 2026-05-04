@@ -103,10 +103,13 @@ but no clone of the workspace.
 | Depth | What runs | Realizes system? | Requires Nix? | Requires workspace clone? |
 |---|---|---|---|---|
 | TUI only | `dots install` | No | No | No |
-| Full | `dots install` then `dots deploy` | Yes | Yes | Yes |
+| Full | `dots install` then `dots deploy` | Yes | Yes (offered on demand) | Yes (offered on demand) |
 
 The TUI's exit screen states which step is done and what remains; the
 asymmetry is communicated by binary output, not by gatekeeping channels.
+`dots deploy` self-bootstraps both prereqs with explicit per-prereq
+consent (ADR-0010); a fresh machine reaches realization through prompts,
+not through a copy-and-paste recipe.
 
 Whether the curl-install path stays as-is, gets deprecated, or gets
 blessed as a primary path is a **deferred** policy decision (§12) —
@@ -161,3 +164,4 @@ accepted unless marked otherwise.
 | 0007 | [`apps/` directory admission criteria](docs/adr/0007-apps-directory-admission-criteria.md) |
 | 0008 | [Per-tool nixpkgs pinning experiment](docs/adr/0008-per-tool-nixpkgs-pinning-experiment.md) |
 | 0009 | [The TUI invokes `dots deploy` via subprocess](docs/adr/0009-tui-invokes-deploy-via-subprocess.md) |
+| 0010 | [`dots deploy` self-bootstraps Nix and the workspace clone](docs/adr/0010-dots-deploy-self-bootstraps-prereqs.md) |
