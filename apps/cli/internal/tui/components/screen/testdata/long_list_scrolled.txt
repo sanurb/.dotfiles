@@ -1,0 +1,14 @@
+● Shell → Terminal
+
+Step 1: Shell
+Pick one.
+
+▲ 6 more above
+  xonsh
+  ion
+▸ dash
+  ksh
+  tcsh
+▼ 1 more below
+
+↑/k up • ↓/j down • [Enter] select

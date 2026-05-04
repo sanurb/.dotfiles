@@ -1,0 +1,10 @@
+
+╭─────────────────────────────────────────╮
+│                                         │
+│  Failure: moon run modules:deploy       │
+│                                         │
+│  ✗ exit status 1: nh-home not on $PATH  │
+│                                         │
+│  [Ctrl-C] quit                          │
+│                                         │
+╰─────────────────────────────────────────╯

@@ -41,6 +41,11 @@
     # Charm CLI dependencies that apps/cli shells out to.
     gum
 
+    # TUI demo recorder. Renders docs/demos/*.tape into GIFs that the
+    # README links to; also drives manual visual regression for the
+    # wizard's screen primitive.
+    vhs
+
     # Release tooling — declared so `goreleaser check` and snapshot builds
     # work inside the dev shell without a host install. cosign and syft are
     # invoked by the GoReleaser pipeline (signing, SBOM); having them on

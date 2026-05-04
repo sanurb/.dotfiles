@@ -1,0 +1,13 @@
+✓ Shell → ✓ Terminal → ✓ Multiplexer → ✓ Editor → ✓ Git → ● Confirm
+
+Step 6: Confirm
+Review your selections before writing .dots-state.toml.
+
+▸ Yes, write profile
+  No, cancel
+
+────────────────────────
+i Persona summary  [i]
+g Open the dots guide  [g]
+
+↑/k up • ↓/j down • [Enter] confirm • [Esc] back • [g] guide

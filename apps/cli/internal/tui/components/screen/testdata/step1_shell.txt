@@ -1,0 +1,10 @@
+● Shell → Terminal → Multiplexer → Editor → Git → Confirm
+
+Step 1: Shell
+One shell defines the persona. Atuin/zoxide/starship are baked in regardless.
+
+▸ Fish
+  Zsh + Powerlevel10k
+  Nushell
+
+↑/k up • ↓/j down • [Enter] select

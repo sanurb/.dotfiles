@@ -1,8 +1,0 @@
-Step 2 of 6                                                          ● ◉ ○ ○ ○ ○
-
-Detecting hardware
-Probing chip and OS version.
-
-◐ Reading sysctl…
-
-↑/↓ move   enter select   esc back   ? help   q quit

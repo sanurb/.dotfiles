@@ -1,21 +1,17 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/charmbracelet/huh"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 )
 
 // runStandaloneInstall captures a profile to ~/.config/dots/ when no
-// workspace is reachable. Skips scan/snapshot/realize since those need
-// the flake. Reuses ui.HuhOptions and Capabilities.Extras() so the
-// form here and the wizard's capabilitiesForm stay aligned.
+// workspace is reachable. Reuses the bubbletea wizard in ModeStandalone,
+// which short-circuits Done after persisting — no scan/snapshot/realize.
 func runStandaloneInstall() int {
 	path, err := userConfigStatePath()
 	if err != nil {
@@ -23,60 +19,26 @@ func runStandaloneInstall() int {
 		return 1
 	}
 
-	initial := loadStandaloneInitial(path)
-	formShell := initial.Pillars.Shell
-	formTerminal := initial.Pillars.Terminal
-	formMultiplexer := initial.Pillars.Multiplexer
-	formEditor := initial.Capabilities.Editor
-	formGit := initial.Capabilities.Git
-
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title("Shell").
-				Options(ui.HuhOptions(ui.ShellOptions, 0)...).Value(&formShell),
-			huh.NewSelect[string]().Title("Terminal").
-				Options(ui.HuhOptions(ui.TerminalOptions, 0)...).Value(&formTerminal),
-			huh.NewSelect[string]().Title("Multiplexer").
-				Options(ui.HuhOptions(ui.MultiplexerOptions, 0)...).Value(&formMultiplexer),
-			ui.EditorConfirm(&formEditor),
-			ui.GitConfirm(&formGit),
-		),
-	).WithTheme(huh.ThemeCharm()).WithShowHelp(false)
-
-	if err := form.Run(); err != nil {
-		if errors.Is(err, huh.ErrUserAborted) {
-			// 130 = 128 + SIGINT, matching shell convention for Ctrl+C —
-			// also what ui.Run returns for stepAborted.
-			return 130
-		}
-		fmt.Fprintln(os.Stderr, "install:", err)
-		return 1
+	deps := ui.Deps{
+		StatePersister: standalonePersister{path: path},
+		Initial:        loadStandaloneInitial(path),
 	}
-
-	out := state.State{
-		SchemaVersion: state.SchemaVersion,
-		Pillars: state.Pillars{
-			Shell:       formShell,
-			Terminal:    formTerminal,
-			Multiplexer: formMultiplexer,
-		},
-		Capabilities: state.Capabilities{
-			Editor: formEditor,
-			Git:    formGit,
-		},
-	}
-
-	if err := state.Save(path, out); err != nil {
-		fmt.Fprintln(os.Stderr, "install: save state:", err)
-		return 1
-	}
-	return 0
+	return ui.Run(ui.ModeStandalone, deps)
 }
 
-// userConfigStatePath is the standalone-install state location. Same
-// FileName as the workspace-resident copy so the schema is identical,
-// just kept under XDG_CONFIG_HOME so a user without the workspace has
-// a writable home for the profile.
+// standalonePersister implements ui.StatePersister against a user-config
+// path (typically ~/.config/dots/.dots-state.toml). No backup snapshot
+// is taken — without a workspace there is no .dots_backups/<ts>/ folder
+// convention to honor, and a simple atomic Save handles partial-write
+// safety.
+type standalonePersister struct {
+	path string
+}
+
+func (p standalonePersister) SaveState(s state.State) error {
+	return state.Save(p.path, s)
+}
+
 func userConfigStatePath() (string, error) {
 	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
 		return filepath.Join(v, "dots", state.FileName), nil
