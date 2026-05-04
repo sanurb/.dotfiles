@@ -3,7 +3,7 @@
 // backend. The CLI never mutates ~/ directly: it scans, prompts, and
 // delegates to `moon run modules:<task>`.
 //
-// The verb grammar (ADR-0013) groups every subcommand by side-effect class:
+// The verb grammar groups every subcommand by side-effect class:
 // converge (state-changing, idempotent), measure (read-only), power-user
 // (composable, off the golden path), and meta. The dispatcher in this file
 // owns name resolution, alias lookup, did-you-mean on misses, and the
@@ -45,7 +45,7 @@ const (
 	cloneTarget  = "~/.dotfiles"
 )
 
-// Group names for the usage table (ADR-0013). Stable strings — used as
+// Group names for the usage table. Stable strings — used as
 // section headings in --help output. Order in the help reflects
 // importance to a first-time user.
 const (
@@ -167,10 +167,10 @@ func allKnownNames() []string {
 func runInstall([]string) int {
 	// One install path. If prereqs (Nix, workspace clone) are missing,
 	// they are bootstrapped here behind explicit per-prereq consent —
-	// the same Honesty-gated subprocess flow `dots apply` uses
-	// (ADR-0010, ADR-0012). The wizard then runs against a real
-	// workspace; ADR-0012 retired the previous "standalone" branch
-	// that produced a TOML artifact and three manual steps.
+	// the same Honesty-gated subprocess flow `dots apply` uses. The
+	// wizard then runs against a real workspace; the binary no longer
+	// ships a "standalone" branch that produces a TOML artifact and
+	// three manual steps.
 	if _, err := workspace.Root(); err != nil {
 		if code, ok := bootstrapForInstall(); !ok {
 			return code
@@ -237,7 +237,7 @@ func runSync([]string) int {
 }
 
 // runWithRealize runs the wizard and, on consent, hands off to
-// `dots apply` as a subprocess. ADR-0009 records the rationale.
+// `dots apply` as a subprocess.
 //
 // The subprocess is invoked with --yes because the wizard's realize
 // prompt already obtained the user's consent; re-prompting in the
@@ -290,8 +290,7 @@ func main() {
 	// Bare `dots` → init wizard. Predictable: typing `dots` on a
 	// configured machine still re-runs init, which is idempotent (it
 	// detects existing Nix and existing workspace and proceeds to the
-	// wizard with no destructive action). ADR-0012 retired the
-	// no-workspace dead-end that used to terminate here.
+	// wizard with no destructive action).
 	name := "init"
 	var rest []string
 	if len(os.Args) >= 2 {
@@ -359,8 +358,8 @@ func runHelp(rest []string) {
 }
 
 // printInstallNextSteps tells the user what to do after a wizard run
-// where they declined the realize prompt. ADR-0012 retired the
-// no-workspace branch — the wizard always runs workspace-backed.
+// where they declined the realize prompt. The wizard always runs
+// workspace-backed.
 //
 // On the realize-yes path, this function isn't called — `dots apply`
 // has already run and printed its own outcome by the time control

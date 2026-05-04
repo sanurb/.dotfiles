@@ -1,9 +1,10 @@
 # dots explain: bootstrap
 
-`dots install` is the single supported entry point for a fresh machine.
-ADR-0010 describes the auto-bootstrap contract; ADR-0012 retired the
-"standalone" branch that used to produce a TOML artifact and three
-manual steps.
+`dots install` is the single supported entry point for a fresh
+machine. It auto-bootstraps Nix and the workspace clone behind explicit
+per-prereq consent and runs the wizard against the resulting workspace
+— there is no "standalone" branch that produces a TOML artifact and
+three manual steps.
 
 What "bootstrap" means here, in order:
 

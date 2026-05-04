@@ -16,7 +16,7 @@ this repo. There are three peer install paths — Homebrew, curl, and
 > **Supported platforms:** macOS and Linux. The realization layer
 > depends on `nh` and Moon, neither of which has a Windows port; the
 > TUI binary similarly does not ship for Windows. Windows users need
-> WSL2 — both the TUI and `dots deploy` work inside it. (ADR-0011)
+> WSL2 — both the TUI and `dots deploy` work inside it.
 
 ### Homebrew
 
@@ -63,12 +63,12 @@ dots rollback         # switch Home Manager to the prior generation
 
 `dots init` is the unified entry point. On a fresh machine it
 self-bootstraps Nix and the workspace clone behind per-prereq consent
-prompts (ADR-0010, ADR-0012), runs the wizard against the cloned
+prompts, runs the wizard against the cloned
 workspace, then offers to realize. No intermediate artifact, no manual
 follow-up steps. Every state-mutating command is shown verbatim before
 it runs.
 
-The verb grammar (ADR-0013) groups every subcommand by side-effect
+The verb grammar groups every subcommand by side-effect
 class: **converge** (init, apply, update, rollback, sync), **measure**
 (status, plan, diff, doctor, why, explain, scan), and **power-user**
 (capture, profile, completion, backup). Run `dots help` for the full

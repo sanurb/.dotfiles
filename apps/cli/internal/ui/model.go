@@ -8,8 +8,7 @@
 // this wizard. After the user consents on stepRealizePrompt the wizard
 // exits with Result.RealizeRequested = true; main.go re-invokes the
 // dots binary as `dots deploy` so the realization driver renders
-// against the real terminal instead of inside an alt-screen TUI. See
-// ADR-0009.
+// against the real terminal instead of inside an alt-screen TUI.
 package ui
 
 import (
@@ -310,8 +309,8 @@ func boolToCursor(yes bool) int {
 }
 
 // persistAndAdvance writes the in-memory persona to disk and starts
-// the scan. ADR-0012 removed the standalone short-circuit; every
-// wizard run is workspace-backed and proceeds to scan unconditionally.
+// the scan. Every wizard run is workspace-backed and proceeds to scan
+// unconditionally — there is no standalone short-circuit.
 func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
 	if m.deps.StatePersister != nil {
 		if err := m.deps.StatePersister.SaveState(m.state); err != nil {

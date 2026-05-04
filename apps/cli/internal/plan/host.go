@@ -12,8 +12,8 @@ func osHostname() (string, error) {
 
 // nixArchByGoarch maps Go's GOARCH tokens to Nix's prefix tokens.
 // Closed table — adding a new architecture is a one-line edit here
-// and a new test row in TestHostNixIdent. ADR-0011 records the
-// supported-platform scope (macOS + Linux only).
+// and a new test row in TestHostNixIdent. Supported platforms: macOS
+// and Linux only.
 var nixArchByGoarch = map[string]string{
 	"amd64": "x86_64",
 	"arm64": "aarch64",

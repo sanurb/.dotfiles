@@ -42,7 +42,7 @@ archives:
   #   /releases/latest/download/dots-{darwin,linux}-{amd64,arm64}
   # without a version segment. Cosign + SBOM coverage is automatic
   # because signs/sboms below match `artifacts: archive`, which fires
-  # on every archives entry regardless of format. (ADR-0011)
+  # on every archives entry regardless of format.
   - id: dots-binary
     ids: [dots]
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"

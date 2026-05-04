@@ -1,7 +1,6 @@
 // Package exitcode is the single source of truth for dots exit codes.
 // The numeric values are part of the CLI's stable contract — scripts
-// branch on them. ADR-0013 documents the meaning per code; do not
-// renumber without a new ADR.
+// branch on them. Do not renumber lightly.
 package exitcode
 
 const (

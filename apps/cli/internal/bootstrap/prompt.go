@@ -1,12 +1,12 @@
 // Package bootstrap detects and offers to install dots' two runtime
 // prerequisites — Nix and the workspace clone — before deploy. Every
-// state-mutating action is gated by an explicit Y/N consent prompt that
-// echoes the EXACT command being offered, in keeping with the Honesty
-// priority. ADR-0010 records the contract.
+// state-mutating action is gated by an explicit Y/N consent prompt
+// that echoes the EXACT command being offered, in keeping with the
+// Honesty priority.
 //
 // Imports are deliberately limited to os/exec, os, and io plumbing.
-// Per ADR-0009, subprocess invocation of curl/sh/git is not an I1
-// violation; the bootstrap package contains no Nix-related Go imports.
+// Subprocess invocation of curl/sh/git is not an I1 violation; the
+// bootstrap package contains no Nix-related Go imports.
 package bootstrap
 
 import (

@@ -12,9 +12,9 @@ import "github.com/sanurb/.dotfiles/apps/cli/internal/state"
 // an import cycle.
 
 // Mode discriminates the wizard's flow. Realization is never run from
-// inside the wizard regardless of mode (ADR-0009). The wizard always
-// runs against a real workspace — ADR-0012 retired the previous
-// "standalone" mode that produced an artifact-and-homework epilogue.
+// inside the wizard regardless of mode. The wizard always runs against
+// a real workspace — there is no "standalone" mode that produces an
+// artifact-and-homework epilogue.
 type Mode int
 
 const (
@@ -36,10 +36,10 @@ type SnapshotResult struct {
 }
 
 // ApplyCommand is the user-facing label echoed in wizard surfaces
-// when the realize hand-off is about to run. Post-ADR-0015 the apply
-// path is dots-direct (no moon) so this is just a stable label, not
-// the literal subprocess command — the actual nh invocation is
-// composed at runtime in apps/cli/cmd_apply.go::runHomeActivation.
+// when the realize hand-off is about to run. The apply path is
+// dots-direct (no moon) so this is just a stable label, not the
+// literal subprocess command — the actual nh invocation is composed
+// at runtime in apps/cli/cmd_apply.go::runHomeActivation.
 const ApplyCommand = "dots apply"
 
 // Snapshotter takes "Safe Snapshots" — quarantines colliding paths.
@@ -58,10 +58,11 @@ type StatePersister interface {
 
 // Deps is the bag of ports the wizard needs.
 //
-// Realization is intentionally NOT a port: PR #2 moved `nh home switch`
-// out of the wizard entirely. The wizard signals consent via
+// Realization is intentionally NOT a port: `nh home switch` does not
+// run inside the wizard. The wizard signals consent via
 // Result.RealizeRequested and exits; main.go invokes `dots deploy` as
-// a subprocess. ADR-0009 records the rationale.
+// a subprocess so nh's progress renders against the real terminal
+// instead of inside an alt-screen TUI.
 type Deps struct {
 	Snapshotter    Snapshotter
 	StatePersister StatePersister

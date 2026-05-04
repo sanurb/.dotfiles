@@ -12,7 +12,7 @@ import (
 // Result is what Run returns. Code follows the dots exit-code convention
 // (0 success, 1 internal failure, 130 user abort). RealizeRequested
 // signals "user opted in on the Realize-now prompt" — main.go invokes
-// `dots deploy` as a subprocess on that signal (ADR-0009).
+// `dots deploy` as a subprocess on that signal.
 type Result struct {
 	Code             int
 	RealizeRequested bool

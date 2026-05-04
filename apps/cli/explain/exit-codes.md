@@ -1,7 +1,7 @@
 # dots explain: exit-codes
 
-The numeric exit codes below are part of the dots CLI's stable contract.
-ADR-0013 records the meaning per code; scripts may branch on them.
+The numeric exit codes below are part of the dots CLI's stable
+contract. Scripts may branch on them.
 
   0  Success.
      The verb completed and any side-effects landed cleanly.

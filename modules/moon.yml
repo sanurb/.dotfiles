@@ -7,13 +7,12 @@ project:
   name: modules
   description: "Home Manager projection."
 
-# ADR-0015: the activation path (dots apply → nh home switch) is
-# dots-direct. Moon's only role here is the dev-side flake checks
-# and the input-update helper below. The previous `modules:deploy`
-# moon task and its scripts/deploy.sh helper were removed once the
-# Go binary started invoking nh in-process; the moon layer was
-# adding interpolation footguns and earning none of moon's caching
-# or graph value for a linear two-step sequence.
+# The activation path (dots apply → nh home switch) is dots-direct;
+# moon's only role here is the dev-side flake checks and the input-
+# update helper below. A previous modules:deploy task ran nh through
+# moon's argv interpolator, which silently rewrote bash-local $VARs
+# in the script body — the script was moved into the Go binary and
+# the moon layer dropped.
 tasks:
   check:
     command: "nix flake check --impure --accept-flake-config"

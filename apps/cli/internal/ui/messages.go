@@ -9,7 +9,7 @@ package ui
 // longer drives `nh home switch` from inside the bubbletea program.
 // On user consent, the wizard returns a Result with RealizeRequested
 // set; main.go then invokes `dots deploy` as a subprocess so nh's
-// progress renders against the real terminal. See ADR-0009.
+// progress renders against the real terminal.
 
 type scanCompleteMsg struct {
 	collisions []Collision

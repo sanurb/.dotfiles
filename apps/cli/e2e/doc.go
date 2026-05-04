@@ -4,8 +4,9 @@
 // running dots from a terminal would observe.
 //
 // E2E tests are intentionally few and slow. Each one covers a flow we
-// have actively had a bug in (ADR-0010/0012: bootstrap propagation,
-// v0.4.3: moon's subprocess environment). They are the safety net
-// that catches regressions our unit tests cannot, because the bugs
-// live at the process boundary, not inside any one Go function.
+// have actively had a bug in (bootstrap propagation across the install
+// → apply subprocess hand-off; environment leakage in earlier moon-
+// driven activation paths). They are the safety net that catches
+// regressions our unit tests cannot, because the bugs live at the
+// process boundary, not inside any one Go function.
 package e2e

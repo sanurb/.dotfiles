@@ -14,8 +14,8 @@ import (
 )
 
 // Scope note: in this release the verb only inspects the persona
-// recorded in `.dots-state.toml`. A future ADR-introduced profile
-// catalog will extend list/use.
+// recorded in `.dots-state.toml`. A future profile catalog will
+// extend list/use.
 const cmdProfileSummary = "Inspect the active profile (use <name> reserved for a future release)"
 
 // profileShowJSON is the JSON projection of state.State for `profile

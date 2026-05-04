@@ -133,9 +133,9 @@ func (p tomlPersister) snapshotPriorState(statePath string) error {
 }
 
 // loadInitialState pre-seeds the wizard's pillar form. The wizard is
-// always workspace-backed (ADR-0012) so the lookup is single-source:
-// workspace state file or state.Default(). A parse error is non-fatal
-// because the wizard is how a user fixes a malformed file.
+// always workspace-backed so the lookup is single-source: workspace
+// state file or state.Default(). A parse error is non-fatal because
+// the wizard is how a user fixes a malformed file.
 func loadInitialState(workspaceRoot string) state.State {
 	s, found, err := state.Load(state.Path(workspaceRoot))
 	if err != nil {

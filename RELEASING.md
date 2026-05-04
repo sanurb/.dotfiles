@@ -78,7 +78,7 @@ gh run watch
 
 A successful run produces:
 
-- `dots-{darwin,linux}-{amd64,arm64}` × 4 (raw binary, stable filename — curl-install path; ADR-0011)
+- `dots-{darwin,linux}-{amd64,arm64}` × 4 (raw binary, stable filename — curl-install path)
 - `dots_<version>_{darwin,linux}_{amd64,arm64}.tar.gz` × 4 (versioned archive — Homebrew, manual download)
 - `SHA256SUMS` + `SHA256SUMS.sig` + `SHA256SUMS.pem` (covers every artifact above)
 - One `.sig` and `.pem` per artifact (raw binary AND tar.gz)
