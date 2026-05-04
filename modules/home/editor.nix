@@ -5,11 +5,19 @@
     viAlias = true;
     vimAlias = true;
 
+    # Pass the *unwrapped* neovim. `programs.neovim.package` expects
+    # the bare binary derivation; home-manager's job is to be the
+    # wrapper (injecting plugins, providers, the rplugin manifest).
+    # Passing the already-wrapped `pkgsPins.edge.neovim` made HM wrap
+    # a wrap, and the outer wrap's manifest step `touch`ed
+    # rplugin.vim inside the inner wrap's already-sealed $out — the
+    # "Permission denied" we'd been chasing.
+    #
     # Pinned to `pkgsPins.edge` — the editor cycles upstream faster than
     # nixos-unstable's hydra gating, and the lag has bitten plugin compat
     # before. See docs/maintenance.md for the divergence log; collapse this
-    # back to `pkgs.neovim` if no divergence is recorded for 90 days.
-    package = pkgsPins.edge.neovim;
+    # back to `pkgs.neovim-unwrapped` if no divergence is recorded for 90 days.
+    package = pkgsPins.edge.neovim-unwrapped;
 
     extraPackages = with pkgs; [
       ripgrep
@@ -17,14 +25,9 @@
       tree-sitter
     ];
 
-    # Disable remote-provider integrations. With any of withRuby /
-    # withPython3 / withNodeJs true, home-manager's neovim wrapper
-    # invokes `nvim --headless +UpdateRemotePlugins` during build,
-    # which `touch`es `$out/rplugin.vim`. On nixpkgs neovim 0.12.2
-    # that step runs after $out is sealed read-only and the build
-    # fails with "Permission denied". We do not currently use any
-    # remote plugins, so disabling these is both a fix and a
-    # principled "Declare, Don't Script" minimum-surface choice.
+    # Remote-provider scaffolding off. We don't currently use Python,
+    # Ruby, or Node remote plugins; turning these off keeps HM's
+    # wrapper from carrying their interpreters into the closure.
     withNodeJs = false;
     withPython3 = false;
     withRuby = false;
