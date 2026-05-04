@@ -48,9 +48,14 @@ jobs:
       - name: Initialize cosign
         run: cosign initialize
 
+      # Truthy check, not `!= ''`: an unset GitHub Actions variable
+      # evaluates to null, and `null != ''` is TRUE in expression
+      # syntax, which lets the step run with an empty client-id and
+      # crashes inside the action. `${{ vars.X }}` is falsy for both
+      # unset and empty, which is what we want.
       - name: Mint Homebrew tap token
         id: tap-token
-        if: ${{ vars.HOMEBREW_TAP_CLIENT_ID != '' }}
+        if: ${{ vars.HOMEBREW_TAP_CLIENT_ID }}
         uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
         with:
           client-id: ${{ vars.HOMEBREW_TAP_CLIENT_ID }}
@@ -63,7 +68,9 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean --parallelism=1 ${{ vars.HOMEBREW_TAP_CLIENT_ID == '' && '--skip=homebrew' || '' }}
+          # Mirror the gate above: skip homebrew unless the App is
+          # configured. Negated truthy check, same semantics.
+          args: release --clean --parallelism=1 ${{ !vars.HOMEBREW_TAP_CLIENT_ID && '--skip=homebrew' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ steps.tap-token.outputs.token }}
