@@ -113,6 +113,22 @@ func (p Plan) ComputeHash() string {
 // this to exit-code NoOp under --dry-run.
 func (p Plan) IsNoOp() bool { return len(p.Steps) == 0 }
 
+// HasKind reports whether the plan contains at least one step whose
+// Kind matches any of kinds. Used by callers that branch on "does
+// this plan include a particular class of work" — e.g., consent
+// gating around bootstrap-mutating steps, or "is there an
+// apply-profile step to print."
+func (p Plan) HasKind(kinds ...string) bool {
+	for _, s := range p.Steps {
+		for _, k := range kinds {
+			if s.Kind == k {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Encode writes the Plan to w as indented JSON. The trailing newline
 // is part of the contract — `dots plan > file.json` produces a file
 // most editors will treat as well-formed.

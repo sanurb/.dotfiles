@@ -1,10 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +12,8 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/applied"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/nix"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/rollback"
 )
 
 const cmdRollbackSummary = "Switch Home Manager to a prior generation"
@@ -21,9 +23,9 @@ const cmdRollbackSummary = "Switch Home Manager to a prior generation"
 // notion of "previous"; with a generation number it switches to that
 // specific one.
 //
-// We prefer `nh home rollback` when present (ADR-0006) and fall back
-// to `home-manager` directly otherwise. Both are subprocesses with
-// stdio inherited so output reads natively.
+// We prefer `nh home rollback` when present and fall back to
+// `home-manager` directly otherwise. Both are subprocesses with stdio
+// inherited so output reads natively.
 func runRollback(rest []string) int {
 	fs := flag.NewFlagSet("rollback", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -53,8 +55,8 @@ func runRollback(rest []string) int {
 		generation = gen
 	}
 
-	args, ok := rollbackCommand(generation)
-	if !ok {
+	args, err := rollback.Resolve(generation)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "rollback: no rollback tool available:")
 		fmt.Fprintln(os.Stderr, "  what: neither `nh` nor `home-manager` is on PATH")
 		fmt.Fprintln(os.Stderr, "  why:  Home Manager activation has not bootstrapped this host")
@@ -67,18 +69,21 @@ func runRollback(rest []string) int {
 		return exitcode.Success
 	}
 
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			fmt.Fprintf(os.Stderr, "rollback: `%s` exited %d\n", strings.Join(args, " "), ee.ExitCode())
-			return ee.ExitCode()
+	runErr := nix.Cmd{
+		Name:   args[0],
+		Args:   args[1:],
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}.Run(context.Background())
+	if runErr != nil {
+		if code, ok := nix.IsExit(runErr); ok {
+			fmt.Fprintf(os.Stderr, "rollback: `%s` exited %d\n", strings.Join(args, " "), code)
+			return code
 		}
 		fmt.Fprintln(os.Stderr, "rollback: subprocess failed:")
 		fmt.Fprintf(os.Stderr, "  what: could not execute `%s`\n", strings.Join(args, " "))
-		fmt.Fprintf(os.Stderr, "  why:  %s\n", err)
+		fmt.Fprintf(os.Stderr, "  why:  %v\n", runErr)
 		fmt.Fprintln(os.Stderr, "  next: ensure the tool is installed, or run `dots doctor`")
 		return exitcode.Failure
 	}
@@ -99,27 +104,4 @@ func runRollback(rest []string) int {
 
 	fmt.Fprintln(os.Stderr, "✓ rollback complete")
 	return exitcode.Success
-}
-
-// rollbackCommand picks between `nh home rollback [N]` and
-// `home-manager` invocations. nh wins when present because the
-// codebase already expresses a preference for it (ADR-0006); the
-// home-manager fallbacks track the canonical generation-management
-// surface (`--switch-generation N` for explicit, `--rollback` for
-// previous).
-func rollbackCommand(generation string) ([]string, bool) {
-	if _, err := exec.LookPath("nh"); err == nil {
-		args := []string{"nh", "home", "rollback"}
-		if generation != "" {
-			args = append(args, generation)
-		}
-		return args, true
-	}
-	if _, err := exec.LookPath("home-manager"); err == nil {
-		if generation != "" {
-			return []string{"home-manager", "--switch-generation", generation}, true
-		}
-		return []string{"home-manager", "--rollback"}, true
-	}
-	return nil, false
 }

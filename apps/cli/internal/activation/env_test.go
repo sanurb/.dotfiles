@@ -1,4 +1,4 @@
-package main
+package activation
 
 import (
 	"maps"
@@ -6,26 +6,27 @@ import (
 	"testing"
 )
 
-func TestBuildActivationEnv(t *testing.T) {
-	t.Run("when workspace is reachable, then NH_SHOW_ACTIVATION_LOGS is set and devenv profile bin leads PATH", func(t *testing.T) {
+func TestBuild(t *testing.T) {
+	t.Run("when workspace is reachable, then NH_SHOW_ACTIVATION_LOGS is set, devenv profile bin leads PATH, and DOTS_WORKSPACE_ROOT is exported", func(t *testing.T) {
 		shellEnv := buildShellEnv(map[string]string{"PATH": "/usr/bin:/bin"})
 		workspace := "/Users/dev/dotfiles"
 
-		got := asEnvMap(buildActivationEnv(shellEnv, workspace))
+		got := asEnvMap(Build(shellEnv, workspace))
 
 		want := map[string]string{
 			"PATH":                    "/Users/dev/dotfiles/.devenv/profile/bin:/usr/bin:/bin",
 			"HOME":                    "/Users/dev",
 			"TERM":                    "xterm-256color",
 			"NH_SHOW_ACTIVATION_LOGS": "1",
+			"DOTS_WORKSPACE_ROOT":     "/Users/dev/dotfiles",
 		}
 		assertEnvEqual(t, got, want)
 	})
 
-	t.Run("when workspace is unresolvable, then NH_SHOW_ACTIVATION_LOGS is set but PATH is unchanged", func(t *testing.T) {
+	t.Run("when workspace is unresolvable, then NH_SHOW_ACTIVATION_LOGS is set but PATH and DOTS_WORKSPACE_ROOT are unchanged", func(t *testing.T) {
 		shellEnv := []string{"PATH=/usr/bin", "FOO=bar"}
 
-		got := asEnvMap(buildActivationEnv(shellEnv, ""))
+		got := asEnvMap(Build(shellEnv, ""))
 
 		want := map[string]string{
 			"PATH":                    "/usr/bin",
