@@ -1,0 +1,42 @@
+name: flake-lock-update
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: flake-lock-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: bump flake.lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+        with:
+          extra-conf: |
+            accept-flake-config = true
+
+      - name: Open flake.lock PR
+        uses: DeterminateSystems/update-flake-lock@834c491b2ece4de0bbd00d85214bb5e83b4da5c6 # v28
+        with:
+          pr-title: "chore(deps): bump flake.lock"
+          commit-msg: "chore(deps): bump flake.lock"
+          pr-labels: |
+            dependencies
+            nix
+          pr-body: |
+            Automated weekly `nix flake update`. CI gates this PR via the
+            home-activation flake check; investigate offending inputs
+            before merging.

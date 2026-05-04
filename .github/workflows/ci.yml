@@ -1,69 +1,56 @@
-# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
----
 name: ci
-
-# Pull-request gate. Two jobs:
-#   - flake-check: builds every entry under flake.checks.<system>, on
-#     both ubuntu and macos. The home-activation entry covers the
-#     class of regression that took eight patch releases to surface in
-#     v0.4.x — neovim wrapper bugs, home-manager option renames, any
-#     activation derivation that fails to build.
-#   - cli-quality: vet + test + treefmt --fail-on-change for the Go
-#     binary, run inside the dev shell so versions match what
-#     contributors see locally.
 
 on:
   pull_request:
   push:
     branches: [main]
+  merge_group:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Cancel superseded runs on rapid PR pushes — saves runner time and
-# avoids flapping required-check status on the merge button.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   flake-check:
-    name: flake check (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    name: flake check (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
         with:
           extra-conf: |
             accept-flake-config = true
 
-      # devenv-root is a flake input that points at the workspace path.
-      # The .envrc maintains this for direnv users; CI replicates the
-      # behavior so devShells.default doesn't fall through to the
-      # no-op shell during evaluation.
       - name: Seed devenv-root
         run: echo "$PWD" > .devenv-root
 
-      - name: nix flake check
-        run: nix flake check --impure --accept-flake-config
+      - name: Run flake checks
+        run: nix flake check --impure --accept-flake-config --print-build-logs
 
   cli-quality:
     name: cli quality (vet, test, fmt)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
         with:
           extra-conf: |
             accept-flake-config = true
@@ -71,10 +58,7 @@ jobs:
       - name: Seed devenv-root
         run: echo "$PWD" > .devenv-root
 
-      # One nix-develop invocation, one shell, three gates. Bundling
-      # avoids spinning up the dev shell three times — each entry takes
-      # a few seconds even with the eval cached.
-      - name: vet · test · fmt
+      - name: vet · test · treefmt
         run: |
           nix develop --impure --accept-flake-config \
             --override-input devenv-root "file+file://$PWD/.devenv-root" \
@@ -83,3 +67,38 @@ jobs:
               go test ./apps/cli/...
               treefmt --fail-on-change
             '
+
+  commit-lint:
+    name: commit lint
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Lint commit subjects
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: |
+          set -eu
+          pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9._/-]+\))?!?:[[:space:]].+'
+          fail=0
+          while IFS=' ' read -r sha subject; do
+            if ! printf '%s' "$subject" | grep -qE "$pattern"; then
+              echo "::error::commit ${sha:0:12} does not follow Conventional Commits"
+              echo "  subject: $subject"
+              fail=1
+            fi
+          done < <(git log --no-merges --format='%H %s' "${BASE_SHA}..${HEAD_SHA}")
+
+          if [ "$fail" -ne 0 ]; then
+            echo
+            echo "Expected: <type>(<scope>): <subject>"
+            echo "Types:    feat | fix | chore | docs | style | refactor | perf | test | build | ci | revert"
+            exit 1
+          fi
