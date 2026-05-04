@@ -319,23 +319,74 @@ func snapshotConflicts(rels []string) error {
 // — the long-running activation phase needs to talk to the user
 // directly. The exit code is propagated verbatim so a moon failure
 // reads as a moon failure, not a generic dots error.
+//
+// Resolves moon in three layers (see resolveMoonCmd) so a user who
+// has not yet run `direnv allow` / `nix develop` still gets a working
+// `dots apply`. Without this, a clean shell PATH would dead-end here
+// even though the workspace ships its own proto-managed moon.
 func runMoonDeploy() int {
-	cmd := exec.Command("moon", "run", ui.MoonDeployTask)
+	cmd, label := resolveMoonCmd()
+	if cmd == nil {
+		fmt.Fprintln(os.Stderr, "apply: moon not reachable:")
+		fmt.Fprintln(os.Stderr, "  what: cannot locate moon to run modules:deploy")
+		fmt.Fprintln(os.Stderr, "  why:  not on PATH, no <workspace>/.proto/bin/moon, and `nix` is also missing")
+		fmt.Fprintln(os.Stderr, "  next: enter the dev shell (direnv allow / `nix develop`) or run `dots doctor`")
+		return exitcode.Failure
+	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			fmt.Fprintf(os.Stderr, "apply: `moon run %s` exited %d\n", ui.MoonDeployTask, ee.ExitCode())
+			fmt.Fprintf(os.Stderr, "apply: `%s` exited %d\n", label, ee.ExitCode())
 			return ee.ExitCode()
 		}
 		fmt.Fprintln(os.Stderr, "apply: moon run failed:")
-		fmt.Fprintf(os.Stderr, "  what: could not execute `moon run %s`\n", ui.MoonDeployTask)
+		fmt.Fprintf(os.Stderr, "  what: could not execute `%s`\n", label)
 		fmt.Fprintf(os.Stderr, "  why:  %s\n", err)
-		fmt.Fprintln(os.Stderr, "  next: ensure moon is on PATH (run `dots doctor`)")
+		fmt.Fprintln(os.Stderr, "  next: run `dots doctor` to diagnose the toolchain")
 		return exitcode.Failure
 	}
 	return exitcode.Success
+}
+
+// resolveMoonCmd builds a runnable *exec.Cmd for `moon run
+// modules:deploy`. Order of attempts:
+//
+//  1. moon on PATH — the dev-shell-activated case (direnv allow,
+//     nix develop, or a manually-extended PATH).
+//  2. <workspace>/.proto/bin/moon — the workspace's proto install.
+//     `.proto/` is per-machine and not in git; it exists once any of
+//     direnv/nix-develop/proto-install has run in this checkout.
+//     Running it directly works even when the user's interactive
+//     shell PATH is bare, which is the exact failure mode that
+//     prompted this resolver.
+//  3. `nix develop -c moon run modules:deploy` — last resort. Slow
+//     (cold flake eval) but always correct when nix is available;
+//     this covers a fresh clone before proto has populated .proto/bin.
+//
+// Returns (nil, "") only when every attempt is exhausted. The label
+// is used in error messages so a failure reads as the exact command
+// that was tried.
+func resolveMoonCmd() (*exec.Cmd, string) {
+	if _, err := exec.LookPath("moon"); err == nil {
+		return exec.Command("moon", "run", ui.MoonDeployTask),
+			"moon run " + ui.MoonDeployTask
+	}
+	if root, err := workspace.Root(); err == nil {
+		for _, sub := range []string{".proto/bin/moon", ".proto/shims/moon"} {
+			p := filepath.Join(root, sub)
+			if _, err := os.Stat(p); err == nil {
+				return exec.Command(p, "run", ui.MoonDeployTask),
+					p + " run " + ui.MoonDeployTask
+			}
+		}
+	}
+	if _, err := exec.LookPath("nix"); err == nil {
+		return exec.Command("nix", "develop", "-c", "moon", "run", ui.MoonDeployTask),
+			"nix develop -c moon run " + ui.MoonDeployTask
+	}
+	return nil, ""
 }
 
 // short renders the first 12 hex chars of a hash for human surfaces.
