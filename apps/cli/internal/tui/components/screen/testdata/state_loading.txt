@@ -1,0 +1,7 @@
+● Scan → Snapshot → Realize
+
+Step 1: Scanning
+
+◐ Scanning $HOME for brownfield collisions…
+
+[Ctrl-C] quit

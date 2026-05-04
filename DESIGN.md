@@ -87,25 +87,43 @@ components:
     border_foreground: text.muted
     padding: { rows: 1, columns: 2 }
     margin: { top: 1, bottom: 1 }
-    role: frames every wizard surface; the only top-level container
+    role: |
+      Frames OUTCOME surfaces only — done, failed, doctor, aborted.
+      Wizard step screens render borderless; the stepper, headings,
+      and whitespace carry the structure. Outcome surfaces keep the
+      rounded panel to mark terminal states in the flow.
 
   step-header:
-    typography: heading
+    typography:
+      heading_prefix: muted     # "Step N:"
+      heading_title:  heading   # focal title
     leading_glyph: none
     trailing_separator: blank line (margin_bottom 1)
+    role: |
+      The "Step N: <Title>" line beneath the stepper. Prefix is muted
+      so the eye lands on the title. Outcome surfaces use the same
+      role with prefix glyphs ("✓", "✗") in place of "Step N:".
 
-  breadcrumb:
-    layout: inline, separated by " › " in muted
+  stepper:
+    layout: inline, separated by " → " in text.muted
     states:
       complete:
         glyph: "✓"
         typography: status-success
+        label: status-success
       current:
         glyph: "●"
-        typography: heading
+        typography: { bold: true, foreground: accent.primary }
+        label: { bold: true, foreground: accent.primary }
       upcoming:
-        glyph: "○"
-        typography: muted
+        glyph: none
+        label: muted
+    role: |
+      Linear progress indicator at the top of every wizard step. One
+      stepper per screen; never two trackers on the same view. Welcome
+      and outcome surfaces render no stepper. Replaces the previous
+      "breadcrumb" component — the rename matches the screen primitive's
+      API surface and the linear-flow reference (Gentleman.Dots).
 
   list-item:
     states:
@@ -116,10 +134,17 @@ components:
         bold: true
         role: row the user is currently focused on
       selected:
-        prefix: "[x] "
+        prefix: "  "
         foreground: accent.primary
         bold: false
-        role: chosen in a multi-select
+        role: |
+          The committed value in a single-select. Carries no [x]; the
+          accent foreground is the only signal. The cursor row's accent
+          foreground compounds with this state when both are true.
+      multiselect-checked:
+        prefix: "[x] "
+        foreground: accent.primary
+        role: chosen in a multi-select (capability matrices, not pillars)
       default-marked:
         prefix: "  "
         suffix: " (default)"
@@ -130,11 +155,27 @@ components:
         prefix: "  "
         foreground: text.primary
 
+  auxiliary-action-row:
+    layout: |
+      Stack of rows below the option list, preceded by a 24-cell muted
+      rule. Each row: icon (one cell + space) + label (body) + optional
+      "[<key>]" mnemonic in muted.
+    icon: { foreground: accent.secondary }
+    label: { typography: body }
+    separator: { glyph: "────────────────────────", typography: muted }
+    role: |
+      Contextual reading material / shortcuts (e.g. "Learn about Neovim",
+      "View Keymaps"). Non-focusable in cursor flow; bound to the screen's
+      Keymap.Mnemonics and surfaced in the footer alongside the canonical
+      key entries. NEVER rendered above the option list.
+
   keybind-footer:
-    layout: inline, separated by "  " (two spaces)
+    layout: inline, separated by " • " in muted
+    key_label_format: "[<key>]"        # e.g. [Enter], [Esc], [Ctrl-C]
+    arrow_keys_format: "<arrow>/<vim>" # e.g. ↑/k, ↓/j
     key_label: typography keybind-hint
     description: typography muted
-    placement: last row of the panel, never wrapped
+    placement: last row of the screen, never wrapped
     role: contract that every screen advertises its exit key
 
   status-badge:
@@ -243,16 +284,20 @@ still runs but is allowed to clip; we do not design for sub-80-column phones.
 
 Conventions:
 
-- The whole UI is a single `panel` per step. No side-by-side panels, no
-  multi-column layouts. One column of attention, top to bottom.
-- Inside the panel: `padding: 1 row × 2 columns`. Outside: `margin: 1 row
-  top, 1 row bottom`. These match the existing `styPanel` and are part of
-  the contract.
+- Wizard step screens render **borderless** — the stepper, headings, and
+  whitespace carry the structure. A rounded `panel` is reserved for
+  outcome surfaces (done, failed, doctor, aborted) where the frame marks
+  a terminal state in the flow.
+- The canonical screen template is the slot order owned by
+  `components/screen.Layout`: stepper, blank row, "Step N: <Title>" header,
+  description, blank row, content (option list or status), optional
+  auxiliary action panel preceded by a muted rule, blank row, footer.
+  Views never reorder these slots.
+- One column of attention, top to bottom. No side-by-side panels.
 - Reflow: the only width-responsive element is the `progress-bar`, which is
-  `min(60, terminal_width - 10)` — always leaves room for the panel border
-  and padding.
-- Vertical density: between logical sections inside a panel, insert exactly
-  one blank row. Never two; never zero.
+  `min(60, terminal_width - 10)`.
+- Vertical density: between logical sections, insert exactly one blank
+  row. Never two; never zero.
 
 ## Elevation & Depth
 
@@ -262,9 +307,11 @@ in this priority order:
 
 1. **Color weight.** `accent.title` > `text.primary` > `text.muted`. The eye
    lands on the title because it is the only saturated magenta on screen.
-2. **Border.** The single `panel` rounded border separates the active screen
-   from the surrounding shell — the equivalent of a "card" in a GUI design
-   system, and the only depth cue we use.
+2. **Border.** The rounded `panel` border marks **outcome surfaces** —
+   done, failed, doctor, aborted. It is the equivalent of a "card" in a
+   GUI design system and the only depth cue we use; wizard steps in
+   progress are intentionally borderless so the user perceives the flow,
+   not a sequence of framed dialogs.
 3. **Whitespace.** A blank row between blocks does the work that elevation
    would do in a GUI.
 
@@ -287,35 +334,45 @@ shouldn't.
 the prose contract for each. Views must compose these atoms; they must not
 introduce new ones without first adding tokens here.
 
-- **`panel`** — the only top-level container. Rounded border in
-  `text.muted`, padding 1×2, margin 1 top / 1 bottom. Every wizard step,
-  every doctor surface, renders inside one.
+- **`panel`** — outcome surfaces only (done, failed, doctor, aborted).
+  Rounded border in `text.muted`, padding 1×2, margin 1 top / 1 bottom.
+  Wizard steps in progress are borderless.
 
-- **`step-header`** — title row. Uses `heading` typography, no leading
-  glyph, blank row below. Examples: "dots install", "Brownfield conflicts",
-  "✓ Realized" (where the leading glyph is part of the literal string, not
-  a header convention).
+- **`step-header`** — `Step N:` muted prefix + focal title in
+  `accent.title`. Examples: `Step 6: Confirm`, `✓ Realized` (where the
+  leading glyph stands in for the prefix on outcome surfaces). No leading
+  glyph in the wizard flow itself.
 
-- **`breadcrumb`** — three states (`complete`, `current`, `upcoming`).
-  Inline, separated by ` › ` in `muted`. The current step is the only one
-  that takes `heading` typography; complete steps are
-  `status.success` + glyph `✓`; upcoming are `muted` + glyph `○`. This is
-  the **only** place all three accent/status colors are allowed to coexist,
-  because each is constrained to a different breadcrumb cell.
+- **`stepper`** — three states (`complete`, `current`, `upcoming`).
+  Inline, separated by ` → ` in `muted`. Complete steps render `✓ Label`
+  in `status.success`; the current step renders `● Label` in
+  `accent.primary` bold; upcoming steps render the label only, in
+  `muted`. This is the **only** place where all three status/accent
+  colors coexist, because each is confined to a different stepper cell.
 
-- **`list-item`** — four states (`cursor`, `selected`, `default-marked`,
-  `plain`). The `cursor` row is the focus indicator: `▸` prefix in
-  `accent.primary`, bold. `selected` (multi-select chosen) uses `[x] ` in
-  `accent.primary`. `default-marked` carries a trailing ` (default)` in
-  `muted` — it is the system's recommendation, never a selection. `plain`
-  is two leading spaces and `text.primary`. A row may be both `cursor` and
-  `selected`; in that case `cursor` styling wins on the prefix and the
-  `[x]` survives in the body.
+- **`list-item`** — five states (`cursor`, `selected`, `multiselect-checked`,
+  `default-marked`, `plain`). The `cursor` row is the focus indicator: `▸`
+  prefix in `accent.primary`, bold; the row's text adopts `accent.primary`
+  too. `selected` is the committed value in a single-select — no `[x]`,
+  just `accent.primary` foreground. `multiselect-checked` keeps `[x] ` in
+  `accent.primary` for capability matrices. `default-marked` carries a
+  trailing ` (default)` in `muted`. `plain` is two leading spaces and
+  `text.primary`. A row may be `cursor` and `selected` simultaneously; in
+  that case the `▸` prefix wins on the lead and `accent.primary` is the
+  text foreground throughout.
 
-- **`keybind-footer`** — last row of the panel, never wrapped. Each entry
-  is a `keybind-hint` key label followed by a `muted` description, joined
-  by two spaces between entries. Every screen MUST advertise its exit key
-  here.
+- **`auxiliary-action-row`** — the contextual affordance block below the
+  option list. Preceded by a 24-cell muted rule, then one row per
+  affordance: icon (one cell + space) in `accent.secondary`, label in
+  `body`, optional `[<key>]` mnemonic in `muted`. Bound to the screen's
+  Keymap.Mnemonics so the same keys advertised in the footer drive the
+  rows. The block sits **below** the option list — never above it — so
+  the cursor flow (focus → commit) reaches the option list first.
+
+- **`keybind-footer`** — last row of the screen, never wrapped. Entries
+  separated by ` • ` in `muted`. Key labels render as `[<key>]` in
+  `keybind-hint` (arrow keys keep the `↑/k`, `↓/j` form); each followed
+  by a `muted` description. Every screen MUST advertise its exit key.
 
 - **`status-badge`** — three states (`ok`, `fail`, `warn`) using the
   glyphs `✓ / ✗ / ○`. Used as a row leader on outcome lines (the "done"
@@ -363,10 +420,15 @@ step," you've broken the user's only outcome signal.
 **Don't fake elevation.** No ASCII drop shadows, no nested borders, no
 double-line frames. Use whitespace and color weight.
 
-**Don't compete with the breadcrumb's `current`.** When a screen is
+**Don't compete with the stepper's `current`.** When a screen is
 inside a step, the screen's own `step-header` should not introduce a
-*second* magenta heading on the same vertical axis as the breadcrumb's
+*second* magenta heading on the same vertical axis as the stepper's
 current cell. Pick one focal heading per screen.
+
+**Don't render auxiliary actions above the option list.** The auxiliary
+panel always sits below, separated by a single muted rule. Above-the-list
+placement competes with the cursor flow and forces the user to scan past
+non-focusable rows before reaching the choices that matter.
 
 **Don't add a component without adding tokens here first.** If a future
 wizard step needs an atom that isn't in this list, update DESIGN.md

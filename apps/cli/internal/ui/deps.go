@@ -18,8 +18,9 @@ import "github.com/sanurb/.dotfiles/apps/cli/internal/state"
 type Mode int
 
 const (
-	ModeInstall Mode = iota
-	ModeSync
+	ModeInstall    Mode = iota // full first-run flow: pillars → scan → snapshot → realize
+	ModeSync                   // brownfield-safe: skip pillars, scan → snapshot → realize
+	ModeStandalone             // no workspace: pillars → write profile to user-config; no realize
 )
 
 // Collision is a path under $HOME that exists as a real file or dir
