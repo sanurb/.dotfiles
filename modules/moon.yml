@@ -45,6 +45,17 @@ tasks:
   # (nh >=4.3.0 hides them by default).
   deploy:
     command: "bash"
+    # env is declared explicitly so moon forwards parent-process
+    # values to the task. Without this declaration, moon's default
+    # task-env policy strips unknown vars; DOTS_NIX_SYSTEM (set by
+    # `dots apply`) never reaches the bash subshell, the `nix eval`
+    # fallback fires, and on a host where moon also stripped PATH
+    # entries that find nix the fallback empties out — exactly what
+    # v0.4.4 was supposed to prevent. The `$VAR` syntax interpolates
+    # the parent's env at task-spawn time.
+    env:
+      DOTS_NIX_SYSTEM: "$DOTS_NIX_SYSTEM"
+      NH_SHOW_ACTIVATION_LOGS: "1"
     args:
       - "-c"
       # set -eu so any future `$(...)` substitution that fails or any
@@ -54,13 +65,12 @@ tasks:
       # progress to stdout that may legitimately produce broken pipes.
       - |-
         set -eu
-        export NH_SHOW_ACTIVATION_LOGS=1
         sys="${DOTS_NIX_SYSTEM:-$(nix eval --raw --impure --expr 'builtins.currentSystem' 2>/dev/null || true)}"
         if [ -z "$sys" ]; then
           echo "modules:deploy: cannot resolve nix system identifier" >&2
           echo "  what: DOTS_NIX_SYSTEM is unset and 'nix eval' produced no output" >&2
-          echo "  why:  nix may be missing or experimental-features may be disabled" >&2
-          echo "  next: invoke via 'dots apply' (which sets DOTS_NIX_SYSTEM) or activate the dev shell" >&2
+          echo "  why:  moon's task env may have stripped DOTS_NIX_SYSTEM, and nix may not be on PATH for this subshell" >&2
+          echo "  next: invoke via 'dots apply' (which sets DOTS_NIX_SYSTEM) and confirm 'dots --version' is >= 0.4.4" >&2
           exit 1
         fi
         exec nh home switch -c "${sys}" . -- \
