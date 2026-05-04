@@ -1,3 +1,0 @@
-# ADR-0006: `nh` as deploy driver, `nom` as build renderer, composed by `$PATH`
-
-`nh` is the lifecycle driver: `dots deploy` shells out to `nh home switch`, which builds `activationPackage` directly via `nix build` and execs the resulting `./activate` — no `home-manager` CLI involved. `nom` is the build renderer; `nh` delegates to it automatically when on `$PATH` and falls back to plain `nix build` output when absent. Composing them through `$PATH` rather than CLI flags keeps each tool single-responsibility and reduces the doctor's job to presence + version-floor (`nh >= 4.3.0` for `NH_SHOW_ACTIVATION_LOGS`), not configuration.
