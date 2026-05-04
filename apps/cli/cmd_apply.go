@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -21,6 +20,16 @@ import (
 )
 
 const cmdApplySummary = "Apply the plan: bootstrap if needed, snapshot conflicts, realize the profile"
+
+// Env keys that compose moon's subprocess environment. Centralized so
+// renames are one-place edits and the contract is self-documenting.
+// The same identifiers appear in modules/moon.yml's deploy task —
+// changing any string here is a coordinated rename across Go + YAML.
+const (
+	envPath          = "PATH"
+	envProtoHome     = "PROTO_HOME"
+	envDotsNixSystem = "DOTS_NIX_SYSTEM"
+)
 
 // runApply implements `dots apply [profile] [--plan FILE] [--dry-run]
 // [--yes] [--non-interactive] [--json]`. It is the canonical converge
@@ -353,39 +362,60 @@ func runMoonDeploy() int {
 	return exitcode.Success
 }
 
-// resolveMoonCmd builds a runnable *exec.Cmd for `moon run
-// modules:deploy`. Order of attempts:
+// moonProbe is the dependency surface resolveMoon needs from the
+// outside world. Injected so the resolver's layer-precedence logic
+// is unit-testable without exec or filesystem coupling.
+type moonProbe struct {
+	lookPath  func(name string) (string, error)
+	statFile  func(path string) error
+	workspace func() (string, error)
+}
+
+func defaultMoonProbe() moonProbe {
+	return moonProbe{
+		lookPath: exec.LookPath,
+		statFile: func(p string) error {
+			_, err := os.Stat(p)
+			return err
+		},
+		workspace: workspace.Root,
+	}
+}
+
+// resolveMoonCmd is the production entry point that wires the default
+// probe. Tests call resolveMoon directly with a stubbed probe.
+func resolveMoonCmd() (*exec.Cmd, string) {
+	return resolveMoon(defaultMoonProbe())
+}
+
+// resolveMoon builds a runnable *exec.Cmd for `moon run modules:deploy`.
+// Order of attempts:
 //
-//  1. moon on PATH — the dev-shell-activated case (direnv allow,
-//     nix develop, or a manually-extended PATH).
-//  2. <workspace>/.proto/bin/moon — the workspace's proto install.
-//     `.proto/` is per-machine and not in git; it exists once any of
-//     direnv/nix-develop/proto-install has run in this checkout.
-//     Running it directly works even when the user's interactive
-//     shell PATH is bare, which is the exact failure mode that
-//     prompted this resolver.
+//  1. moon on PATH — the dev-shell-activated case.
+//  2. <workspace>/.proto/bin/moon (then .proto/shims/moon) — proto's
+//     per-machine install. Works in a bare shell once direnv/devenv
+//     has populated .proto/.
 //  3. `nix develop -c moon run modules:deploy` — last resort. Slow
-//     (cold flake eval) but always correct when nix is available;
-//     this covers a fresh clone before proto has populated .proto/bin.
+//     (cold flake eval) but covers a fresh clone where .proto is empty.
 //
 // Returns (nil, "") only when every attempt is exhausted. The label
 // is used in error messages so a failure reads as the exact command
 // that was tried.
-func resolveMoonCmd() (*exec.Cmd, string) {
-	if _, err := exec.LookPath("moon"); err == nil {
+func resolveMoon(p moonProbe) (*exec.Cmd, string) {
+	if _, err := p.lookPath("moon"); err == nil {
 		return exec.Command("moon", "run", ui.MoonDeployTask),
 			"moon run " + ui.MoonDeployTask
 	}
-	if root, err := workspace.Root(); err == nil {
+	if root, err := p.workspace(); err == nil {
 		for _, sub := range []string{".proto/bin/moon", ".proto/shims/moon"} {
-			p := filepath.Join(root, sub)
-			if _, err := os.Stat(p); err == nil {
-				return exec.Command(p, "run", ui.MoonDeployTask),
-					p + " run " + ui.MoonDeployTask
+			full := filepath.Join(root, sub)
+			if err := p.statFile(full); err == nil {
+				return exec.Command(full, "run", ui.MoonDeployTask),
+					full + " run " + ui.MoonDeployTask
 			}
 		}
 	}
-	if _, err := exec.LookPath("nix"); err == nil {
+	if _, err := p.lookPath("nix"); err == nil {
 		return exec.Command("nix", "develop", "-c", "moon", "run", ui.MoonDeployTask),
 			"nix develop -c moon run " + ui.MoonDeployTask
 	}
@@ -395,6 +425,11 @@ func resolveMoonCmd() (*exec.Cmd, string) {
 // moonEnv resolves the workspace, the home dir, and the current
 // environment, then delegates to buildMoonEnv (the pure function).
 // Split for testability — buildMoonEnv has no os/workspace coupling.
+//
+// The nix system identifier comes from plan.CurrentHost().NixIdent()
+// so dots and the e2e tests share the same formula; pre-computing it
+// here kills the bash task's nix-eval round-trip that was v0.4.3's
+// failure mode.
 func moonEnv() []string {
 	env := os.Environ()
 	root, err := workspace.Root()
@@ -402,26 +437,7 @@ func moonEnv() []string {
 		return env
 	}
 	home, _ := os.UserHomeDir()
-	sys := nixSystem(runtime.GOOS, runtime.GOARCH)
-	return buildMoonEnv(env, root, home, sys)
-}
-
-// nixSystem maps Go's runtime tuple to the Nix system identifier the
-// flake's `homeConfigurations` is keyed by. Pre-computing this in dots
-// kills the bash task's `$(nix eval ...)` round-trip — that eval was
-// the failure mode behind v0.4.3's "homeConfigurations." (empty)
-// error, since command substitution silently swallows nix-eval errors
-// and feeds nh an empty -c value. Mapping is exhaustive over the
-// supported platforms (ADR-0011: macOS + Linux only); an unknown
-// architecture falls through unmapped so the bash fallback can still
-// run nix eval and surface the real cause.
-func nixSystem(goos, goarch string) string {
-	archMap := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}
-	arch, ok := archMap[goarch]
-	if !ok {
-		return ""
-	}
-	return arch + "-" + goos
+	return buildMoonEnv(env, root, home, plan.CurrentHost().NixIdent())
 }
 
 // buildMoonEnv mirrors devenv.nix's enterShell so moon's task
@@ -448,8 +464,8 @@ func nixSystem(goos, goarch string) string {
 // `/.cargo/bin` and the noise on PATH is worse than the omission.
 func buildMoonEnv(env []string, workspaceRoot, homeDir, nixSys string) []string {
 	protoHome := filepath.Join(workspaceRoot, ".proto")
-	env = setEnvKey(env, "PROTO_HOME", protoHome)
-	env = setEnvKey(env, "DOTS_NIX_SYSTEM", nixSys)
+	env = setEnvKey(env, envProtoHome, protoHome)
+	env = setEnvKey(env, envDotsNixSystem, nixSys)
 
 	extras := []string{
 		filepath.Join(protoHome, "shims"),
@@ -483,13 +499,14 @@ func prependPathEntries(env, extras []string) []string {
 	}
 	sep := string(os.PathListSeparator)
 	prepend := strings.Join(extras, sep)
+	pathPrefix := envPath + "="
 	for i, e := range env {
-		if strings.HasPrefix(e, "PATH=") {
-			env[i] = "PATH=" + prepend + sep + strings.TrimPrefix(e, "PATH=")
+		if strings.HasPrefix(e, pathPrefix) {
+			env[i] = pathPrefix + prepend + sep + strings.TrimPrefix(e, pathPrefix)
 			return env
 		}
 	}
-	return append(env, "PATH="+prepend)
+	return append(env, pathPrefix+prepend)
 }
 
 // short renders the first 12 hex chars of a hash for human surfaces.

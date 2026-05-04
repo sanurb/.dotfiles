@@ -80,15 +80,6 @@ func newHarness(t *testing.T) *harness {
 	}
 }
 
-// moonInvoked is a binary-truth probe: did the moon stub write its
-// record file? Distinguishes "stub never ran" from "stub ran with
-// empty env", which assertEqual on the parsed map cannot.
-func (h *harness) moonInvoked() bool {
-	h.t.Helper()
-	_, err := os.Stat(h.MoonRecord)
-	return err == nil
-}
-
 // withStateFile writes a `.dots-state.toml` so plan/apply resolve a
 // profile. The factory in factory_test.go produces realistic content.
 func (h *harness) withStateFile(toml string) *harness {
@@ -97,16 +88,24 @@ func (h *harness) withStateFile(toml string) *harness {
 	return h
 }
 
+// installStub plants a POSIX shell script at the given absolute path
+// and marks it executable. Used by both withStub (PATH-front shims)
+// and withMoonStub (workspace-resolved moon binary).
+func (h *harness) installStub(path, body string) {
+	h.t.Helper()
+	mustWrite(h.t, path, body)
+	mustChmod(h.t, path, 0o755)
+}
+
 // withMoonStub plants a POSIX shell script at <ws>/.proto/bin/moon.
 // resolveMoonCmd's layer 2 picks it up because the test's PATH
 // (BinDir + /usr/bin:/bin) deliberately lacks moon. The stub writes
-// its received env to MoonRecord and exits 0, simulating a clean
-// `moon run modules:deploy` for the purposes of the test.
+// its received env to MoonRecord and exits 0.
 func (h *harness) withMoonStub() *harness {
-	h.t.Helper()
-	script := "#!/bin/sh\nenv > \"$STUB_MOON_RECORD\"\nexit 0\n"
-	mustWrite(h.t, filepath.Join(h.Workspace, ".proto", "bin", "moon"), script)
-	mustChmod(h.t, filepath.Join(h.Workspace, ".proto", "bin", "moon"), 0o755)
+	h.installStub(
+		filepath.Join(h.Workspace, ".proto", "bin", "moon"),
+		"#!/bin/sh\nenv > \"$STUB_MOON_RECORD\"\nexit 0\n",
+	)
 	return h
 }
 
@@ -114,10 +113,7 @@ func (h *harness) withMoonStub() *harness {
 // (front of PATH). Used to satisfy bootstrap.NixPresent without a
 // real nix install — the stub never actually runs in apply tests.
 func (h *harness) withStub(name, body string) *harness {
-	h.t.Helper()
-	p := filepath.Join(h.BinDir, name)
-	mustWrite(h.t, p, body)
-	mustChmod(h.t, p, 0o755)
+	h.installStub(filepath.Join(h.BinDir, name), body)
 	return h
 }
 
@@ -155,14 +151,15 @@ func (h *harness) run(args ...string) result {
 	return result{Stdout: stdout.String(), Stderr: stderr.String(), ExitCode: code}
 }
 
-// moonEnvAsMap reads MoonRecord and parses the dumped env. Returns
-// nil when the stub never ran — distinguishing absence from emptiness
-// for tests that assert on whether moon was invoked at all.
-func (h *harness) moonEnvAsMap() map[string]string {
+// moonEnv reads the env dump the moon stub recorded. Returns
+// (env, true) when the stub ran, (nil, false) when it didn't —
+// the boolean is the binary-truth probe; the map is the contents.
+// One accessor over two methods keeps the test surface tight.
+func (h *harness) moonEnv() (map[string]string, bool) {
 	h.t.Helper()
 	body, err := os.ReadFile(h.MoonRecord)
 	if err != nil {
-		return nil
+		return nil, false
 	}
 	out := make(map[string]string)
 	for _, line := range strings.Split(string(body), "\n") {
@@ -170,7 +167,7 @@ func (h *harness) moonEnvAsMap() map[string]string {
 			out[line[:i]] = line[i+1:]
 		}
 	}
-	return out
+	return out, true
 }
 
 // mustWrite/mustMkdir/mustChmod are the harness's bottle-feeder

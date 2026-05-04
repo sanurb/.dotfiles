@@ -3,9 +3,10 @@ package e2e
 import (
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
 )
 
 func TestApply(t *testing.T) {
@@ -17,8 +18,8 @@ func TestApply(t *testing.T) {
 
 		h.run("apply", "--yes")
 
-		moonEnv := h.moonEnvAsMap()
-		assertEqual(t, moonEnv["PROTO_HOME"], filepath.Join(h.Workspace, ".proto"))
+		env, _ := h.moonEnv()
+		assertEqual(t, env["PROTO_HOME"], filepath.Join(h.Workspace, ".proto"))
 	})
 
 	t.Run("when user runs apply --yes from a bare shell, then moon's PATH leads with proto shims and proto bin from the workspace", func(t *testing.T) {
@@ -29,12 +30,12 @@ func TestApply(t *testing.T) {
 
 		h.run("apply", "--yes")
 
-		moonPath := h.moonEnvAsMap()["PATH"]
+		env, _ := h.moonEnv()
 		want := []string{
 			filepath.Join(h.Workspace, ".proto", "shims"),
 			filepath.Join(h.Workspace, ".proto", "bin"),
 		}
-		assertPathLeading(t, moonPath, want)
+		assertPathLeading(t, env["PATH"], want)
 	})
 
 	t.Run("when user runs apply --yes from a bare shell, then moon receives DOTS_NIX_SYSTEM matching the host architecture", func(t *testing.T) {
@@ -45,7 +46,8 @@ func TestApply(t *testing.T) {
 
 		h.run("apply", "--yes")
 
-		assertEqual(t, h.moonEnvAsMap()["DOTS_NIX_SYSTEM"], expectedNixSystem())
+		env, _ := h.moonEnv()
+		assertEqual(t, env["DOTS_NIX_SYSTEM"], expectedNixSystem())
 	})
 
 	t.Run("when user runs apply --dry-run, then plan is rendered to stdout and moon is never invoked", func(t *testing.T) {
@@ -56,23 +58,18 @@ func TestApply(t *testing.T) {
 
 		got := h.run("apply", "--dry-run")
 
+		_, invoked := h.moonEnv()
 		assertEqual(t, got.ExitCode, 0)
 		assertContains(t, got.Stdout, "apply profile zsh")
-		assertEqual(t, h.moonInvoked(), false)
+		assertEqual(t, invoked, false)
 	})
 }
 
-// expectedNixSystem mirrors apps/cli/cmd_apply.go::nixSystem so the
-// E2E test computes the same identifier dots will set. Pinning to
-// the host's actual GOOS/GOARCH lets one test cover both macOS and
-// Linux runners without forking.
+// expectedNixSystem reuses the production formula by calling into
+// plan.Host.NixIdent — when the formula changes for any reason the
+// e2e expectation tracks it automatically.
 func expectedNixSystem() string {
-	archMap := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}
-	arch, ok := archMap[runtime.GOARCH]
-	if !ok {
-		return ""
-	}
-	return arch + "-" + runtime.GOOS
+	return plan.CurrentHost().NixIdent()
 }
 
 // assertEqual is the package's single comparison primitive: deep

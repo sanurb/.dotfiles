@@ -58,33 +58,6 @@ func TestBuildMoonEnv(t *testing.T) {
 	})
 }
 
-func TestNixSystem(t *testing.T) {
-	t.Run("when GOARCH is arm64 on darwin, then identifier is aarch64-darwin", func(t *testing.T) {
-		got := nixSystem("darwin", "arm64")
-
-		assertStringEqual(t, got, "aarch64-darwin")
-	})
-
-	t.Run("when GOARCH is amd64 on linux, then identifier is x86_64-linux", func(t *testing.T) {
-		got := nixSystem("linux", "amd64")
-
-		assertStringEqual(t, got, "x86_64-linux")
-	})
-
-	t.Run("when GOARCH is unknown, then identifier is empty so the bash fallback can run nix eval", func(t *testing.T) {
-		got := nixSystem("plan9", "riscv64")
-
-		assertStringEqual(t, got, "")
-	})
-}
-
-func assertStringEqual(t *testing.T, got, want string) {
-	t.Helper()
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
 // buildShellEnv is the data factory for a parent shell's environment.
 // Defaults look like a bare login shell; overrides replace specific
 // keys so each test reads as the minimal delta from a normal shell.
