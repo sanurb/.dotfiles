@@ -28,8 +28,15 @@ tasks:
   # `nix build` resolves the homeManagerConfiguration record (a set)
   # and trips the flake schema check on `homeConfigurations.<name>.type`.
   # The `-c` form goes through auto-detect, which appends the suffix.
-  # flake.nix keys homeConfigurations by <system>; we resolve at deploy
-  # time via `nix eval --impure`.
+  # flake.nix keys homeConfigurations by <system>.
+  #
+  # System resolution: `dots apply` pre-computes `DOTS_NIX_SYSTEM` from
+  # runtime.GOOS/GOARCH (see apps/cli/cmd_apply.go::nixSystem) and sets
+  # it in the moon subprocess env. We use it directly. The nix-eval
+  # fallback handles direct `moon run modules:deploy` invocations from
+  # an activated dev shell. v0.4.3 hit a bug where command substitution
+  # silently swallowed a failed `nix eval`, leaving sys="" and feeding
+  # nh an empty -c value — sidestepping the eval entirely is the fix.
   #
   # `--impure --accept-flake-config` forwards to `nix build` via nh's
   # `--` passthrough so home.nix can read MOON_WORKSPACE_ROOT and the
@@ -42,7 +49,14 @@ tasks:
       - "-c"
       - |-
         export NH_SHOW_ACTIVATION_LOGS=1
-        sys="$(nix eval --raw --impure --expr 'builtins.currentSystem')"
+        sys="${DOTS_NIX_SYSTEM:-$(nix eval --raw --impure --expr 'builtins.currentSystem' 2>/dev/null)}"
+        if [ -z "$sys" ]; then
+          echo "modules:deploy: cannot resolve nix system identifier" >&2
+          echo "  what: DOTS_NIX_SYSTEM is unset and 'nix eval' produced no output" >&2
+          echo "  why:  nix may be missing or experimental-features may be disabled" >&2
+          echo "  next: invoke via 'dots apply' (which sets DOTS_NIX_SYSTEM) or activate the dev shell" >&2
+          exit 1
+        fi
         exec nh home switch -c "${sys}" . -- \
           --impure --accept-flake-config
     deps:

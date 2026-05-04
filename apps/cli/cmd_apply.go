@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -401,7 +402,26 @@ func moonEnv() []string {
 		return env
 	}
 	home, _ := os.UserHomeDir()
-	return buildMoonEnv(env, root, home)
+	sys := nixSystem(runtime.GOOS, runtime.GOARCH)
+	return buildMoonEnv(env, root, home, sys)
+}
+
+// nixSystem maps Go's runtime tuple to the Nix system identifier the
+// flake's `homeConfigurations` is keyed by. Pre-computing this in dots
+// kills the bash task's `$(nix eval ...)` round-trip — that eval was
+// the failure mode behind v0.4.3's "homeConfigurations." (empty)
+// error, since command substitution silently swallows nix-eval errors
+// and feeds nh an empty -c value. Mapping is exhaustive over the
+// supported platforms (ADR-0011: macOS + Linux only); an unknown
+// architecture falls through unmapped so the bash fallback can still
+// run nix eval and surface the real cause.
+func nixSystem(goos, goarch string) string {
+	archMap := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}
+	arch, ok := archMap[goarch]
+	if !ok {
+		return ""
+	}
+	return arch + "-" + goos
 }
 
 // buildMoonEnv mirrors devenv.nix's enterShell so moon's task
@@ -411,24 +431,25 @@ func moonEnv() []string {
 //	export PROTO_HOME="$DEVENV_ROOT/.proto"
 //	export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$HOME/.cargo/bin:$PATH"
 //
-// Without PROTO_HOME, proto walks up to the user-level ~/.proto
-// install, where the workspace's pinned tool versions are NOT
-// installed — the user sees "this version has not been installed"
-// even though `<workspace>/.proto/tools/<tool>/<version>/` is right
-// there. v0.4.0–v0.4.2 each chipped at the symptoms; this function
-// recreates the full activation in one place so the regression is
-// caught at the unit level.
+// Plus DOTS_NIX_SYSTEM (e.g., "aarch64-darwin"), pre-computed by dots
+// so modules:deploy's bash task does not have to round-trip through
+// `nix eval --raw --impure --expr 'builtins.currentSystem'` — that
+// eval is fragile and command-substitution-swallowed when nix is
+// missing or experimental features are off. The bash task uses
+// `${DOTS_NIX_SYSTEM:-<fallback>}` so direct `moon run` invocations
+// still work.
 //
 // Pure function: no os.Stat, no os.Getenv, no workspace.Root. The
 // caller (moonEnv) supplies them. Missing directories are NOT
 // filtered here — the caller may pass paths that don't yet exist
 // on a fresh clone, and that's fine: the resolver's nix-develop
-// layer covers that case. We do skip empty homeDir though, because
+// layer covers that case. We skip empty homeDir though, because
 // `~/.cargo/bin` resolved from a missing $HOME would land at
 // `/.cargo/bin` and the noise on PATH is worse than the omission.
-func buildMoonEnv(env []string, workspaceRoot, homeDir string) []string {
+func buildMoonEnv(env []string, workspaceRoot, homeDir, nixSys string) []string {
 	protoHome := filepath.Join(workspaceRoot, ".proto")
 	env = setEnvKey(env, "PROTO_HOME", protoHome)
+	env = setEnvKey(env, "DOTS_NIX_SYSTEM", nixSys)
 
 	extras := []string{
 		filepath.Join(protoHome, "shims"),

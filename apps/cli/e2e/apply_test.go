@@ -3,6 +3,7 @@ package e2e
 import (
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -36,6 +37,17 @@ func TestApply(t *testing.T) {
 		assertPathLeading(t, moonPath, want)
 	})
 
+	t.Run("when user runs apply --yes from a bare shell, then moon receives DOTS_NIX_SYSTEM matching the host architecture", func(t *testing.T) {
+		h := newHarness(t).
+			withStub("nix", nixStubBody).
+			withMoonStub().
+			withStateFile(buildStateTOML(stateOverrides{}))
+
+		h.run("apply", "--yes")
+
+		assertEqual(t, h.moonEnvAsMap()["DOTS_NIX_SYSTEM"], expectedNixSystem())
+	})
+
 	t.Run("when user runs apply --dry-run, then plan is rendered to stdout and moon is never invoked", func(t *testing.T) {
 		h := newHarness(t).
 			withStub("nix", nixStubBody).
@@ -48,6 +60,19 @@ func TestApply(t *testing.T) {
 		assertContains(t, got.Stdout, "apply profile zsh")
 		assertEqual(t, h.moonInvoked(), false)
 	})
+}
+
+// expectedNixSystem mirrors apps/cli/cmd_apply.go::nixSystem so the
+// E2E test computes the same identifier dots will set. Pinning to
+// the host's actual GOOS/GOARCH lets one test cover both macOS and
+// Linux runners without forking.
+func expectedNixSystem() string {
+	archMap := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}
+	arch, ok := archMap[runtime.GOARCH]
+	if !ok {
+		return ""
+	}
+	return arch + "-" + runtime.GOOS
 }
 
 // assertEqual is the package's single comparison primitive: deep
