@@ -81,7 +81,7 @@ func runApply(rest []string) int {
 	// still get a single line on stderr because stdout is reserved
 	// for plan/data output.
 	if isAlreadyApplied(p) {
-		fmt.Fprintf(os.Stderr, "system is already at plan %s; no-op\n", short(p.Hash))
+		fmt.Fprintf(os.Stderr, "system is already at plan %s; no-op\n", short(p.ConvergedHash()))
 		return exitcode.NoOp
 	}
 
@@ -293,13 +293,24 @@ func emitPlan(p plan.Plan, common cliflags.Common) {
 	renderPlan(os.Stdout, p, !common.NoColor)
 }
 
-// isAlreadyApplied checks the applied.toml receipt for a converged-
-// state match. Uses ConvergedHash (not Hash) so a plan with a
-// just-completed prerequisite step (snapshot, bootstrap) still
-// recognizes the previous receipt — the work changed shape but the
-// desired state did not. A missing or unreadable receipt is treated
-// as "not applied" — the safe default.
+// isAlreadyApplied returns true only when the plan is pure
+// converged-state delivery (just apply-profile, no prerequisites)
+// AND the receipt's hash matches the plan's converged state.
+//
+// Prerequisite steps — snapshot-conflicts, bootstrap-nix,
+// clone-workspace — mutate the host BEFORE activation can succeed.
+// Their presence means there is real work to do, regardless of
+// whether the converged-state hash matches a prior receipt: the
+// receipt only attests to past success, not to current cleanliness.
+// Skipping a snapshot because "we converged once" would leave the
+// colliding file in place and break the next activation.
+//
+// A missing or unreadable receipt is treated as "not applied" — the
+// safe default.
 func isAlreadyApplied(p plan.Plan) bool {
+	if p.HasKind(plan.KindBootstrapNix, plan.KindCloneWorkspace, plan.KindSnapshotConflicts) {
+		return false
+	}
 	path, err := applied.DefaultPath()
 	if err != nil {
 		return false
