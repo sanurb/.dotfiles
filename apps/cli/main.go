@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
@@ -52,13 +53,15 @@ var commands = map[string]command{
 }
 
 func runInstall([]string) int {
-	// Two-mode install: inside a workspace, the full wizard (form →
-	// scan → snapshot → realize). Outside, a form-only path that
-	// writes the profile to the user-config dir and stops there.
+	// Two-mode install: inside a workspace, the full wizard (pillar
+	// selection → scan → optional snapshot → "Realize now?" prompt).
+	// Outside, a form-only path that writes the profile to the user-
+	// config dir and stops there. Realization is never run from inside
+	// the wizard — see ADR-0009 and runWithRealize below.
 	if _, err := workspace.Root(); err != nil {
 		code := runStandaloneInstall()
 		if code == 0 {
-			printInstallNextSteps()
+			printInstallNextSteps(false)
 		}
 		return code
 	}
@@ -67,11 +70,7 @@ func runInstall([]string) int {
 		fmt.Fprintln(os.Stderr, "install:", err)
 		return 1
 	}
-	code := ui.Run(ui.ModeInstall, deps)
-	if code == 0 {
-		printInstallNextSteps()
-	}
-	return code
+	return runWithRealize(ui.ModeInstall, deps)
 }
 
 func runSync([]string) int {
@@ -79,14 +78,59 @@ func runSync([]string) int {
 	// the activation phase — a brownfield sync is the most likely entry
 	// point for a tree whose hooks predate the Moon migration.
 	syncMoonHooksSilent()
-	// Gate verified workspace presence; defense in depth in case a
-	// future change lets workspace.Root() fail post-gate.
 	deps, err := newWizardDeps()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sync:", err)
 		return 1
 	}
-	return ui.Run(ui.ModeSync, deps)
+	return runWithRealize(ui.ModeSync, deps)
+}
+
+// runWithRealize runs the wizard and, on consent, hands off to
+// `dots deploy` as a subprocess. The wizard never realizes the system
+// itself; it captures intent and exits, and main owns the follow-on
+// invocation. ADR-0009 records the rationale (TUI stays free of Nix
+// imports; deploy gates re-fire on the subprocess).
+func runWithRealize(mode ui.Mode, deps ui.Deps) int {
+	r := ui.Run(mode, deps)
+	if r.Code != 0 {
+		return r.Code
+	}
+	if !r.RealizeRequested {
+		printInstallNextSteps(true)
+		return 0
+	}
+	if err := execSelfDeploy(); err != nil {
+		ee, ok := err.(*exec.ExitError)
+		if ok {
+			return ee.ExitCode()
+		}
+		fmt.Fprintln(os.Stderr, "deploy:", err)
+		return 1
+	}
+	return 0
+}
+
+// execSelfDeploy invokes `<self> deploy` as a subprocess inheriting
+// stdio. Resolution order: os.Executable() (robust to PATH mutations
+// between the install and deploy phases — e.g. a Homebrew symlink path
+// vs. the binary's real /opt/homebrew/Cellar/... target) → exec.LookPath
+// fallback for unusual install layouts where Executable() returns a
+// path the kernel resolved but a child process can't re-exec (NixOS
+// /proc/self/exe is one such case).
+func execSelfDeploy() error {
+	self, err := os.Executable()
+	if err != nil {
+		self, err = exec.LookPath("dots")
+		if err != nil {
+			return fmt.Errorf("cannot locate dots binary: %w", err)
+		}
+	}
+	cmd := exec.Command(self, "deploy")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func runDoctorCmd(rest []string) int {
@@ -136,18 +180,22 @@ func main() {
 }
 
 // printInstallNextSteps tells the user what to do after a successful
-// install wizard. Branches on workspace presence: in-workspace, the
-// next step is realize via `dots deploy`; outside, the user needs Nix
-// and a clone before realization. Shares URL constants with the
-// dispatcher gate so the two messages can't drift.
-func printInstallNextSteps() {
-	if _, err := workspace.Root(); err == nil {
+// install wizard run that DID NOT realize. The hasWorkspace flag
+// distinguishes the two cases: inside the workspace, "deferred — run
+// dots deploy" is enough; outside, the user needs Nix and a clone
+// first, so we keep the bootstrap recipe.
+//
+// On the realize-yes path, this function isn't called — `dots deploy`
+// has already run and printed its own outcome by the time control
+// returns to main, so any extra epilogue would just be noise.
+func printInstallNextSteps(hasWorkspace bool) {
+	if hasWorkspace {
 		fmt.Println()
-		fmt.Println("Profile written. Run `dots deploy` to realize this profile.")
+		fmt.Println("Profile saved. Run `dots deploy` when ready.")
 		return
 	}
 	fmt.Printf(`
-Profile written.
+Profile saved.
 
 To realize this profile, you need the dotfiles workspace and Nix:
   1. Install Nix:    %s

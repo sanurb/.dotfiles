@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -85,32 +82,10 @@ func (f fsSnapshotter) Snapshot(cs []ui.Collision) (ui.SnapshotResult, error) {
 	return ui.SnapshotResult{Count: len(cs), Path: dest}, nil
 }
 
-// moonRealizer implements ui.Realizer by shelling out to the Moon
-// deploy task, capturing stdout/stderr to a buffer so the TUI is not
-// corrupted by interleaved deploy logs. On failure, the captured
-// output is folded into the error.
-//
-// DOTS_CAPS is dead. The realizer no longer carries any persona config:
-// the .dots-state.toml file at the workspace root is the input, read by
-// home.nix via builtins.fromTOML.
-type moonRealizer struct{}
-
-func (moonRealizer) Realize() (ui.RealizationResult, error) {
-	started := time.Now()
-	cmd := exec.Command("moon", "run", ui.MoonDeployTask)
-	cmd.Stdout = io.Discard
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		tail := strings.TrimSpace(stderr.String())
-		if len(tail) > 1000 {
-			tail = tail[len(tail)-1000:]
-		}
-		return ui.RealizationResult{}, fmt.Errorf("%s: %w\n%s", ui.MoonRunDeploy, err, tail)
-	}
-	return ui.RealizationResult{DurationMs: time.Since(started).Milliseconds()}, nil
-}
+// Realization is no longer a wizard concern. The wizard signals
+// consent via ui.Result.RealizeRequested and exits; main re-invokes
+// `dots deploy` as a subprocess so nh's output renders against the
+// real terminal. ADR-0009 records the rationale.
 
 // tomlPersister snapshots the existing .dots-state.toml into the dots
 // backup directory before atomically writing the new one. It is the
@@ -200,7 +175,6 @@ func newWizardDeps() (ui.Deps, error) {
 	session := &backupSession{}
 	return ui.Deps{
 		Snapshotter:    fsSnapshotter{session: session},
-		Realizer:       moonRealizer{},
 		StatePersister: tomlPersister{workspaceRoot: root, session: session},
 		Initial:        loadInitialState(root),
 	}, nil

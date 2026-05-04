@@ -24,8 +24,8 @@ func (m Model) layout() screen.Layout {
 		return m.transientLayout("Scanning $HOME for brownfield collisions…")
 	case stepSnapshotting:
 		return m.transientLayout("Snapshotting colliding paths into ~/.dots_backups…")
-	case stepRealizing:
-		return m.realizingLayout()
+	case stepRealizePrompt:
+		return m.realizePromptLayout()
 	case stepDone:
 		return m.doneLayout()
 	case stepFailed:
@@ -58,6 +58,8 @@ func (m Model) currentRows() []screen.Row {
 		return optionRows(confirmOptions(m.mode), m.cursor)
 	case stepConflict:
 		return optionRows(conflictOptions(), m.cursor)
+	case stepRealizePrompt:
+		return optionRows(realizePromptOptions(), m.cursor)
 	}
 	return nil
 }
@@ -180,7 +182,7 @@ func (m Model) conflictLayout() screen.Layout {
 	}
 }
 
-// -- transient (scan / snapshot / realize) -------------------------
+// -- transient (scan / snapshot) -----------------------------------
 
 func (m Model) transientLayout(message string) screen.Layout {
 	return screen.Layout{
@@ -193,27 +195,42 @@ func (m Model) transientLayout(message string) screen.Layout {
 	}
 }
 
-func (m Model) realizingLayout() screen.Layout {
-	body := strings.Join([]string{
-		fmt.Sprintf("%s %s", m.spinner.View(), theme.Body.Render("Realizing Home Manager state…")),
-		"",
-		m.progress.View(),
-		"",
-		theme.Muted.Render(MoonRunDeploy),
-	}, "\n")
+// -- realize prompt ------------------------------------------------
+
+// realizePromptLayout is the consent gate that PR #2 inserts between
+// scan/snapshot and realization. The user has already committed to
+// the persona on stepConfirm; this is a separate "are you sure you
+// want to mutate the system right now?" check, with explicit visibility
+// of the command that will run.
+func (m Model) realizePromptLayout() screen.Layout {
+	desc := fmt.Sprintf("Will run %s in a subprocess. Output streams to this terminal.", MoonRunDeploy)
+
+	km := screen.Keymap{
+		Up: "↑/k", Down: "↓/j",
+		Select:     "Enter",
+		SelectVerb: "confirm",
+		Quit:       "Ctrl-C",
+	}
+
 	return screen.Layout{
-		Content: body,
-		Keymap:  screen.Keymap{Quit: "Ctrl-C"},
-		Width:   m.width,
+		Title:       "Realize now?",
+		Description: desc,
+		Content:     screen.RenderRows(m.currentRows()),
+		Keymap:      km,
+		Width:       m.width,
 	}
 }
 
 // -- outcome surfaces ----------------------------------------------
 
 func (m Model) doneLayout() screen.Layout {
+	heading, title := "✓", "Profile saved"
+	if m.realizeRequested {
+		title = "Profile saved — realizing next"
+	}
 	return screen.Layout{
-		Heading:  "✓",
-		Title:    "Realized",
+		Heading:  heading,
+		Title:    title,
 		Content:  m.renderDoneSummary(),
 		Bordered: true,
 		Keymap:   screen.Keymap{Select: "Enter", SelectVerb: "dismiss"},
@@ -307,9 +324,12 @@ func gitOptions() []wizardOption {
 }
 
 func confirmOptions(mode Mode) []wizardOption {
-	primary := "Yes, write profile and realize"
-	if mode == ModeStandalone {
-		primary = "Yes, write profile"
+	// Confirm now writes the profile only; realization is gated by a
+	// separate prompt (stepRealizePrompt) so the persona-commit and
+	// system-mutation decisions stay distinct.
+	primary := "Yes, write profile"
+	if mode != ModeStandalone {
+		primary = "Yes, write profile and continue"
 	}
 	return []wizardOption{
 		{Label: primary},
@@ -321,5 +341,12 @@ func conflictOptions() []wizardOption {
 	return []wizardOption{
 		{Label: "Snapshot and continue"},
 		{Label: "Abort"},
+	}
+}
+
+func realizePromptOptions() []wizardOption {
+	return []wizardOption{
+		{Label: "Yes, run dots deploy now"},
+		{Label: "No, exit — I'll run dots deploy myself"},
 	}
 }

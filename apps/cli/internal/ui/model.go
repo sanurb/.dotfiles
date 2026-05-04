@@ -3,14 +3,19 @@
 // the active step; the visual frame for every step is built from the
 // reusable primitives in internal/tui/components/screen and the tokens
 // in internal/tui/theme — no inline styling, no per-step layout.
+//
+// Realization (the `nh home switch` invocation) is NOT performed by
+// this wizard. After the user consents on stepRealizePrompt the wizard
+// exits with Result.RealizeRequested = true; main.go re-invokes the
+// dots binary as `dots deploy` so the realization driver renders
+// against the real terminal instead of inside an alt-screen TUI. See
+// ADR-0009.
 package ui
 
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -32,15 +37,10 @@ const (
 	stepScanning
 	stepConflict
 	stepSnapshotting
-	stepRealizing
+	stepRealizePrompt
 	stepDone
 	stepFailed
 	stepAborted
-)
-
-const (
-	realizeEstimateSec = 25
-	progressTickEvery  = 250 * time.Millisecond
 )
 
 // stepperLabels are the six labels shown in the top stepper during the
@@ -53,8 +53,7 @@ type Model struct {
 	deps Deps
 	step stepID
 
-	spinner  spinner.Model
-	progress progress.Model
+	spinner spinner.Model
 
 	state           state.State
 	formShell       string
@@ -65,26 +64,20 @@ type Model struct {
 
 	cursor int
 
-	collisions     []Collision
-	snapshotResult SnapshotResult
-	realizeResult  RealizationResult
-	err            error
+	collisions       []Collision
+	snapshotResult   SnapshotResult
+	realizeRequested bool
 
-	startedAt time.Time
-	width     int
-	height    int
+	err error
+
+	width  int
+	height int
 }
 
 // New returns a fully wired model ready for tea.NewProgram.
 func New(mode Mode, deps Deps) *Model {
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 	sp.Style = theme.Spinner
-
-	pr := progress.New(
-		progress.WithGradient(string(theme.ColAccent), string(theme.ColSuccess)),
-		progress.WithoutPercentage(),
-	)
-	pr.Width = 50
 
 	initial := deps.Initial
 	if initial.SchemaVersion == 0 {
@@ -95,7 +88,6 @@ func New(mode Mode, deps Deps) *Model {
 		mode:            mode,
 		deps:            deps,
 		spinner:         sp,
-		progress:        pr,
 		state:           initial,
 		formShell:       initial.Pillars.Shell,
 		formTerminal:    initial.Pillars.Terminal,
@@ -128,7 +120,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.progress.Width = min(60, msg.Width-10)
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -142,13 +133,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
-	case progressTickMsg:
-		return m.handleProgressTick()
-
 	case scanCompleteMsg:
 		m.collisions = msg.collisions
 		if len(m.collisions) == 0 {
-			return m.startRealize()
+			return m.afterSnapshotOrSkip()
 		}
 		return m.transition(stepConflict), nil
 
@@ -158,26 +146,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case snapshotCompleteMsg:
 		m.snapshotResult = SnapshotResult(msg)
-		return m.startRealize()
+		return m.afterSnapshotOrSkip()
 
 	case snapshotFailedMsg:
 		m.err = msg.err
 		return m.fail()
-
-	case realizeCompleteMsg:
-		m.realizeResult = RealizationResult(msg)
-		_ = m.progress.SetPercent(1.0)
-		return m.transition(stepDone), tea.Quit
-
-	case realizeFailedMsg:
-		m.err = msg.err
-		return m.fail()
-
-	case progress.FrameMsg:
-		newP, cmd := m.progress.Update(msg)
-		p, _ := newP.(progress.Model)
-		m.progress = p
-		return m, cmd
 	}
 
 	return m, nil
@@ -192,7 +165,7 @@ func (m Model) View() string {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.step {
 	case stepWelcome, stepShell, stepTerminal, stepMultiplexer,
-		stepEditor, stepGit, stepConfirm, stepConflict:
+		stepEditor, stepGit, stepConfirm, stepConflict, stepRealizePrompt:
 		return m.handleSelectKey(msg)
 
 	case stepDone, stepFailed, stepAborted:
@@ -273,6 +246,13 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		return m.startSnapshot()
+
+	case stepRealizePrompt:
+		// Row 0: Yes — realize via subprocess after the wizard exits.
+		// Row 1: No — exit cleanly with stepDone; main prints the
+		// "Profile saved. Run `dots deploy` when ready." reminder.
+		m.realizeRequested = m.cursor == 0
+		return m.transition(stepDone), tea.Quit
 	}
 	return m, nil
 }
@@ -280,6 +260,11 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 // back returns to the previous step. Pillar selections persist in
 // formXxx fields independently of cursor; transition() reseeds cursor
 // from the captured value so the user sees their prior choice highlighted.
+//
+// stepRealizePrompt is intentionally not reachable via Esc — once the
+// state file is persisted, the prompt is a forward-only consent gate.
+// Backing out would suggest the persona could be re-edited, which it
+// can't from here.
 func (m Model) back() (tea.Model, tea.Cmd) {
 	switch m.step {
 	case stepTerminal:
@@ -322,6 +307,8 @@ func (m Model) initialCursor(s stepID) int {
 			return 0
 		}
 		return 1
+	case stepRealizePrompt:
+		return 0 // default cursor on Yes — affirmative is the install-flow happy path
 	}
 	return 0
 }
@@ -350,6 +337,20 @@ func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
 	return m.startScan()
 }
 
+// afterSnapshotOrSkip is the post-scan / post-snapshot fork. Sync mode
+// auto-realizes (the user invoked `dots sync` precisely to re-realize,
+// re-prompting is friction); install mode asks one more time before
+// mutating the system.
+func (m Model) afterSnapshotOrSkip() (tea.Model, tea.Cmd) {
+	switch m.mode {
+	case ModeSync:
+		m.realizeRequested = true
+		return m.transition(stepDone), tea.Quit
+	default:
+		return m.transition(stepRealizePrompt), nil
+	}
+}
+
 func (m Model) startScan() (tea.Model, tea.Cmd) {
 	next := m.transition(stepScanning)
 	return next, tea.Batch(next.spinner.Tick, next.scanCmd())
@@ -358,29 +359,6 @@ func (m Model) startScan() (tea.Model, tea.Cmd) {
 func (m Model) startSnapshot() (tea.Model, tea.Cmd) {
 	next := m.transition(stepSnapshotting)
 	return next, tea.Batch(next.spinner.Tick, next.snapshotCmd())
-}
-
-func (m Model) startRealize() (tea.Model, tea.Cmd) {
-	next := m.transition(stepRealizing)
-	next.startedAt = time.Now()
-	return next, tea.Batch(
-		next.spinner.Tick,
-		next.realizeCmd(),
-		next.progressTickCmd(),
-	)
-}
-
-func (m Model) handleProgressTick() (tea.Model, tea.Cmd) {
-	if m.step != stepRealizing {
-		return m, nil
-	}
-	elapsed := time.Since(m.startedAt).Seconds()
-	pct := elapsed / float64(realizeEstimateSec)
-	if pct > 0.95 {
-		pct = 0.95
-	}
-	cmd := m.progress.SetPercent(pct)
-	return m, tea.Batch(cmd, m.progressTickCmd())
 }
 
 func (m Model) fail() (tea.Model, tea.Cmd) {
@@ -413,23 +391,6 @@ func (m Model) snapshotCmd() tea.Cmd {
 	}
 }
 
-func (m Model) realizeCmd() tea.Cmd {
-	deps := m.deps
-	return func() tea.Msg {
-		res, err := deps.Realizer.Realize()
-		if err != nil {
-			return realizeFailedMsg{err: err}
-		}
-		return realizeCompleteMsg(res)
-	}
-}
-
-func (m Model) progressTickCmd() tea.Cmd {
-	return tea.Tick(progressTickEvery, func(t time.Time) tea.Msg {
-		return progressTickMsg(t)
-	})
-}
-
 // -- helpers --------------------------------------------------------
 
 func indexOf(opts []Option, value string) int {
@@ -441,8 +402,10 @@ func indexOf(opts []Option, value string) int {
 	return 0
 }
 
-// renderDoneSummary builds the post-realize "what just happened" block
-// for stepDone (the only screen wrapped in OutcomePanel).
+// renderDoneSummary builds the post-wizard "what just happened" block
+// for stepDone (the only screen wrapped in OutcomePanel). The deploy
+// status is reported by main.go after the subprocess returns — this
+// function only summarizes what the wizard itself decided.
 func (m Model) renderDoneSummary() string {
 	var b strings.Builder
 	if m.snapshotResult.Count > 0 {
@@ -471,17 +434,20 @@ func (m Model) renderDoneSummary() string {
 	fmt.Fprintf(&b, "  %s extras  %s %s\n",
 		theme.BadgeOK, theme.Muted.Render("→"), theme.Body.Render(extrasLine))
 
-	if m.mode == ModeStandalone {
+	switch {
+	case m.mode == ModeStandalone:
 		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
-			theme.BadgeWarn, theme.Muted.Render("→"), theme.Muted.Render("not run (no workspace)"))
-	} else {
+			theme.BadgeWarn, theme.Muted.Render("→"),
+			theme.Muted.Render("not run (no workspace)"))
+	case m.realizeRequested:
 		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
 			theme.BadgeOK, theme.Muted.Render("→"),
-			theme.Body.Render(fmt.Sprintf("%s in %.1fs",
-				MoonRunDeploy, float64(m.realizeResult.DurationMs)/1000.0)))
+			theme.Muted.Render("running "+MoonRunDeploy+"…"))
+	default:
+		fmt.Fprintf(&b, "  %s deploy  %s %s\n",
+			theme.BadgeWarn, theme.Muted.Render("→"),
+			theme.Muted.Render("deferred — run `dots deploy` when ready"))
 	}
 
-	b.WriteString("\n")
-	b.WriteString(theme.Muted.Render("Open a new shell to pick up changes."))
-	return b.String()
+	return strings.TrimRight(b.String(), "\n")
 }

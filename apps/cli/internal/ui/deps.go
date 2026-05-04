@@ -11,16 +11,26 @@ import "github.com/sanurb/.dotfiles/apps/cli/internal/state"
 // and because the alternative (UI calls main package directly) creates
 // an import cycle.
 
-// Mode discriminates the wizard's flow. Install is the full first-run
-// experience (pillar selection + conflict resolution + activation).
-// Sync is the recurring brownfield-safe path (skip pillars, only
-// resolve conflicts and activate against the current state file).
+// Mode discriminates the wizard's flow.
+//
+// Install is the full first-run experience: pillar selection → scan →
+// optional snapshot → realize prompt. The user's "Yes" on the prompt
+// surfaces as Result.RealizeRequested; main.go runs `dots deploy` as a
+// subprocess so nh's output renders against the real terminal. The
+// wizard never realizes the system itself.
+//
+// Sync skips the pillar selection (the persona is preserved) and
+// auto-confirms realization — the user invoked `dots sync` precisely
+// to re-realize, so an extra prompt is friction.
+//
+// Standalone has no workspace and therefore no realization step at all;
+// the wizard captures the persona to ~/.config/dots and exits.
 type Mode int
 
 const (
-	ModeInstall    Mode = iota // full first-run flow: pillars → scan → snapshot → realize
-	ModeSync                   // brownfield-safe: skip pillars, scan → snapshot → realize
-	ModeStandalone             // no workspace: pillars → write profile to user-config; no realize
+	ModeInstall Mode = iota
+	ModeSync
+	ModeStandalone
 )
 
 // Collision is a path under $HOME that exists as a real file or dir
@@ -34,11 +44,6 @@ type Collision struct {
 type SnapshotResult struct {
 	Count int
 	Path  string // absolute backup directory
-}
-
-// RealizationResult is the outcome of a deploy.
-type RealizationResult struct {
-	DurationMs int64
 }
 
 // MoonDeployTask is the Moon target invoked by `dots deploy` and echoed
@@ -55,16 +60,6 @@ type Snapshotter interface {
 	Snapshot([]Collision) (SnapshotResult, error)
 }
 
-// Realizer materializes the declared environment by invoking
-// `moon run modules:deploy`. The state file at the workspace root is
-// the input — this layer does not pass capabilities, env vars, or any
-// other config carrier (DOTS_CAPS is dead). The implementation is
-// responsible for not corrupting the TUI: capture stdout/stderr to a
-// buffer, surface only on error.
-type Realizer interface {
-	Realize() (RealizationResult, error)
-}
-
 // StatePersister snapshots the existing state file (if any) into the
 // dots backup directory, then atomically writes the new persona to the
 // workspace root. Implementations should fail loudly: a half-written
@@ -74,9 +69,13 @@ type StatePersister interface {
 }
 
 // Deps is the bag of ports the wizard needs.
+//
+// Realization is intentionally NOT a port: PR #2 moved `nh home switch`
+// out of the wizard entirely. The wizard signals consent via
+// Result.RealizeRequested and exits; main.go invokes `dots deploy` as
+// a subprocess. ADR-0009 records the rationale.
 type Deps struct {
 	Snapshotter    Snapshotter
-	Realizer       Realizer
 	StatePersister StatePersister
 
 	// Initial is the state read off disk before the wizard launches; the
