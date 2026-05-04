@@ -23,7 +23,7 @@ const cmdApplySummary = "Apply the plan: bootstrap if needed, snapshot conflicts
 
 // envPath is the only env key shared between activationEnv and
 // prependPathEntries. PROTO_HOME / DOTS_NIX_SYSTEM are gone now that
-// the deploy path no longer goes through moon (ADR-0015).
+// the deploy path no longer goes through moon.
 const envPath = "PATH"
 
 // runApply implements `dots apply [profile] [--plan FILE] [--dry-run]
@@ -133,10 +133,8 @@ func runApply(rest []string) int {
 				return exitcode.Failure
 			}
 			if !noPreflight {
-				if code := runDoctor(false, false); code != exitcode.Success {
-					fmt.Fprintln(os.Stderr, "apply: doctor pre-flight failed; aborting before activation")
-					fmt.Fprintln(os.Stderr, "  next: address the doctor failures above, or rerun with --no-preflight to bypass")
-					return exitcode.PreFlight
+				if code := runApplyPreflight(); code != exitcode.Success {
+					return code
 				}
 			}
 			if code := runHomeActivation(p.Profile); code != exitcode.Success {
@@ -331,12 +329,10 @@ func snapshotConflicts(rels []string) error {
 }
 
 // runHomeActivation execs `nh home switch -c <system> .` directly,
-// in-process from dots. Replaces the prior `moon run modules:deploy`
-// chain. ADR-0015 records the rationale: the deploy path was a
-// linear two-step sequence (doctor → activate); routing it through
-// moon added moon's task-graph indirection, argv interpolator, and
-// env-passthrough surface area without earning any of moon's
-// caching or graph value. Calling nh directly removes those layers.
+// in-process from dots. The prior `moon run modules:deploy` chain
+// added moon's task-graph indirection, argv interpolator, and
+// env-passthrough surface area without earning any of moon's caching
+// or graph value for a linear two-step sequence (doctor → activate).
 //
 // `--show-activation-logs` is on by default so any home-manager
 // activation-script failure surfaces verbatim. Without it, nh
@@ -347,7 +343,7 @@ func runHomeActivation(profile string) int {
 	if sys == "" {
 		fmt.Fprintln(os.Stderr, "apply: cannot resolve nix system identifier")
 		fmt.Fprintf(os.Stderr, "  what: GOOS=%s GOARCH=%s is not in the supported set\n", runtime.GOOS, runtime.GOARCH)
-		fmt.Fprintln(os.Stderr, "  next: dots supports darwin/{arm64,amd64} and linux/{arm64,amd64} (ADR-0011)")
+		fmt.Fprintln(os.Stderr, "  next: dots supports darwin/{arm64,amd64} and linux/{arm64,amd64}")
 		return exitcode.Failure
 	}
 
@@ -408,6 +404,57 @@ func lookPathInEnv(name string, env []string) (string, error) {
 		}
 	}
 	return "", exec.ErrNotFound
+}
+
+// runApplyPreflight is the gate `dots apply` runs before activation.
+// It is deliberately narrower than `dots doctor`: doctor validates
+// the full dev environment (LSPs, formatters, dev shell tooling);
+// preflight only validates what `nh home switch` actually needs.
+//
+// Why split: when the deploy went through moon, the user had to be
+// in the dev shell (otherwise moon was unreachable), so a "full
+// dev-shell doctor" was a defensible apply gate. Now activation is
+// dots-direct (ADR-0015), so apply can succeed without the dev
+// shell — but the full doctor reports failures for tools (gopls,
+// treefmt, etc.) that are irrelevant to the activation. Surfacing
+// those as PreFlight failures was doctor theater.
+//
+// What apply needs:
+//   - workspace reachable (the flake lives there).
+//   - nh executable resolvable via activationEnv's augmented PATH.
+//   - nix executable on PATH (nh shells out to it).
+//
+// The state file is intentionally NOT checked: plan computation
+// already handled missing state with a default profile. Doctor
+// remains for "is this dev environment properly set up" — a
+// separate, manual check the user runs explicitly.
+func runApplyPreflight() int {
+	var failures []string
+
+	if _, err := workspace.Root(); err != nil {
+		failures = append(failures, fmt.Sprintf("workspace: %v", err))
+	}
+
+	env := activationEnv()
+	if _, err := lookPathInEnv("nh", env); err != nil {
+		failures = append(failures, "nh: not on PATH and not at <ws>/.devenv/profile/bin/nh")
+	}
+
+	if _, err := exec.LookPath("nix"); err != nil {
+		failures = append(failures, "nix: not on PATH")
+	}
+
+	if len(failures) == 0 {
+		return exitcode.Success
+	}
+
+	fmt.Fprintln(os.Stderr, "apply: pre-flight failed:")
+	for _, f := range failures {
+		fmt.Fprintln(os.Stderr, "  ✗ "+f)
+	}
+	fmt.Fprintln(os.Stderr, "  next: install the missing tool(s), or run `dots doctor` for full diagnostics")
+	fmt.Fprintln(os.Stderr, "  escape: rerun with --no-preflight if you have already validated the toolchain")
+	return exitcode.PreFlight
 }
 
 // activationEnv returns os.Environ() with two additions: PATH-prepend

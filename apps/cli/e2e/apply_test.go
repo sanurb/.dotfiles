@@ -15,7 +15,7 @@ func TestApply(t *testing.T) {
 			withNhStub().
 			withStateFile(buildStateTOML(stateOverrides{}))
 
-		h.run("apply", "--yes", "--no-preflight")
+		h.run("apply", "--yes")
 
 		args, ok := h.nhArgs()
 		want := []string{
