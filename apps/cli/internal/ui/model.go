@@ -47,7 +47,11 @@ const (
 // install flow (post-welcome, pre-scan).
 var stepperLabels = []string{"Shell", "Terminal", "Multiplexer", "Editor", "Git", "Confirm"}
 
-// Model is the wizard's bubbletea model.
+// Model is the wizard's bubbletea model. m.state is the single source
+// of truth for the persona — pillar selections write through it
+// directly; the on-disk file is only touched at persistAndAdvance.
+// Aborts (Esc, Cancel, Ctrl-C) discard the in-memory mutations because
+// the process exits.
 type Model struct {
 	mode Mode
 	deps Deps
@@ -55,13 +59,7 @@ type Model struct {
 
 	spinner spinner.Model
 
-	state           state.State
-	formShell       string
-	formTerminal    string
-	formMultiplexer string
-	formEditor      bool
-	formGit         bool
-
+	state  state.State
 	cursor int
 
 	collisions       []Collision
@@ -85,21 +83,15 @@ func New(mode Mode, deps Deps) *Model {
 	}
 
 	m := &Model{
-		mode:            mode,
-		deps:            deps,
-		spinner:         sp,
-		state:           initial,
-		formShell:       initial.Pillars.Shell,
-		formTerminal:    initial.Pillars.Terminal,
-		formMultiplexer: initial.Pillars.Multiplexer,
-		formEditor:      initial.Capabilities.Editor,
-		formGit:         initial.Capabilities.Git,
+		mode:    mode,
+		deps:    deps,
+		spinner: sp,
+		state:   initial,
 	}
 
-	switch mode {
-	case ModeSync:
+	if mode == ModeSync {
 		m.step = stepScanning
-	default:
+	} else {
 		m.step = stepWelcome
 	}
 	m.cursor = m.initialCursor(m.step)
@@ -199,39 +191,54 @@ func (m Model) handleSelectKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// selectionStep describes a step that captures one piece of persona
+// state. apply mutates m.state from the cursor; next is the step the
+// commit advances to. One row per pillar/capability — adding a step
+// is a one-line table edit.
+type selectionStep struct {
+	apply func(s *state.State, cursor int)
+	next  stepID
+}
+
+var selectionSteps = map[stepID]selectionStep{
+	stepShell: {
+		apply: func(s *state.State, c int) { s.Pillars.Shell = ShellOptions[c].Value },
+		next:  stepTerminal,
+	},
+	stepTerminal: {
+		apply: func(s *state.State, c int) { s.Pillars.Terminal = TerminalOptions[c].Value },
+		next:  stepMultiplexer,
+	},
+	stepMultiplexer: {
+		apply: func(s *state.State, c int) { s.Pillars.Multiplexer = MultiplexerOptions[c].Value },
+		next:  stepEditor,
+	},
+	stepEditor: {
+		apply: func(s *state.State, c int) { s.Capabilities.Editor = c == 0 },
+		next:  stepGit,
+	},
+	stepGit: {
+		apply: func(s *state.State, c int) { s.Capabilities.Git = c == 0 },
+		next:  stepConfirm,
+	},
+}
+
 func (m Model) commit() (tea.Model, tea.Cmd) {
+	if def, ok := selectionSteps[m.step]; ok {
+		def.apply(&m.state, m.cursor)
+		return m.transition(def.next), nil
+	}
+
 	switch m.step {
 	case stepWelcome:
 		if m.cursor == 1 {
 			m.step = stepAborted
 			return m, tea.Quit
 		}
-		switch m.mode {
-		case ModeInstall, ModeStandalone:
-			return m.transition(stepShell), nil
-		case ModeSync:
+		if m.mode == ModeSync {
 			return m.startScan()
 		}
-
-	case stepShell:
-		m.formShell = ShellOptions[m.cursor].Value
-		return m.transition(stepTerminal), nil
-
-	case stepTerminal:
-		m.formTerminal = TerminalOptions[m.cursor].Value
-		return m.transition(stepMultiplexer), nil
-
-	case stepMultiplexer:
-		m.formMultiplexer = MultiplexerOptions[m.cursor].Value
-		return m.transition(stepEditor), nil
-
-	case stepEditor:
-		m.formEditor = m.cursor == 0
-		return m.transition(stepGit), nil
-
-	case stepGit:
-		m.formGit = m.cursor == 0
-		return m.transition(stepConfirm), nil
+		return m.transition(stepShell), nil
 
 	case stepConfirm:
 		if m.cursor != 0 {
@@ -248,35 +255,27 @@ func (m Model) commit() (tea.Model, tea.Cmd) {
 		return m.startSnapshot()
 
 	case stepRealizePrompt:
-		// Row 0: Yes — realize via subprocess after the wizard exits.
-		// Row 1: No — exit cleanly with stepDone; main prints the
-		// "Profile saved. Run `dots deploy` when ready." reminder.
 		m.realizeRequested = m.cursor == 0
 		return m.transition(stepDone), tea.Quit
 	}
 	return m, nil
 }
 
-// back returns to the previous step. Pillar selections persist in
-// formXxx fields independently of cursor; transition() reseeds cursor
-// from the captured value so the user sees their prior choice highlighted.
-//
-// stepRealizePrompt is intentionally not reachable via Esc — once the
-// state file is persisted, the prompt is a forward-only consent gate.
-// Backing out would suggest the persona could be re-edited, which it
-// can't from here.
+// previousStep is the Esc target for each step that supports it. Steps
+// absent from the map have no back action. stepRealizePrompt is
+// intentionally absent: once the state file is persisted, the prompt
+// is a forward-only consent gate.
+var previousStep = map[stepID]stepID{
+	stepTerminal:    stepShell,
+	stepMultiplexer: stepTerminal,
+	stepEditor:      stepMultiplexer,
+	stepGit:         stepEditor,
+	stepConfirm:     stepGit,
+}
+
 func (m Model) back() (tea.Model, tea.Cmd) {
-	switch m.step {
-	case stepTerminal:
-		return m.transition(stepShell), nil
-	case stepMultiplexer:
-		return m.transition(stepTerminal), nil
-	case stepEditor:
-		return m.transition(stepMultiplexer), nil
-	case stepGit:
-		return m.transition(stepEditor), nil
-	case stepConfirm:
-		return m.transition(stepGit), nil
+	if prev, ok := previousStep[m.step]; ok {
+		return m.transition(prev), nil
 	}
 	return m, nil
 }
@@ -289,48 +288,45 @@ func (m Model) transition(s stepID) Model {
 	return m
 }
 
+// cursorSeeders restores the cursor to the row that matches the
+// current persona on entry to a selection step (or on Esc-back). Steps
+// absent from the map default to row 0, which is also the affirmative
+// row for prompt-style steps (welcome, confirm, conflict,
+// stepRealizePrompt).
+var cursorSeeders = map[stepID]func(Model) int{
+	stepShell:       func(m Model) int { return indexOf(ShellOptions, m.state.Pillars.Shell) },
+	stepTerminal:    func(m Model) int { return indexOf(TerminalOptions, m.state.Pillars.Terminal) },
+	stepMultiplexer: func(m Model) int { return indexOf(MultiplexerOptions, m.state.Pillars.Multiplexer) },
+	stepEditor:      func(m Model) int { return boolToCursor(m.state.Capabilities.Editor) },
+	stepGit:         func(m Model) int { return boolToCursor(m.state.Capabilities.Git) },
+}
+
 func (m Model) initialCursor(s stepID) int {
-	switch s {
-	case stepShell:
-		return indexOf(ShellOptions, m.formShell)
-	case stepTerminal:
-		return indexOf(TerminalOptions, m.formTerminal)
-	case stepMultiplexer:
-		return indexOf(MultiplexerOptions, m.formMultiplexer)
-	case stepEditor:
-		if m.formEditor {
-			return 0
-		}
-		return 1
-	case stepGit:
-		if m.formGit {
-			return 0
-		}
-		return 1
-	case stepRealizePrompt:
-		return 0 // default cursor on Yes — affirmative is the install-flow happy path
+	if f, ok := cursorSeeders[s]; ok {
+		return f(m)
 	}
 	return 0
 }
 
-// persistAndAdvance copies the captured persona into m.state, writes
-// it via StatePersister, and starts the scan. ModeStandalone short-
-// circuits to Done after writing — there is no workspace to scan or
-// realize against.
-func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
-	m.state.Pillars.Shell = m.formShell
-	m.state.Pillars.Terminal = m.formTerminal
-	m.state.Pillars.Multiplexer = m.formMultiplexer
-	m.state.Capabilities.Editor = m.formEditor
-	m.state.Capabilities.Git = m.formGit
+// boolToCursor maps the affirmative/negative value of a Yes/No
+// selection back to its row index. Yes = row 0; No = row 1.
+func boolToCursor(yes bool) int {
+	if yes {
+		return 0
+	}
+	return 1
+}
 
+// persistAndAdvance writes the in-memory persona to disk and starts
+// the scan. ModeStandalone short-circuits to Done — there is no
+// workspace to scan or realize against.
+func (m Model) persistAndAdvance() (tea.Model, tea.Cmd) {
 	if m.deps.StatePersister != nil {
 		if err := m.deps.StatePersister.SaveState(m.state); err != nil {
 			m.err = fmt.Errorf("persist state: %w", err)
 			return m.fail()
 		}
 	}
-
 	if m.mode == ModeStandalone {
 		return m.transition(stepDone), tea.Quit
 	}

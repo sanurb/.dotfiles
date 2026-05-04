@@ -8,58 +8,52 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/tui/theme"
 )
 
-// layout returns the screen.Layout for the current step. The dispatcher's
-// View calls this once per render.
+// layoutBuilders dispatches each stepID to the method that renders it.
+// Method values bind at table-definition time; new steps are added by
+// inserting one row, not by editing a switch.
+var layoutBuilders = map[stepID]func(Model) screen.Layout{
+	stepWelcome:       Model.welcomeLayout,
+	stepShell:         Model.pillarLayout,
+	stepTerminal:      Model.pillarLayout,
+	stepMultiplexer:   Model.pillarLayout,
+	stepEditor:        Model.pillarLayout,
+	stepGit:           Model.pillarLayout,
+	stepConfirm:       Model.confirmLayout,
+	stepConflict:      Model.conflictLayout,
+	stepScanning:      Model.scanningLayout,
+	stepSnapshotting:  Model.snapshottingLayout,
+	stepRealizePrompt: Model.realizePromptLayout,
+	stepDone:          Model.doneLayout,
+	stepFailed:        Model.failedLayout,
+	stepAborted:       Model.abortedLayout,
+}
+
 func (m Model) layout() screen.Layout {
-	switch m.step {
-	case stepWelcome:
-		return m.welcomeLayout()
-	case stepShell, stepTerminal, stepMultiplexer, stepEditor, stepGit:
-		return m.pillarLayout()
-	case stepConfirm:
-		return m.confirmLayout()
-	case stepConflict:
-		return m.conflictLayout()
-	case stepScanning:
-		return m.transientLayout("Scanning $HOME for brownfield collisions…")
-	case stepSnapshotting:
-		return m.transientLayout("Snapshotting colliding paths into ~/.dots_backups…")
-	case stepRealizePrompt:
-		return m.realizePromptLayout()
-	case stepDone:
-		return m.doneLayout()
-	case stepFailed:
-		return m.failedLayout()
-	case stepAborted:
-		return m.abortedLayout()
+	if f, ok := layoutBuilders[m.step]; ok {
+		return f(m)
 	}
 	return screen.Layout{}
 }
 
-// currentRows returns the option rows for the active selection step.
-// Used by handleSelectKey to bound cursor movement, and indirectly by
-// pillarLayout / welcomeLayout / confirmLayout / conflictLayout to
-// render the option list.
+// stepOptions is the option set every selection-style step renders.
+// Three-row sets pull from the public Option lists (pillars); the rest
+// are the mode-aware Yes/No-shaped wizardOptions defined below. Steps
+// not in the map render no rows (transient/outcome surfaces).
+var stepOptions = map[stepID]func(Model) []wizardOption{
+	stepWelcome:       func(m Model) []wizardOption { return welcomeOptions(m.mode) },
+	stepShell:         func(Model) []wizardOption { return asWizardOptions(ShellOptions) },
+	stepTerminal:      func(Model) []wizardOption { return asWizardOptions(TerminalOptions) },
+	stepMultiplexer:   func(Model) []wizardOption { return asWizardOptions(MultiplexerOptions) },
+	stepEditor:        func(Model) []wizardOption { return editorOptions() },
+	stepGit:           func(Model) []wizardOption { return gitOptions() },
+	stepConfirm:       func(m Model) []wizardOption { return confirmOptions(m.mode) },
+	stepConflict:      func(Model) []wizardOption { return conflictOptions() },
+	stepRealizePrompt: func(Model) []wizardOption { return realizePromptOptions() },
+}
+
 func (m Model) currentRows() []screen.Row {
-	switch m.step {
-	case stepWelcome:
-		return optionRows(welcomeOptions(m.mode), m.cursor)
-	case stepShell:
-		return optionRows(asWizardOptions(ShellOptions), m.cursor)
-	case stepTerminal:
-		return optionRows(asWizardOptions(TerminalOptions), m.cursor)
-	case stepMultiplexer:
-		return optionRows(asWizardOptions(MultiplexerOptions), m.cursor)
-	case stepEditor:
-		return optionRows(editorOptions(), m.cursor)
-	case stepGit:
-		return optionRows(gitOptions(), m.cursor)
-	case stepConfirm:
-		return optionRows(confirmOptions(m.mode), m.cursor)
-	case stepConflict:
-		return optionRows(conflictOptions(), m.cursor)
-	case stepRealizePrompt:
-		return optionRows(realizePromptOptions(), m.cursor)
+	if f, ok := stepOptions[m.step]; ok {
+		return optionRows(f(m), m.cursor)
 	}
 	return nil
 }
@@ -107,20 +101,19 @@ func stepperIndex(s stepID) int {
 	return int(s - stepShell)
 }
 
+// pillarTexts is the title + description pair for each pillar step.
+// Lookup-only; pillarCopy returns the zero pair for non-pillar steps.
+var pillarTexts = map[stepID]struct{ title, desc string }{
+	stepShell:       {"Shell", "One shell defines the persona. Atuin, zoxide, and starship are baked in regardless."},
+	stepTerminal:    {"Terminal Emulator", "Pick the terminal app to configure."},
+	stepMultiplexer: {"Multiplexer", "Pick one, or 'None' to skip."},
+	stepEditor:      {"Neovim", "Includes LSP, TreeSitter, and the dots Neovim config."},
+	stepGit:         {"Git defaults", "Global git config (identity stays external)."},
+}
+
 func pillarCopy(s stepID) (title, desc string) {
-	switch s {
-	case stepShell:
-		return "Shell", "One shell defines the persona. Atuin, zoxide, and starship are baked in regardless."
-	case stepTerminal:
-		return "Terminal Emulator", "Pick the terminal app to configure."
-	case stepMultiplexer:
-		return "Multiplexer", "Pick one, or 'None' to skip."
-	case stepEditor:
-		return "Neovim", "Includes LSP, TreeSitter, and the dots Neovim config."
-	case stepGit:
-		return "Git defaults", "Global git config (identity stays external)."
-	}
-	return "", ""
+	t := pillarTexts[s]
+	return t.title, t.desc
 }
 
 // -- confirm --------------------------------------------------------
@@ -128,12 +121,12 @@ func pillarCopy(s stepID) (title, desc string) {
 func (m Model) confirmLayout() screen.Layout {
 	idx := stepperIndex(stepConfirm)
 	persona := fmt.Sprintf("%s · %s · %s",
-		m.formShell, m.formTerminal, m.formMultiplexer)
+		m.state.Pillars.Shell, m.state.Pillars.Terminal, m.state.Pillars.Multiplexer)
 	caps := []string{}
-	if m.formEditor {
+	if m.state.Capabilities.Editor {
 		caps = append(caps, "neovim")
 	}
-	if m.formGit {
+	if m.state.Capabilities.Git {
 		caps = append(caps, "git")
 	}
 	capsLine := "(none)"
@@ -186,8 +179,6 @@ func (m Model) conflictLayout() screen.Layout {
 
 func (m Model) transientLayout(message string) screen.Layout {
 	return screen.Layout{
-		Title:     "",
-		Heading:   "",
 		State:     screen.StateLoading,
 		StatusMsg: m.spinner.View() + " " + message,
 		Keymap:    screen.Keymap{Quit: "Ctrl-C"},
@@ -195,26 +186,28 @@ func (m Model) transientLayout(message string) screen.Layout {
 	}
 }
 
+func (m Model) scanningLayout() screen.Layout {
+	return m.transientLayout("Scanning $HOME for brownfield collisions…")
+}
+
+func (m Model) snapshottingLayout() screen.Layout {
+	return m.transientLayout("Snapshotting colliding paths into ~/.dots_backups…")
+}
+
 // -- realize prompt ------------------------------------------------
 
-// realizePromptLayout is the consent gate that PR #2 inserts between
-// scan/snapshot and realization. The user has already committed to
-// the persona on stepConfirm; this is a separate "are you sure you
-// want to mutate the system right now?" check, with explicit visibility
-// of the command that will run.
+// realizePromptLayout is the forward-only consent gate between scan/
+// snapshot and realization. Esc is intentionally absent — the persona
+// is already persisted, so backing out would suggest editability that
+// no longer exists.
 func (m Model) realizePromptLayout() screen.Layout {
-	desc := fmt.Sprintf("Will run %s in a subprocess. Output streams to this terminal.", MoonRunDeploy)
-
-	km := screen.Keymap{
-		Up: "↑/k", Down: "↓/j",
-		Select:     "Enter",
-		SelectVerb: "confirm",
-		Quit:       "Ctrl-C",
-	}
+	km := screen.DefaultKeymap(false)
+	km.SelectVerb = "confirm"
+	km.Quit = "Ctrl-C"
 
 	return screen.Layout{
 		Title:       "Realize now?",
-		Description: desc,
+		Description: fmt.Sprintf("Will run %s in a subprocess. Output streams to this terminal.", MoonRunDeploy),
 		Content:     screen.RenderRows(m.currentRows()),
 		Keymap:      km,
 		Width:       m.width,

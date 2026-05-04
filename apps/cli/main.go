@@ -87,10 +87,7 @@ func runSync([]string) int {
 }
 
 // runWithRealize runs the wizard and, on consent, hands off to
-// `dots deploy` as a subprocess. The wizard never realizes the system
-// itself; it captures intent and exits, and main owns the follow-on
-// invocation. ADR-0009 records the rationale (TUI stays free of Nix
-// imports; deploy gates re-fire on the subprocess).
+// `dots deploy` as a subprocess. ADR-0009 records the rationale.
 func runWithRealize(mode ui.Mode, deps ui.Deps) int {
 	r := ui.Run(mode, deps)
 	if r.Code != 0 {
@@ -100,37 +97,28 @@ func runWithRealize(mode ui.Mode, deps ui.Deps) int {
 		printInstallNextSteps(true)
 		return 0
 	}
-	if err := execSelfDeploy(); err != nil {
-		ee, ok := err.(*exec.ExitError)
-		if ok {
-			return ee.ExitCode()
-		}
+	self, err := resolveSelf()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "deploy:", err)
 		return 1
 	}
-	return 0
+	return run(self, "deploy")
 }
 
-// execSelfDeploy invokes `<self> deploy` as a subprocess inheriting
-// stdio. Resolution order: os.Executable() (robust to PATH mutations
-// between the install and deploy phases — e.g. a Homebrew symlink path
-// vs. the binary's real /opt/homebrew/Cellar/... target) → exec.LookPath
-// fallback for unusual install layouts where Executable() returns a
-// path the kernel resolved but a child process can't re-exec (NixOS
-// /proc/self/exe is one such case).
-func execSelfDeploy() error {
-	self, err := os.Executable()
-	if err != nil {
-		self, err = exec.LookPath("dots")
-		if err != nil {
-			return fmt.Errorf("cannot locate dots binary: %w", err)
-		}
+// resolveSelf locates the running dots binary. os.Executable() is the
+// happy path; the LookPath fallback covers layouts where Executable()
+// returns a path the child process can't re-exec (some NixOS
+// /proc/self/exe cases) or where PATH was mutated between the install
+// and deploy phases.
+func resolveSelf() (string, error) {
+	if self, err := os.Executable(); err == nil {
+		return self, nil
 	}
-	cmd := exec.Command(self, "deploy")
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	self, err := exec.LookPath("dots")
+	if err != nil {
+		return "", fmt.Errorf("cannot locate dots binary: %w", err)
+	}
+	return self, nil
 }
 
 func runDoctorCmd(rest []string) int {
