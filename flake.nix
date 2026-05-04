@@ -43,10 +43,11 @@
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
 
       # Single source of truth for the per-system Home Manager configuration.
-      # Used by both `homeConfigurations` (for `home-manager switch --flake`)
-      # and `packages.homeActivation` (for `moon run modules:deploy`); the
-      # two outputs differ only in shape (config object vs activation drv),
-      # so factor here and avoid re-declaring extraSpecialArgs twice.
+      # Used by `homeConfigurations` (for `home-manager switch --flake`),
+      # `packages.homeActivation` (the activation derivation `dots apply`
+      # invokes via nh), and `checks.home-activation` (the `nix flake check`
+      # gate that fails a PR when the activation derivation can't build).
+      # Factor here so extraSpecialArgs is declared once.
       mkHome = system:
         let pkgs = nixpkgs.legacyPackages.${system};
         in home-manager.lib.homeManagerConfiguration {
@@ -146,6 +147,14 @@
               fi
               echo "ok schema_version=$ver" > $out
             '';
+
+            # Building the activation derivation in CI is the gate that turns
+            # "did we ship a broken activation?" from a release-time
+            # discovery into a PR-time failure. Catches upstream
+            # regressions (e.g., a neovim wrapper bug that breaks
+            # rplugin.vim) and home-manager option-rename breaks before
+            # they reach a user's `dots apply`.
+            home-activation = (mkHome system).activationPackage;
           };
 
           formatter = pkgs.nixpkgs-fmt;
