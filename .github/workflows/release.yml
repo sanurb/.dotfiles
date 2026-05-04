@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+---
 name: release
 
 on:
@@ -6,10 +8,10 @@ on:
       - "v*"
 
 permissions:
-  contents: write       # create the GitHub Release
-  id-token: write       # cosign keyless OIDC + SLSA provenance OIDC
-  packages: write       # future-proof if we publish containers
-  attestations: write   # actions/attest-build-provenance
+  contents: write # create the GitHub Release
+  id-token: write # cosign keyless OIDC + SLSA provenance OIDC
+  packages: write # future-proof if we publish containers
+  attestations: write # actions/attest-build-provenance
 
 jobs:
   goreleaser:
@@ -19,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # GoReleaser needs full history for the changelog
+          fetch-depth: 0 # GoReleaser needs full history for the changelog
 
       - name: Set up Go
         uses: actions/setup-go@v5

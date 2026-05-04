@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+---
+name: bump-flake-lock
+
+# Weekly scheduled `nix flake update` PR. The home-activation check in
+# ci.yml is the safety net: a bad nixpkgs bump (a neovim wrapper
+# regression, a home-manager option rename) fails the PR before merge,
+# turning what was a v0.4.x-style release-time discovery into a quiet
+# bot-PR red check.
+#
+# The default GITHUB_TOKEN does not trigger downstream workflows on
+# the auto-opened PR — a known GitHub limitation. The PR opens green
+# with no checks; clicking "Approve and run workflows" on the PR fires
+# ci.yml. Acceptable trade-off; using a PAT here would mean storing a
+# rotatable secret for a once-weekly bot.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            accept-flake-config = true
+
+      - uses: DeterminateSystems/update-flake-lock@main
+        with:
+          pr-title: "chore(deps): bump flake.lock"
+          commit-msg: "chore(deps): bump flake.lock"
+          pr-body: |
+            Automated weekly `nix flake update`.
+
+            CI gates this PR: a failing `home-activation` check is the
+            signal to investigate the offending input rather than to
+            merge and deal with it after release.

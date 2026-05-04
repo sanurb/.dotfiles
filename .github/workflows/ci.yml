@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+---
+name: ci
+
+# Pull-request gate. Two jobs:
+#   - flake-check: builds every entry under flake.checks.<system>, on
+#     both ubuntu and macos. The home-activation entry covers the
+#     class of regression that took eight patch releases to surface in
+#     v0.4.x — neovim wrapper bugs, home-manager option renames, any
+#     activation derivation that fails to build.
+#   - cli-quality: vet + test + treefmt --fail-on-change for the Go
+#     binary, run inside the dev shell so versions match what
+#     contributors see locally.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on rapid PR pushes — saves runner time and
+# avoids flapping required-check status on the merge button.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flake-check:
+    name: flake check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            accept-flake-config = true
+
+      # devenv-root is a flake input that points at the workspace path.
+      # The .envrc maintains this for direnv users; CI replicates the
+      # behavior so devShells.default doesn't fall through to the
+      # no-op shell during evaluation.
+      - name: Seed devenv-root
+        run: echo "$PWD" > .devenv-root
+
+      - name: nix flake check
+        run: nix flake check --impure --accept-flake-config
+
+  cli-quality:
+    name: cli quality (vet, test, fmt)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            accept-flake-config = true
+
+      - name: Seed devenv-root
+        run: echo "$PWD" > .devenv-root
+
+      # One nix-develop invocation, one shell, three gates. Bundling
+      # avoids spinning up the dev shell three times — each entry takes
+      # a few seconds even with the eval cached.
+      - name: vet · test · fmt
+        run: |
+          nix develop --impure --accept-flake-config \
+            --override-input devenv-root "file+file://$PWD/.devenv-root" \
+            -c sh -eu -c '
+              go vet ./apps/cli/...
+              go test ./apps/cli/...
+              treefmt --fail-on-change
+            '
