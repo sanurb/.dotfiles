@@ -48,8 +48,10 @@ var commands = map[string]command{
 	"sync":    {requiresWorkspace: true, run: runSync},
 	"scan":    {requiresWorkspace: true, run: func([]string) int { return runScan() }},
 	"backup":  {requiresWorkspace: true, run: func([]string) int { return runBackup(false) }},
-	"deploy":  {requiresWorkspace: true, run: func([]string) int { return runDeploy() }},
-	"doctor":  {requiresWorkspace: true, run: runDoctorCmd},
+	// deploy auto-bootstraps Nix and the workspace clone (ADR-0010);
+	// the runDeploy entry point owns the missing-prereq UX itself.
+	"deploy": {requiresWorkspace: false, run: func([]string) int { return runDeploy() }},
+	"doctor": {requiresWorkspace: true, run: runDoctorCmd},
 }
 
 func runInstall([]string) int {
