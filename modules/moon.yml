@@ -43,38 +43,23 @@ tasks:
   # .dots-state.toml outside the flake source filter.
   # NH_SHOW_ACTIVATION_LOGS=1 keeps activation diagnostics visible
   # (nh >=4.3.0 hides them by default).
+  # The deploy script lives at modules/scripts/deploy.sh, NOT inline
+  # in this YAML. Reason: moon's task-arg interpolator rewrites every
+  # "$VAR" pattern in args at task-spawn time — including bash-local
+  # variables that look like $VAR. An inline body containing
+  # `sys=...; if [ -z "$sys" ]` becomes `sys=...; if [ -z "" ]` after
+  # moon substitutes the (undefined-in-moon-env) $sys with empty,
+  # defeating any non-trivial inline bash. Moving the body to a file
+  # removes it from moon's interpolation surface; moon only sees the
+  # script path and the standalone $DOTS_NIX_SYSTEM arg.
   deploy:
-    command: "bash"
-    # env is declared explicitly so moon forwards parent-process
-    # values to the task. Without this declaration, moon's default
-    # task-env policy strips unknown vars; DOTS_NIX_SYSTEM (set by
-    # `dots apply`) never reaches the bash subshell, the `nix eval`
-    # fallback fires, and on a host where moon also stripped PATH
-    # entries that find nix the fallback empties out — exactly what
-    # v0.4.4 was supposed to prevent. The `$VAR` syntax interpolates
-    # the parent's env at task-spawn time.
-    env:
-      DOTS_NIX_SYSTEM: "$DOTS_NIX_SYSTEM"
-      NH_SHOW_ACTIVATION_LOGS: "1"
+    command: "modules/scripts/deploy.sh"
     args:
-      - "-c"
-      # set -eu so any future `$(...)` substitution that fails or any
-      # unset variable surfaces as a hard error instead of silently
-      # propagating empty values into nh's -c (the v0.4.0..v0.4.4
-      # incident class). pipefail is intentionally NOT set: nh writes
-      # progress to stdout that may legitimately produce broken pipes.
-      - |-
-        set -eu
-        sys="${DOTS_NIX_SYSTEM:-$(nix eval --raw --impure --expr 'builtins.currentSystem' 2>/dev/null || true)}"
-        if [ -z "$sys" ]; then
-          echo "modules:deploy: cannot resolve nix system identifier" >&2
-          echo "  what: DOTS_NIX_SYSTEM is unset and 'nix eval' produced no output" >&2
-          echo "  why:  moon's task env may have stripped DOTS_NIX_SYSTEM, and nix may not be on PATH for this subshell" >&2
-          echo "  next: invoke via 'dots apply' (which sets DOTS_NIX_SYSTEM) and confirm 'dots --version' is >= 0.4.4" >&2
-          exit 1
-        fi
-        exec nh home switch -c "${sys}" . -- \
-          --impure --accept-flake-config
+      - "$DOTS_NIX_SYSTEM"
+    env:
+      NH_SHOW_ACTIVATION_LOGS: "1"
+    inputs:
+      - "modules/scripts/deploy.sh"
     deps:
       - "cli:doctor"
     local: true
