@@ -29,6 +29,8 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
+  # Versioned tar.gz archive — preserved for the Homebrew formula and
+  # for users who want LICENSE/README alongside the binary.
   - id: dots
     ids: [dots]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -36,6 +38,15 @@ archives:
     files:
       - LICENSE
       - README.md
+  # Raw binary, stable filename — the curl-install path resolves
+  #   /releases/latest/download/dots-{darwin,linux}-{amd64,arm64}
+  # without a version segment. Cosign + SBOM coverage is automatic
+  # because signs/sboms below match `artifacts: archive`, which fires
+  # on every archives entry regardless of format. (ADR-0011)
+  - id: dots-binary
+    ids: [dots]
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    formats: [binary]
 
 checksum:
   name_template: "SHA256SUMS"
@@ -117,11 +128,13 @@ release:
   footer: |
     ## Verifying the release
 
-    Each archive is signed with [cosign](https://docs.sigstore.dev/) using
-    keyless OIDC (no managed keys). To verify a download:
+    Every artifact (raw binary, tar.gz archive, SHA256SUMS) is signed with
+    [cosign](https://docs.sigstore.dev/) using keyless OIDC — no managed
+    keys; the certificate identity is the GitHub Actions workflow. To
+    verify a download:
 
     ```sh
-    # 1. Verify the checksum file signature.
+    # 1. Verify the checksum file's signature (covers every artifact below).
     cosign verify-blob \
       --certificate-identity-regexp "https://github.com/sanurb/.dotfiles" \
       --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
@@ -129,16 +142,11 @@ release:
       --signature SHA256SUMS.sig \
       SHA256SUMS
 
-    # 2. Verify your archive matches the checksum file.
-    grep "dots_${VERSION}_${OS}_${ARCH}.tar.gz" SHA256SUMS | shasum -a 256 -c -
+    # 2a. Raw binary (curl-install path):
+    grep "dots-${OS}-${ARCH}" SHA256SUMS | shasum -a 256 -c -
 
-    # 3. (Optional) Verify the archive signature directly.
-    cosign verify-blob \
-      --certificate-identity-regexp "https://github.com/sanurb/.dotfiles" \
-      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-      --certificate dots_${VERSION}_${OS}_${ARCH}.tar.gz.pem \
-      --signature dots_${VERSION}_${OS}_${ARCH}.tar.gz.sig \
-      dots_${VERSION}_${OS}_${ARCH}.tar.gz
+    # 2b. Versioned tar.gz (Homebrew / manual archive grab):
+    grep "dots_${VERSION}_${OS}_${ARCH}.tar.gz" SHA256SUMS | shasum -a 256 -c -
     ```
 
 changelog:

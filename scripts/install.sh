@@ -16,7 +16,7 @@
 #   GITHUB        override the GitHub host (default: https://github.com)
 #
 # Verification:
-#   The script always verifies the SHA-256 of the downloaded archive
+#   The script always verifies the SHA-256 of the downloaded binary
 #   against the published SHA256SUMS file. If `cosign` is on PATH, the
 #   SHA256SUMS file's keyless OIDC signature is also verified. For the
 #   strictest install, fetch + verify by hand following RELEASING.md.
@@ -74,7 +74,6 @@ if [ "$(id -u)" -eq 0 ] && [ "$ALLOW_ROOT" != "1" ]; then
 fi
 
 command -v curl >/dev/null 2>&1 || error "curl is required to install dots"
-command -v tar  >/dev/null 2>&1 || error "tar is required to install dots"
 
 # Pick a SHA-256 implementation. macOS 13+ ships its own `sha256sum`
 # without GNU's `-c` flag, so we don't use `-c` anywhere; we just
@@ -91,19 +90,19 @@ sha256_of() {
 
 platform=$(uname -ms)
 case "$platform" in
-  'Darwin x86_64')                 target=darwin_amd64 ;;
-  'Darwin arm64')                  target=darwin_arm64 ;;
-  'Linux x86_64')                  target=linux_amd64  ;;
-  'Linux aarch64' | 'Linux arm64') target=linux_arm64  ;;
-  *) error "unsupported platform: $platform" ;;
+  'Darwin x86_64')                 os=darwin; arch=amd64 ;;
+  'Darwin arm64')                  os=darwin; arch=arm64 ;;
+  'Linux x86_64')                  os=linux;  arch=amd64 ;;
+  'Linux aarch64' | 'Linux arm64') os=linux;  arch=arm64 ;;
+  *) error "unsupported platform: $platform — dots ships for macOS and Linux only" ;;
 esac
 
 # Rosetta 2: a darwin/amd64 shell on Apple Silicon would download an
 # x86_64 binary that runs through translation. Prefer the native build.
-if [ "$target" = "darwin_amd64" ] \
+if [ "$os" = "darwin" ] && [ "$arch" = "amd64" ] \
   && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]; then
-  target=darwin_arm64
-  info "Your shell is running in Rosetta 2 — downloading native dots for $target instead."
+  arch=arm64
+  info "Your shell is running in Rosetta 2 — downloading native dots for $os-$arch instead."
 fi
 
 # --- Resolve version -----------------------------------------------------
@@ -115,8 +114,7 @@ if [ "$VERSION" = "latest" ]; then
   [ -n "$VERSION" ] || error "could not resolve latest release tag"
 fi
 
-version_no_v="${VERSION#v}"
-archive="${BINARY}_${version_no_v}_${target}.tar.gz"
+asset="${BINARY}-${os}-${arch}"
 base_url="$GITHUB/$REPO/releases/download/$VERSION"
 
 # --- Download ------------------------------------------------------------
@@ -124,20 +122,20 @@ base_url="$GITHUB/$REPO/releases/download/$VERSION"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-info "downloading $archive ($VERSION)"
-curl --fail --location --progress-bar --output "$tmp/$archive"   "$base_url/$archive" \
-  || error "failed to download $base_url/$archive"
+info "downloading $asset ($VERSION)"
+curl --fail --location --progress-bar --output "$tmp/$asset"     "$base_url/$asset" \
+  || error "failed to download $base_url/$asset"
 curl --fail --location --silent       --output "$tmp/SHA256SUMS" "$base_url/SHA256SUMS" \
   || error "failed to download SHA256SUMS"
 
 # --- Verify --------------------------------------------------------------
 
 info "verifying SHA-256"
-expected=$(awk -v f="$archive" '$2 == f || $2 == "*"f { print $1; exit }' "$tmp/SHA256SUMS")
-[ -n "$expected" ] || error "no checksum entry for $archive in SHA256SUMS"
-actual=$(sha256_of "$tmp/$archive")
+expected=$(awk -v f="$asset" '$2 == f || $2 == "*"f { print $1; exit }' "$tmp/SHA256SUMS")
+[ -n "$expected" ] || error "no checksum entry for $asset in SHA256SUMS"
+actual=$(sha256_of "$tmp/$asset")
 if [ "$expected" != "$actual" ]; then
-  error "checksum mismatch for $archive (expected $expected, got $actual)"
+  error "checksum mismatch for $asset (expected $expected, got $actual)"
 fi
 
 if command -v cosign >/dev/null 2>&1; then
@@ -158,8 +156,7 @@ fi
 # --- Install -------------------------------------------------------------
 
 mkdir -p "$INSTALL_DIR" || error "failed to create install directory $(tildify "$INSTALL_DIR")"
-tar -xzf "$tmp/$archive" -C "$tmp" || error "failed to extract $archive"
-install -m 0755 "$tmp/$BINARY" "$INSTALL_DIR/$BINARY" \
+install -m 0755 "$tmp/$asset" "$INSTALL_DIR/$BINARY" \
   || error "failed to install binary to $(tildify "$INSTALL_DIR")"
 
 exe="$INSTALL_DIR/$BINARY"

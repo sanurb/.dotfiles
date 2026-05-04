@@ -80,9 +80,15 @@ Long term maintainability is a core priority. If you add new functionality, firs
 
 ## Distribution Model
 
-The two components in §4 produce three entry points. *Entry point* (how
-the binary reaches the user) is orthogonal to *depth* (whether the user
-only writes a profile or also realizes it).
+The two components in §4 produce three peer entry points. *Entry point*
+(how the binary reaches the user) is orthogonal to *depth* (whether the
+user only writes a profile or also realizes it). All three entry points
+are equally supported (ADR-0011); the user picks based on which package
+manager they already use, not on a primary/fallback hierarchy.
+
+**Supported platforms.** macOS and Linux only. `nh` and Moon do not
+have Windows ports; the TUI binary follows suit and does not ship a
+Windows artifact. Windows users use WSL2.
 
 ### Entry points
 
@@ -92,11 +98,13 @@ only writes a profile or also realizes it).
 | Curl install | `curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh \| sh` | Persistent binary in `$INSTALL_DIR` (default `~/.local/bin`) |
 | `nix run` | `nix run github:sanurb/.dotfiles -- <args>` | Ephemeral execution |
 
-The Homebrew tap (`sanurb/homebrew-tap`) ships only `dots`. The
-curl-install fetcher is POSIX `sh`, always verifies SHA-256, and
-verifies the cosign signature when `cosign` is on `$PATH`; manual
-fetch + verify is documented in `RELEASING.md`. `nix run` requires Nix
-but no clone of the workspace.
+The Homebrew tap (`sanurb/homebrew-tap`) ships only `dots`. The curl
+fetcher downloads the stable raw-binary asset
+(`dots-{darwin,linux}-{amd64,arm64}` at
+`/releases/latest/download/`), always verifies SHA-256, and verifies
+the cosign keyless OIDC signature when `cosign` is on `$PATH`; manual
+fetch + verify is documented in `RELEASING.md`. `nix run` requires
+Nix but no clone of the workspace.
 
 ### Depth
 
@@ -110,10 +118,6 @@ asymmetry is communicated by binary output, not by gatekeeping channels.
 `dots deploy` self-bootstraps both prereqs with explicit per-prereq
 consent (ADR-0010); a fresh machine reaches realization through prompts,
 not through a copy-and-paste recipe.
-
-Whether the curl-install path stays as-is, gets deprecated, or gets
-blessed as a primary path is a **deferred** policy decision (§12) —
-this document describes the current state, not the target state.
 
 ## Architectural Invariants
 
@@ -165,3 +169,4 @@ accepted unless marked otherwise.
 | 0008 | [Per-tool nixpkgs pinning experiment](docs/adr/0008-per-tool-nixpkgs-pinning-experiment.md) |
 | 0009 | [The TUI invokes `dots deploy` via subprocess](docs/adr/0009-tui-invokes-deploy-via-subprocess.md) |
 | 0010 | [`dots deploy` self-bootstraps Nix and the workspace clone](docs/adr/0010-dots-deploy-self-bootstraps-prereqs.md) |
+| 0011 | [Curl-install promoted to a peer of Homebrew and `nix run`](docs/adr/0011-curl-install-promoted-to-primary-path.md) |

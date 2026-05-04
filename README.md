@@ -8,70 +8,62 @@ to `moon run modules:<task>`.
 ## Installation
 
 `dots` is two components: a TUI binary that writes a profile, and a Nix
-flake + Home Manager modules that realize the profile into your `$HOME`.
-The TUI runs anywhere; realization needs Nix and a clone of this repo.
-That asymmetry produces three install paths — pick the one that matches
-how far you want to go.
+flake + Home Manager modules that realize the profile into `$HOME`. The
+TUI runs anywhere a Go binary runs; realization needs Nix and a clone of
+this repo. There are three peer install paths — Homebrew, curl, and
+`nix run` — pick the one that matches how you already get tools.
 
-### Path 1 — Try the TUI (no Nix required)
+> **Supported platforms:** macOS and Linux. The realization layer
+> depends on `nh` and Moon, neither of which has a Windows port; the
+> TUI binary similarly does not ship for Windows. Windows users need
+> WSL2 — both the TUI and `dots deploy` work inside it. (ADR-0011)
 
-```sh
-brew install sanurb/tap/dots
-dots install
-```
-
-Outside a workspace, `dots install` runs in standalone mode: it walks
-the wizard and writes `~/.config/dots/selection.toml`, then prints next
-steps. Realization (`dots deploy`) needs Nix and the workspace; without
-those, the TUI is still a valid way to capture a profile. Continue with
-Path 2 or 3 when you're ready to apply it.
-
-### Path 2 — Full install (recommended)
+### Homebrew
 
 ```sh
 brew install sanurb/tap/dots
-dots install                                # captures profile via TUI
-# Install Nix if you don't have it: https://determinate.systems/nix-installer
-git clone https://github.com/sanurb/.dotfiles ~/.dotfiles
-cd ~/.dotfiles
-nix develop -c dots deploy                  # realize the profile
 ```
 
-`dots deploy` shells out to Moon, which is provisioned by the dev
-shell. The `nix develop -c` prefix enters that shell for the single
-command. For the canonical UX (auto-activated shell on `cd` into the
-repo), install [direnv][] (`brew install direnv`, hook it into your
-shell, then `direnv allow`); after that, `dots deploy` works without
-the prefix.
+Persistent binary at `$(brew --prefix)/bin/dots`. The tap
+([sanurb/homebrew-tap][tap]) ships only `dots`; auto-bumps on every
+release.
 
-Re-run `dots deploy` after editing your profile or pulling upstream
-changes.
-
-### Path 3 — Curl-install (no Homebrew)
+### Curl
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh | sh
 ```
 
-Drops the binary at `~/.local/bin/dots` (override with `INSTALL_DIR=`).
-The fetcher is POSIX `sh`, always verifies SHA-256 against the
-published `SHA256SUMS`, and verifies the cosign signature when
-`cosign` is on `$PATH`. Manual fetch + verify is documented in
-[RELEASING.md](./RELEASING.md#verifying-a-downloaded-release).
+Persistent binary at `~/.local/bin/dots` (override with `INSTALL_DIR=`).
+The fetcher is POSIX `sh`, downloads the stable raw-binary asset
+(`dots-{darwin,linux}-{amd64,arm64}`), always verifies SHA-256, and
+verifies the cosign keyless OIDC signature when `cosign` is on `$PATH`.
 
-This delivers only the binary. Realization is the same as Path 2 —
-clone, enter the dev shell, `dots deploy`.
+### `nix run`
 
-### Prerequisites
+```sh
+nix run github:sanurb/.dotfiles -- install
+```
 
-| Requirement | Path 1 | Path 2 | Path 3 |
-|-------------|:------:|:------:|:------:|
-| Homebrew    | ✓      | ✓      |        |
-| Nix         |        | ✓      | ✓      |
-| Repo clone  |        | ✓      | ✓      |
+Ephemeral execution — no persistent install. Requires Nix on the host
+already; no clone required (Nix fetches the flake on demand).
 
-Nix is required for `dots deploy` regardless of how the binary
-arrived. Nix installer: https://determinate.systems/nix-installer.
+### After install
+
+```sh
+dots install   # walk the wizard, capture ~/.config/dots/selection.toml
+dots deploy    # realize the profile (workspace + Nix; offered if missing)
+```
+
+`dots install` writes the profile and (inside a workspace) hands off to
+`dots deploy` for realization. `dots deploy` self-bootstraps Nix and the
+workspace clone with explicit consent prompts — a fresh machine reaches
+realization without manual prep, but every state-mutating step is
+shown verbatim before it runs (ADR-0010).
+
+For the canonical day-to-day UX, install [direnv][] so that entering
+the cloned workspace activates the dev shell automatically; `dots
+deploy` then runs without a `nix develop -c` prefix.
 
 ## Verifying a release
 
