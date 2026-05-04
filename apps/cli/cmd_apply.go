@@ -320,10 +320,11 @@ func snapshotConflicts(rels []string) error {
 // directly. The exit code is propagated verbatim so a moon failure
 // reads as a moon failure, not a generic dots error.
 //
-// Resolves moon in three layers (see resolveMoonCmd) so a user who
-// has not yet run `direnv allow` / `nix develop` still gets a working
-// `dots apply`. Without this, a clean shell PATH would dead-end here
-// even though the workspace ships its own proto-managed moon.
+// Resolves moon in three layers (see resolveMoonCmd) AND augments the
+// subprocess PATH with the workspace's proto + devenv bins. Without
+// the PATH augmentation a bare shell would still trip moon's task
+// subprocesses (`go: command not found`) even after we successfully
+// located moon itself. This recreates the activation direnv would do.
 func runMoonDeploy() int {
 	cmd, label := resolveMoonCmd()
 	if cmd == nil {
@@ -333,6 +334,7 @@ func runMoonDeploy() int {
 		fmt.Fprintln(os.Stderr, "  next: enter the dev shell (direnv allow / `nix develop`) or run `dots doctor`")
 		return exitcode.Failure
 	}
+	cmd.Env = moonEnv()
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -387,6 +389,43 @@ func resolveMoonCmd() (*exec.Cmd, string) {
 			"nix develop -c moon run " + ui.MoonDeployTask
 	}
 	return nil, ""
+}
+
+// moonEnv returns a copy of os.Environ() with the workspace's proto
+// shims, proto bin, and devenv profile bin prepended to PATH. Moon's
+// tasks (cli:build, modules:deploy → nh home switch, treefmt) are
+// orchestrators that spawn their own children — those children
+// inherit our subprocess PATH, not the user's interactive shell, so
+// without this prepend a non-direnv-activated shell ends in `go:
+// command not found` partway through deploy. This is intentionally
+// the same shape direnv's `use flake` produces, narrowed to the dirs
+// moon's tasks actually consume. Missing dirs are skipped silently:
+// on a truly fresh clone neither `.proto` nor `.devenv` exist yet,
+// and the resolver's nix-develop layer picks up the slack.
+func moonEnv() []string {
+	env := os.Environ()
+	root, err := workspace.Root()
+	if err != nil {
+		return env
+	}
+	var extras []string
+	for _, sub := range []string{".proto/shims", ".proto/bin", ".devenv/profile/bin"} {
+		p := filepath.Join(root, sub)
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			extras = append(extras, p)
+		}
+	}
+	if len(extras) == 0 {
+		return env
+	}
+	sep := string(os.PathListSeparator)
+	for i, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			env[i] = "PATH=" + strings.Join(extras, sep) + sep + strings.TrimPrefix(e, "PATH=")
+			return env
+		}
+	}
+	return append(env, "PATH="+strings.Join(extras, sep))
 }
 
 // short renders the first 12 hex chars of a hash for human surfaces.
