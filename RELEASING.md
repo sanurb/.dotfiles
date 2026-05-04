@@ -78,10 +78,11 @@ gh run watch
 
 A successful run produces:
 
-- `dots_<version>_{darwin,linux}_{amd64,arm64}.tar.gz` × 4
-- `SHA256SUMS` + `SHA256SUMS.sig` + `SHA256SUMS.pem`
-- One `.sig` and `.pem` per archive
-- One `.sbom.json` (CycloneDX) per archive
+- `dots-{darwin,linux}-{amd64,arm64}` × 4 (raw binary, stable filename — curl-install path; ADR-0011)
+- `dots_<version>_{darwin,linux}_{amd64,arm64}.tar.gz` × 4 (versioned archive — Homebrew, manual download)
+- `SHA256SUMS` + `SHA256SUMS.sig` + `SHA256SUMS.pem` (covers every artifact above)
+- One `.sig` and `.pem` per artifact (raw binary AND tar.gz)
+- One `.sbom.json` (CycloneDX) per artifact
 - A Homebrew formula commit on `sanurb/homebrew-tap`
 - A GitHub Release with all of the above as assets
 
@@ -98,6 +99,11 @@ A successful run produces:
 
 ## Verifying a downloaded release
 
+The `SHA256SUMS` file covers every artifact. Verify it once with cosign,
+then string-compare your local SHA-256 against the entry in the file —
+this works for both the raw binary (curl-install path) and the
+versioned tar.gz (Homebrew / manual archive grab).
+
 ```sh
 VERSION=v0.1.0
 OS=darwin                 # or linux
@@ -107,9 +113,8 @@ BASE="https://github.com/sanurb/.dotfiles/releases/download/$VERSION"
 curl -fsSLO "$BASE/SHA256SUMS"
 curl -fsSLO "$BASE/SHA256SUMS.sig"
 curl -fsSLO "$BASE/SHA256SUMS.pem"
-curl -fsSLO "$BASE/dots_${VERSION#v}_${OS}_${ARCH}.tar.gz"
 
-# 1. Verify the checksum file's signature.
+# 1. Verify the checksum file's signature (covers every artifact below).
 cosign verify-blob \
   --certificate-identity-regexp "https://github.com/sanurb/.dotfiles" \
   --certificate-oidc-issuer     "https://token.actions.githubusercontent.com" \
@@ -117,9 +122,19 @@ cosign verify-blob \
   --signature                   SHA256SUMS.sig \
   SHA256SUMS
 
-# 2. Verify the archive matches its checksum.
+# 2a. Raw binary (curl-install path) — stable filename, no version segment.
+curl -fsSLO "$BASE/dots-${OS}-${ARCH}"
+grep "dots-${OS}-${ARCH}" SHA256SUMS | shasum -a 256 -c -
+
+# 2b. Versioned tar.gz (Homebrew / manual archive).
+curl -fsSLO "$BASE/dots_${VERSION#v}_${OS}_${ARCH}.tar.gz"
 grep "dots_${VERSION#v}_${OS}_${ARCH}.tar.gz" SHA256SUMS | shasum -a 256 -c -
 ```
+
+The stable raw-binary URL `https://github.com/sanurb/.dotfiles/releases/latest/download/dots-${OS}-${ARCH}`
+resolves to whichever release is current — convenient for `curl | sh`
+recipes that should not pin a version. The fetcher
+(`scripts/install.sh`) consumes that pattern.
 
 ## Rolling back a bad release
 
