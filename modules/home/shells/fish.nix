@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }: {
+{ config, pkgs, lib, workspaceRoot, ... }: {
   programs.fish = {
     enable = true;
     interactiveShellInit = ''
@@ -20,4 +20,19 @@
   programs.atuin.enableFishIntegration = true;
   programs.zoxide.enableFishIntegration = true;
   programs.starship.enableFishIntegration = true;
+
+  # Live-editable seam — same pattern as modules/home/editor.nix.
+  # Pointing ~/.config/fish at the in-repo tree means edits to
+  # conf.d/aliases.fish, functions/<f>.fish, etc. take effect on the
+  # next shell launch without re-running `dots apply`. fish itself
+  # autoloads from this directory at every startup, so the live-edit
+  # ergonomics fall out for free.
+  #
+  # mkOutOfStoreSymlink keeps the target out of the Nix store; when
+  # workspaceRoot is empty (HM run outside `dots apply`) we skip the
+  # link rather than create a dangling pointer to "/config/fish".
+  xdg.configFile."fish" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/fish";
+  };
 }

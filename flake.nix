@@ -155,6 +155,52 @@
             # rplugin.vim) and home-manager option-rename breaks before
             # they reach a user's `dots apply`.
             home-activation = (mkHome system).activationPackage;
+
+            # Persona-shell ↔ source-tree linkage. The wizard's "fish"
+            # selection has to land both as a binary (programs.fish.enable)
+            # and as a config-tree symlink (xdg.configFile."fish") — the
+            # latter is what makes the imported config/fish/ tree
+            # actually reach ~/.config/fish/ at activation time. A
+            # missing xdg.configFile."fish" entry is exactly the bug the
+            # user reported as "fish was selected but did not end up
+            # installed": the binary lands but their abbreviations,
+            # functions, and conf.d entries do not.
+            #
+            # We assert the wiring by inspecting the resolved HM config
+            # (no rebuild — just a property of the eval result) for the
+            # presence of the "fish" key under config.xdg.configFile.
+            fish-config-wired =
+              let
+                # Build an HM config with a non-empty workspaceRoot so
+                # the lib.mkIf gate inside fish.nix actually evaluates
+                # its body. `nix flake check` runs in pure mode where
+                # builtins.getEnv "DOTS_WORKSPACE_ROOT" returns "" —
+                # without the override, the mkIf would collapse and
+                # the check would always pass whether or not fish.nix
+                # declares the entry.
+                evaluated = (home-manager.lib.homeManagerConfiguration {
+                  inherit pkgs;
+                  modules = [
+                    ./modules/profiles/home.nix
+                    { _module.args.workspaceRoot = pkgs.lib.mkForce "/synthetic/dots"; }
+                  ];
+                  extraSpecialArgs = {
+                    inherit inputs system;
+                    pkgsPins.edge = nixpkgs-edge.legacyPackages.${system};
+                  };
+                }).config;
+                ok = evaluated.xdg.configFile ? "fish";
+              in
+              pkgs.runCommand "fish-config-wired" { } (
+                if ok then ''
+                  echo "ok: modules/home/shells/fish.nix declares xdg.configFile.\"fish\"" > $out
+                '' else ''
+                  echo "modules/home/shells/fish.nix is missing xdg.configFile.\"fish\"" >&2
+                  echo "  why: without it, config/fish/ is never linked into ~/.config/fish/" >&2
+                  echo "  fix: add an xdg.configFile.\"fish\".source = mkOutOfStoreSymlink entry" >&2
+                  exit 1
+                ''
+              );
           };
 
           formatter = pkgs.nixpkgs-fmt;
