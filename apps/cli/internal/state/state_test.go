@@ -43,9 +43,11 @@ func TestFontDefaultIsTrue(t *testing.T) {
 }
 
 // TestParseLegacyStateInheritsDefault documents how schema-1 state files
-// (no `font` key, written before this change) are read: parse() seeds
-// from Default(), so the missing key resolves to true. Any change here
-// is an implicit migration the docstring on parse() promises.
+// from a host that toggled the old `git` capability (now removed) are
+// read: parse() seeds from Default(), so the absent `font` key resolves
+// to true and the vestigial `git` key is silently ignored. This is the
+// shape a host writes if it ran an older `dots install` and has never
+// re-installed since the git toggle was retired.
 func TestParseLegacyStateInheritsDefault(t *testing.T) {
 	legacy := `schema_version = 1
 
@@ -60,7 +62,7 @@ git    = true
 `
 	got, err := parse(strings.NewReader(legacy))
 	if err != nil {
-		t.Fatalf("parse legacy: %v", err)
+		t.Fatalf("parse legacy (must tolerate vestigial git key): %v", err)
 	}
 	if !got.Capabilities.Font {
 		t.Fatalf("legacy state without `font` key: got Font=false, want true (inherits Default())")

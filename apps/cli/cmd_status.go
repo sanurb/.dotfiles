@@ -24,7 +24,6 @@ type statusProfileJSON struct {
 	Terminal    string `json:"terminal"`
 	Multiplexer string `json:"multiplexer"`
 	Editor      bool   `json:"editor"`
-	Git         bool   `json:"git"`
 	Font        bool   `json:"font"`
 }
 
@@ -146,7 +145,6 @@ func runStatus(rest []string) int {
 			Terminal:    s.Pillars.Terminal,
 			Multiplexer: s.Pillars.Multiplexer,
 			Editor:      s.Capabilities.Editor,
-			Git:         s.Capabilities.Git,
 			Font:        s.Capabilities.Font,
 		}
 	}
@@ -237,7 +235,7 @@ func renderStatusHuman(
 	case profile == nil:
 		fmt.Printf(labelWidth, "profile", "(no .dots-state.toml — run `dots install`)")
 	default:
-		caps := capabilitiesSummary(profile.Editor, profile.Git, profile.Font)
+		caps := capabilitiesSummary(profile.Editor, profile.Font)
 		line := fmt.Sprintf("%s · %s · %s%s",
 			profile.Shell, profile.Terminal, profile.Multiplexer, caps)
 		fmt.Printf(labelWidth, "profile", line)
@@ -285,19 +283,17 @@ func driftLine(kind driftKind, last *statusLastApplyJSON, freshHash string) stri
 
 // capabilitiesSummary renders an inline parenthetical describing which
 // capability flags are on — the human row reads as
-// "fish · ghostty · zellij  (font, editor, git)" when all are true. An
+// "fish · ghostty · zellij  (font, editor)" when both are true. An
 // empty string is returned when nothing is enabled, so the line stays
-// clean.
-func capabilitiesSummary(editor, git, font bool) string {
+// clean. Git is omitted because git is mandatory infrastructure, not a
+// user-toggleable capability — home.nix imports it unconditionally.
+func capabilitiesSummary(editor, font bool) string {
 	var parts []string
 	if font {
 		parts = append(parts, "font")
 	}
 	if editor {
 		parts = append(parts, "editor")
-	}
-	if git {
-		parts = append(parts, "git")
 	}
 	if len(parts) == 0 {
 		return ""

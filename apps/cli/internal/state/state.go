@@ -63,7 +63,6 @@ func (p Pillars) Format() string {
 
 type Capabilities struct {
 	Editor bool
-	Git    bool
 	Font   bool
 }
 
@@ -82,7 +81,7 @@ func Default() State {
 	return State{
 		SchemaVersion: SchemaVersion,
 		Pillars:       Pillars{Shell: "fish", Terminal: "ghostty", Multiplexer: "zellij"},
-		Capabilities:  Capabilities{Editor: true, Git: true, Font: true},
+		Capabilities:  Capabilities{Editor: true, Font: true},
 	}
 }
 
@@ -161,7 +160,6 @@ func (s State) Validate() error {
 //	multiplexer = "zellij"
 //	[capabilities]
 //	editor = true
-//	git    = true
 //	font   = true
 //
 // Anything outside this shape is ignored — we never want a typo'd key to
@@ -218,8 +216,6 @@ func parse(r io.Reader) (State, error) {
 			switch key {
 			case "editor":
 				out.Capabilities.Editor = b
-			case "git":
-				out.Capabilities.Git = b
 			case "font":
 				out.Capabilities.Font = b
 			}
@@ -244,13 +240,12 @@ multiplexer = %q
 
 [capabilities]
 editor = %v
-git    = %v
 font   = %v
 `
 	_, err := fmt.Fprintf(w, tmpl,
 		s.SchemaVersion,
 		s.Pillars.Shell, s.Pillars.Terminal, s.Pillars.Multiplexer,
-		s.Capabilities.Editor, s.Capabilities.Git, s.Capabilities.Font)
+		s.Capabilities.Editor, s.Capabilities.Font)
 	return err
 }
 

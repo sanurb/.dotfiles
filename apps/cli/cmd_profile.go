@@ -28,7 +28,6 @@ type profileShowJSON struct {
 	Terminal      string `json:"terminal"`
 	Multiplexer   string `json:"multiplexer"`
 	Editor        bool   `json:"editor"`
-	Git           bool   `json:"git"`
 	Font          bool   `json:"font"`
 }
 
@@ -110,7 +109,7 @@ func runProfileList(rest []string) int {
 		fmt.Println("(no profile selected — run `dots install` to capture one)")
 		return exitcode.Success
 	}
-	fmt.Println(s.Pillars.Format() + capabilitiesSummary(s.Capabilities.Editor, s.Capabilities.Git, s.Capabilities.Font))
+	fmt.Println(s.Pillars.Format() + capabilitiesSummary(s.Capabilities.Editor, s.Capabilities.Font))
 	return exitcode.Success
 }
 
@@ -158,7 +157,6 @@ func runProfileShow(rest []string) int {
 			Terminal:      s.Pillars.Terminal,
 			Multiplexer:   s.Pillars.Multiplexer,
 			Editor:        s.Capabilities.Editor,
-			Git:           s.Capabilities.Git,
 			Font:          s.Capabilities.Font,
 		}
 		enc := json.NewEncoder(os.Stdout)
@@ -172,7 +170,6 @@ func runProfileShow(rest []string) int {
 	fmt.Printf("terminal        %s\n", s.Pillars.Terminal)
 	fmt.Printf("multiplexer     %s\n", s.Pillars.Multiplexer)
 	fmt.Printf("editor          %v\n", s.Capabilities.Editor)
-	fmt.Printf("git             %v\n", s.Capabilities.Git)
 	fmt.Printf("font            %v\n", s.Capabilities.Font)
 	return exitcode.Success
 }

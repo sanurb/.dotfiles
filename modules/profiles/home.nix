@@ -38,7 +38,7 @@ let
   defaultState = {
     schema_version = schemaVersion;
     pillars = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
-    capabilities = { editor = true; git = true; font = true; };
+    capabilities = { editor = true; font = true; };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
   state =
@@ -64,10 +64,12 @@ let
 in
 {
   imports =
-    [ homeModules.foundation shellModule terminalModule ]
+    # Git is mandatory infrastructure (identity is sourced externally per
+    # modules/home/git.nix); the wizard never asks about it. Editor and
+    # font remain user-toggleable capabilities.
+    [ homeModules.foundation homeModules.git shellModule terminalModule ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
     ++ lib.optional (caps.editor or true) homeModules.editor
-    ++ lib.optional (caps.git    or true) homeModules.git
     ++ lib.optional (caps.font   or true) homeModules.font;
 
   home.username = if envUser != "" then envUser else "dots";
