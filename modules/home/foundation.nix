@@ -52,7 +52,13 @@
   # "Proto's shims are first in $PATH" — that contract requires proto
   # the binary AND its shim directories on every shell's PATH,
   # regardless of which persona shell the user picked.
-  home.packages = with pkgs; [ direnv fzf proto ];
+  # Modern CLI ergonomics — drop-ins / superchargers for tools every
+  # shell session reaches for: bat (cat with syntax + paging), fd
+  # (find with sane defaults), sd (sed for the single-pass-replace
+  # case), hyperfine (statistical command benchmarks). Persona-
+  # agnostic, so they sit alongside direnv/fzf/proto rather than in
+  # any per-shell module.
+  home.packages = with pkgs; [ direnv fzf proto bat fd sd hyperfine ];
 
   # Source of truth for $PATH additions. home.sessionPath writes
   # into ~/.config/hm-session-vars.{sh,fish}, sourced by every HM-
