@@ -38,7 +38,7 @@ let
   defaultState = {
     schema_version = schemaVersion;
     pillars = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
-    capabilities = { editor = true; git = true; };
+    capabilities = { editor = true; git = true; font = true; };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
   state =
@@ -67,7 +67,8 @@ in
     [ homeModules.foundation shellModule terminalModule ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
     ++ lib.optional (caps.editor or true) homeModules.editor
-    ++ lib.optional (caps.git    or true) homeModules.git;
+    ++ lib.optional (caps.git    or true) homeModules.git
+    ++ lib.optional (caps.font   or true) homeModules.font;
 
   home.username = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;
