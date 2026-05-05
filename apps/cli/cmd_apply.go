@@ -107,6 +107,27 @@ func runApply(rest []string) int {
 		return code
 	}
 
+	// Fire install-runtimes concurrently when safe. apply-profile (HM
+	// activation) and install-runtimes (proto downloads) write to
+	// disjoint trees — HM under ~/.local/state and ~/.config; proto
+	// under ~/.proto/installs — so the only shared resources are
+	// network and CPU, which both tools share happily. Overlapping
+	// them collapses the wall time from `apply-profile + downloads`
+	// to `max(apply-profile, downloads)`, which on a cold install is
+	// dominated by the proto download phase.
+	//
+	// Safety conditions: proto must already be on PATH (otherwise
+	// install-runtimes can't run before HM installs it) and
+	// clone-workspace must not be pending (proto reads .prototools
+	// from the workspace root). When either fails, the channel stays
+	// nil and the step loop runs install-runtimes synchronously.
+	var runtimesAsync <-chan int
+	if shouldParallelizeRuntimes(p) {
+		ch := make(chan int, 1)
+		runtimesAsync = ch
+		go func() { ch <- runInstallRuntimes() }()
+	}
+
 	// bootstrap-nix is terminal: the just-installed nix is not on this
 	// PATH, so the process must exit before any later step runs.
 	for _, step := range p.Steps {
@@ -157,7 +178,16 @@ func runApply(rest []string) int {
 			}
 
 		case plan.KindInstallRuntimes:
-			if code := runInstallRuntimes(); code != exitcode.Success {
+			var code int
+			if runtimesAsync != nil {
+				// Goroutine fired earlier in parallel with apply-profile.
+				// Wait for its result here so the step loop preserves the
+				// "every step succeeded before receipt write" invariant.
+				code = <-runtimesAsync
+			} else {
+				code = runInstallRuntimes()
+			}
+			if code != exitcode.Success {
 				return code
 			}
 
@@ -462,6 +492,34 @@ func runHomeActivation(profile string) int {
 	fmt.Fprintf(os.Stderr, "  why:  %v\n", runErr)
 	fmt.Fprintln(os.Stderr, "  next: run `dots doctor` to diagnose the toolchain")
 	return exitcode.Failure
+}
+
+// shouldParallelizeRuntimes decides whether install-runtimes can run
+// concurrently with the rest of the step loop. Two preconditions:
+//
+//  1. proto must already be reachable on the activation env's PATH.
+//     On the first-ever apply, HM installs proto in this same run —
+//     so install-runtimes has to wait for apply-profile. The
+//     LookPathIn check returns ErrNotFound in that case and we fall
+//     through to sequential execution.
+//
+//  2. clone-workspace must not be pending. proto reads .prototools
+//     from the workspace root; until the clone lands the file isn't
+//     there to consult.
+//
+// All other steps (apply-profile, snapshot-conflicts, bootstrap-nix
+// already gated by exit-on-success) run on disjoint resources and are
+// safe to overlap.
+func shouldParallelizeRuntimes(p plan.Plan) bool {
+	if !p.HasKind(plan.KindInstallRuntimes) {
+		return false
+	}
+	if p.HasKind(plan.KindCloneWorkspace) {
+		return false
+	}
+	env := activationEnv()
+	_, err := activation.LookPathIn("proto", env)
+	return err == nil
 }
 
 // runInstallRuntimes invokes `proto use` against the workspace,
