@@ -111,9 +111,7 @@ func (p Plan) ComputeHash() string {
 		Host          Host   `json:"host"`
 		Steps         []Step `json:"steps"`
 	}
-	b, _ := json.Marshal(canon{p.SchemaVersion, p.Profile, p.Host, p.Steps})
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
+	return hashCanon(canon{p.SchemaVersion, p.Profile, p.Host, p.Steps})
 }
 
 // ConvergedHash returns the hash of the *desired converged state*
@@ -143,7 +141,16 @@ func (p Plan) ConvergedHash() string {
 			break
 		}
 	}
-	b, _ := json.Marshal(canon{p.SchemaVersion, p.Profile, p.Host, cmd})
+	return hashCanon(canon{p.SchemaVersion, p.Profile, p.Host, cmd})
+}
+
+// hashCanon marshals v to canonical JSON and returns its SHA-256 hex.
+// Errors from json.Marshal are intentionally swallowed — the input
+// types (anonymous canon structs above) have no encoders that can
+// fail, and there is no useful recovery: a corrupt hash is a defect,
+// not a runtime condition.
+func hashCanon(v any) string {
+	b, _ := json.Marshal(v)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
@@ -166,6 +173,23 @@ func (p Plan) HasKind(kinds ...string) bool {
 		}
 	}
 	return false
+}
+
+// HasSideEffectSteps reports whether the plan contains any step that
+// mutates host state independently of apply-profile. These are the
+// "make-ready / sync" steps — bootstrap-nix, clone-workspace,
+// snapshot-conflicts, install-runtimes — whose presence means there
+// is real work to do regardless of whether the converged-state hash
+// matches a prior receipt. Centralizes the kind list so adding a
+// new side-effect step (e.g., a future bootstrap-homebrew) updates
+// one site instead of every caller's switch.
+func (p Plan) HasSideEffectSteps() bool {
+	return p.HasKind(
+		KindBootstrapNix,
+		KindCloneWorkspace,
+		KindSnapshotConflicts,
+		KindInstallRuntimes,
+	)
 }
 
 // Encode writes the Plan to w as indented JSON. The trailing newline

@@ -107,25 +107,22 @@ func runApply(rest []string) int {
 		return code
 	}
 
-	// Fire install-runtimes concurrently when safe. apply-profile (HM
-	// activation) and install-runtimes (proto downloads) write to
-	// disjoint trees — HM under ~/.local/state and ~/.config; proto
-	// under ~/.proto/installs — so the only shared resources are
-	// network and CPU, which both tools share happily. Overlapping
-	// them collapses the wall time from `apply-profile + downloads`
-	// to `max(apply-profile, downloads)`, which on a cold install is
-	// dominated by the proto download phase.
-	//
-	// Safety conditions: proto must already be on PATH (otherwise
-	// install-runtimes can't run before HM installs it) and
-	// clone-workspace must not be pending (proto reads .prototools
-	// from the workspace root). When either fails, the channel stays
-	// nil and the step loop runs install-runtimes synchronously.
+	// Built once and threaded through every subprocess that runs
+	// against the activation env (apply-profile / install-runtimes /
+	// reachability probes). Avoids re-snapshotting os.Environ() on
+	// every helper call.
+	env := activationEnv()
+
+	// apply-profile (HM activation) and install-runtimes (proto
+	// downloads) write to disjoint trees and share only network +
+	// CPU, so overlapping them collapses wall time to max(activate,
+	// downloads). The fork is gated on proto already being reachable
+	// and clone-workspace not pending — see shouldParallelizeRuntimes.
 	var runtimesAsync <-chan int
-	if shouldParallelizeRuntimes(p) {
+	if shouldParallelizeRuntimes(p, env) {
 		ch := make(chan int, 1)
 		runtimesAsync = ch
-		go func() { ch <- runInstallRuntimes() }()
+		go func() { ch <- runInstallRuntimes(env) }()
 	}
 
 	// bootstrap-nix is terminal: the just-installed nix is not on this
@@ -173,19 +170,16 @@ func runApply(rest []string) int {
 					return exitcode.PreFlight
 				}
 			}
-			if code := runHomeActivation(p.Profile); code != exitcode.Success {
+			if code := runHomeActivation(p.Profile, env); code != exitcode.Success {
 				return code
 			}
 
 		case plan.KindInstallRuntimes:
 			var code int
 			if runtimesAsync != nil {
-				// Goroutine fired earlier in parallel with apply-profile.
-				// Wait for its result here so the step loop preserves the
-				// "every step succeeded before receipt write" invariant.
 				code = <-runtimesAsync
 			} else {
-				code = runInstallRuntimes()
+				code = runInstallRuntimes(env)
 			}
 			if code != exitcode.Success {
 				return code
@@ -329,27 +323,21 @@ func emitPlan(p plan.Plan, common cliflags.Common) {
 }
 
 // isAlreadyApplied returns true only when the plan is pure
-// converged-state delivery (just apply-profile, no prerequisites)
+// converged-state delivery (just apply-profile, no side effects)
 // AND the receipt's hash matches the plan's converged state.
 //
-// Side-effect steps — snapshot-conflicts, bootstrap-nix,
-// clone-workspace, install-runtimes — mutate the host independently
-// of the converged-state hash. Their presence means there is real
-// work to do, regardless of whether the receipt matches: the receipt
-// attests to past success, not to current cleanliness or runtime
-// freshness. Skipping a snapshot because "we converged once" leaves
-// the colliding file in place and breaks the next activation;
-// skipping install-runtimes leaves a stale proto closure.
+// Side-effect steps mutate the host independently of the converged-
+// state hash. Their presence means there is real work to do
+// regardless of receipt match: the receipt attests to past success,
+// not to current cleanliness or runtime freshness. Skipping a
+// snapshot because "we converged once" leaves the colliding file in
+// place and breaks the next activation; skipping install-runtimes
+// leaves a stale proto closure.
 //
 // A missing or unreadable receipt is treated as "not applied" — the
 // safe default.
 func isAlreadyApplied(p plan.Plan) bool {
-	if p.HasKind(
-		plan.KindBootstrapNix,
-		plan.KindCloneWorkspace,
-		plan.KindSnapshotConflicts,
-		plan.KindInstallRuntimes,
-	) {
+	if p.HasSideEffectSteps() {
 		return false
 	}
 	path, err := applied.DefaultPath()
@@ -452,7 +440,7 @@ func emitActivationCommand(p plan.Plan) int {
 // activation-script failure surfaces verbatim. Without it, nh
 // reports a bare "Activation failed (exit 1)" and swallows the
 // real cause.
-func runHomeActivation(profile string) int {
+func runHomeActivation(profile string, env []string) int {
 	sys := plan.CurrentHost().NixIdent()
 	if sys == "" {
 		fmt.Fprintln(os.Stderr, "apply: cannot resolve nix system identifier")
@@ -461,7 +449,6 @@ func runHomeActivation(profile string) int {
 		return exitcode.Failure
 	}
 
-	env := activationEnv()
 	nhPath, err := activation.LookPathIn(nix.ToolNh, env)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "apply: nh not reachable:")
@@ -495,30 +482,18 @@ func runHomeActivation(profile string) int {
 }
 
 // shouldParallelizeRuntimes decides whether install-runtimes can run
-// concurrently with the rest of the step loop. Two preconditions:
-//
-//  1. proto must already be reachable on the activation env's PATH.
-//     On the first-ever apply, HM installs proto in this same run —
-//     so install-runtimes has to wait for apply-profile. The
-//     LookPathIn check returns ErrNotFound in that case and we fall
-//     through to sequential execution.
-//
-//  2. clone-workspace must not be pending. proto reads .prototools
-//     from the workspace root; until the clone lands the file isn't
-//     there to consult.
-//
-// All other steps (apply-profile, snapshot-conflicts, bootstrap-nix
-// already gated by exit-on-success) run on disjoint resources and are
-// safe to overlap.
-func shouldParallelizeRuntimes(p plan.Plan) bool {
+// concurrently with the rest of the step loop. Preconditions: proto
+// reachable (first-ever apply has HM installing it in this same run,
+// so the goroutine can't fire) and clone-workspace not pending
+// (.prototools lives in the workspace).
+func shouldParallelizeRuntimes(p plan.Plan, env []string) bool {
 	if !p.HasKind(plan.KindInstallRuntimes) {
 		return false
 	}
 	if p.HasKind(plan.KindCloneWorkspace) {
 		return false
 	}
-	env := activationEnv()
-	_, err := activation.LookPathIn("proto", env)
+	_, err := activation.LookPathIn(nix.ToolProto, env)
 	return err == nil
 }
 
@@ -534,14 +509,13 @@ func shouldParallelizeRuntimes(p plan.Plan) bool {
 // nix-profile gcroot update. The next invocation finds proto and
 // converges. This is preferable to failing the whole apply when
 // activation succeeded; the user sees a one-line note and can rerun.
-func runInstallRuntimes() int {
+func runInstallRuntimes(env []string) int {
 	root, err := workspace.Root()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "install-runtimes: workspace not resolved; skipping")
 		return exitcode.Success
 	}
-	env := activationEnv()
-	protoPath, err := activation.LookPathIn("proto", env)
+	protoPath, err := activation.LookPathIn(nix.ToolProto, env)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "install-runtimes: proto not yet on PATH; rerun `dots apply` after this activation lands")
 		return exitcode.Success

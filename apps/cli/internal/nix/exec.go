@@ -25,6 +25,7 @@ import (
 const (
 	ToolNh          = "nh"
 	ToolHomeManager = "home-manager"
+	ToolProto       = "proto"
 )
 
 // Cmd describes a Nix-tool subprocess on the activation path. Zero
