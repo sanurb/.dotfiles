@@ -156,6 +156,11 @@ func runApply(rest []string) int {
 				return code
 			}
 
+		case plan.KindInstallRuntimes:
+			if code := runInstallRuntimes(); code != exitcode.Success {
+				return code
+			}
+
 		default:
 			fmt.Fprintf(os.Stderr, "apply: unknown step kind %q (plan schema drift?)\n", step.Kind)
 			return exitcode.Failure
@@ -297,18 +302,24 @@ func emitPlan(p plan.Plan, common cliflags.Common) {
 // converged-state delivery (just apply-profile, no prerequisites)
 // AND the receipt's hash matches the plan's converged state.
 //
-// Prerequisite steps — snapshot-conflicts, bootstrap-nix,
-// clone-workspace — mutate the host BEFORE activation can succeed.
-// Their presence means there is real work to do, regardless of
-// whether the converged-state hash matches a prior receipt: the
-// receipt only attests to past success, not to current cleanliness.
-// Skipping a snapshot because "we converged once" would leave the
-// colliding file in place and break the next activation.
+// Side-effect steps — snapshot-conflicts, bootstrap-nix,
+// clone-workspace, install-runtimes — mutate the host independently
+// of the converged-state hash. Their presence means there is real
+// work to do, regardless of whether the receipt matches: the receipt
+// attests to past success, not to current cleanliness or runtime
+// freshness. Skipping a snapshot because "we converged once" leaves
+// the colliding file in place and breaks the next activation;
+// skipping install-runtimes leaves a stale proto closure.
 //
 // A missing or unreadable receipt is treated as "not applied" — the
 // safe default.
 func isAlreadyApplied(p plan.Plan) bool {
-	if p.HasKind(plan.KindBootstrapNix, plan.KindCloneWorkspace, plan.KindSnapshotConflicts) {
+	if p.HasKind(
+		plan.KindBootstrapNix,
+		plan.KindCloneWorkspace,
+		plan.KindSnapshotConflicts,
+		plan.KindInstallRuntimes,
+	) {
 		return false
 	}
 	path, err := applied.DefaultPath()
@@ -450,6 +461,51 @@ func runHomeActivation(profile string) int {
 	fmt.Fprintln(os.Stderr, "  what: could not execute `nh home switch`")
 	fmt.Fprintf(os.Stderr, "  why:  %v\n", runErr)
 	fmt.Fprintln(os.Stderr, "  next: run `dots doctor` to diagnose the toolchain")
+	return exitcode.Failure
+}
+
+// runInstallRuntimes invokes `proto use` against the workspace,
+// installing every runtime pinned in .prototools (bun, node, go,
+// rust, moon, …). ADR-0008 says proto owns these; this step makes
+// `dots apply` actually deliver them rather than stopping at "proto
+// is on PATH" and leaving the user to run `proto use` themselves.
+//
+// Skips gracefully on a fresh host where proto isn't yet on PATH —
+// this can happen when the same `dots apply` is the run that just
+// installed proto via HM, but the binary lookup is racy with the
+// nix-profile gcroot update. The next invocation finds proto and
+// converges. This is preferable to failing the whole apply when
+// activation succeeded; the user sees a one-line note and can rerun.
+func runInstallRuntimes() int {
+	root, err := workspace.Root()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "install-runtimes: workspace not resolved; skipping")
+		return exitcode.Success
+	}
+	env := activationEnv()
+	protoPath, err := activation.LookPathIn("proto", env)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "install-runtimes: proto not yet on PATH; rerun `dots apply` after this activation lands")
+		return exitcode.Success
+	}
+	runErr := nix.Cmd{
+		Name:   protoPath,
+		Args:   []string{"use"},
+		Env:    env,
+		Dir:    root,
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}.Run(context.Background())
+	if runErr == nil {
+		return exitcode.Success
+	}
+	if code, ok := nix.IsExit(runErr); ok {
+		fmt.Fprintf(os.Stderr, "install-runtimes: `proto use` exited %d\n", code)
+		return code
+	}
+	fmt.Fprintln(os.Stderr, "install-runtimes: proto exec failed:")
+	fmt.Fprintf(os.Stderr, "  why: %v\n", runErr)
 	return exitcode.Failure
 }
 

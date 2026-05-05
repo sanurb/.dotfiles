@@ -32,6 +32,7 @@ const (
 	KindCloneWorkspace    = "clone-workspace"
 	KindSnapshotConflicts = "snapshot-conflicts"
 	KindApplyProfile      = "apply-profile"
+	KindInstallRuntimes   = "install-runtimes"
 )
 
 // Step.Action values — the diff verb. ActionAdd is "+", ActionChange is

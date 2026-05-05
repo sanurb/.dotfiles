@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/applied"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
@@ -105,6 +106,24 @@ func computePlan(profile string) (plan.Plan, error) {
 		Summary: fmt.Sprintf("apply profile %s", planProfileLabel(resolved)),
 		Command: applyProfileCommand(),
 	})
+
+	// Realize the runtime versions declared in .prototools — Go, Bun,
+	// Node, Rust, etc. ADR-0008 says proto owns these; "Declare, Don't
+	// Script" means the user declares the pin and `dots apply` makes
+	// it real. Without this step, apply leaves the workspace's runtime
+	// closure half-installed (proto on PATH, but no tools yet) and
+	// pushes the actualization onto the user.
+	if root, err := workspace.Root(); err == nil {
+		if _, perr := os.Stat(filepath.Join(root, ".prototools")); perr == nil {
+			p.Steps = append(p.Steps, plan.Step{
+				ID:      nextID(),
+				Kind:    plan.KindInstallRuntimes,
+				Action:  plan.ActionChange,
+				Summary: "install proto-pinned runtimes from .prototools",
+				Command: "proto use",
+			})
+		}
+	}
 
 	p.Seal()
 	return p, nil
