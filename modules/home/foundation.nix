@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }: {
+{ config, pkgs, lib, ... }: {
   # Foundation — the "air" the environment breathes. These three tools
   # (Atuin, Zoxide, Starship) are mandatory infrastructure for every
   # persona, regardless of which shell / terminal / multiplexer the user
@@ -46,22 +46,47 @@
   programs.starship.enable = true;
   xdg.configFile."starship.toml".source = ./assets/starship.toml;
 
-  # direnv + fzf live here because they're persona-agnostic baseline
-  # ergonomics, the same way the previous home.nix kept them at the top.
-  home.packages = with pkgs; [ direnv fzf ];
+  # direnv + fzf + proto live here because they're persona-agnostic
+  # baseline ergonomics. Proto is the runtime version manager: per
+  # ADR-0008 it owns Go/Bun/Node/Rust/etc., and AGENTS.md commits to
+  # "Proto's shims are first in $PATH" — that contract requires proto
+  # the binary AND its shim directories on every shell's PATH,
+  # regardless of which persona shell the user picked.
+  home.packages = with pkgs; [ direnv fzf proto ];
+
+  # Proto installs tools to ~/.proto/installs/<tool>/<version>/ and
+  # exposes them via shims at ~/.proto/shims/<tool>. The .proto/bin
+  # directory holds proto's own self-managed binaries. Both must be
+  # ahead of system PATH so a workspace's `.prototools` pin wins
+  # against any system-installed Go/Node/etc.
+  home.sessionPath = [
+    "${config.home.homeDirectory}/.proto/shims"
+    "${config.home.homeDirectory}/.proto/bin"
+  ];
+
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
   };
 
-  # Bash always available as a fallback non-interactive shell, even when
-  # the user's interactive persona is fish/zsh/nushell.
+  # Bash and Zsh always available — non-interactive fallback (bash)
+  # and the macOS default login shell (zsh). HM-managing both means
+  # session-vars (PATH including .proto/shims) and the direnv hook
+  # reach the actual shell the user runs, regardless of which persona
+  # shell `dots install` captured. Persona-specific opinions
+  # (Powerlevel10k, fish abbreviations, etc.) layer on top in
+  # modules/home/shells/<persona>.nix when that persona is selected.
   programs.bash = {
     enable = true;
     initExtra = ''
       command -v starship >/dev/null && eval "$(starship init bash)"
       command -v direnv   >/dev/null && eval "$(direnv hook bash)"
     '';
+    shellAliases.nix = "nom";
+  };
+
+  programs.zsh = {
+    enable = true;
     shellAliases.nix = "nom";
   };
 }
