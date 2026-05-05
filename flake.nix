@@ -189,15 +189,21 @@
                     pkgsPins.edge = nixpkgs-edge.legacyPackages.${system};
                   };
                 }).config;
-                ok = evaluated.xdg.configFile ? "fish";
+                # The fish module symlinks per-subtree rather than the
+                # whole fish directory (HM owns config.fish), so we
+                # assert that at least conf.d and functions are wired.
+                # Either missing means the user's curated tree won't
+                # reach ~/.config/fish/.
+                ok = evaluated.xdg.configFile ? "fish/conf.d"
+                  && evaluated.xdg.configFile ? "fish/functions";
               in
               pkgs.runCommand "fish-config-wired" { } (
                 if ok then ''
-                  echo "ok: modules/home/shells/fish.nix declares xdg.configFile.\"fish\"" > $out
+                  echo "ok: modules/home/shells/fish.nix wires fish/conf.d + fish/functions" > $out
                 '' else ''
-                  echo "modules/home/shells/fish.nix is missing xdg.configFile.\"fish\"" >&2
-                  echo "  why: without it, config/fish/ is never linked into ~/.config/fish/" >&2
-                  echo "  fix: add an xdg.configFile.\"fish\".source = mkOutOfStoreSymlink entry" >&2
+                  echo "modules/home/shells/fish.nix is missing xdg.configFile entries for fish subtrees" >&2
+                  echo "  why: without them, config/fish/ is never linked into ~/.config/fish/" >&2
+                  echo "  fix: declare xdg.configFile.\"fish/conf.d\" and \"fish/functions\" via mkOutOfStoreSymlink" >&2
                   exit 1
                 ''
               );

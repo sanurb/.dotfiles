@@ -3,6 +3,8 @@
     enable = true;
     interactiveShellInit = ''
       set -g fish_greeting ""
+      set -gx EDITOR 'nvim'
+      set -gx MANPAGER 'nvim +Man!'
     '';
     shellAbbrs = {
       g = "git";
@@ -22,17 +24,27 @@
   programs.starship.enableFishIntegration = true;
 
   # Live-editable seam — same pattern as modules/home/editor.nix.
-  # Pointing ~/.config/fish at the in-repo tree means edits to
-  # conf.d/aliases.fish, functions/<f>.fish, etc. take effect on the
-  # next shell launch without re-running `dots apply`. fish itself
-  # autoloads from this directory at every startup, so the live-edit
-  # ergonomics fall out for free.
+  # We symlink each top-level subtree of config/fish/ separately
+  # rather than the entire ~/.config/fish directory because
+  # programs.fish.enable = true makes HM author
+  # ~/.config/fish/config.fish itself (rendered from
+  # interactiveShellInit + shellAbbrs + shellAliases above), and a
+  # dir-level mkOutOfStoreSymlink would collide with that file. Per-
+  # subtree symlinks let HM own config.fish while edits to the
+  # imported tree (conf.d entries, custom functions, completions,
+  # fisher's plugin file) take effect on the next shell launch
+  # without re-running `dots apply`.
   #
-  # mkOutOfStoreSymlink keeps the target out of the Nix store; when
-  # workspaceRoot is empty (HM run outside `dots apply`) we skip the
-  # link rather than create a dangling pointer to "/config/fish".
-  xdg.configFile."fish" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/fish";
+  # When workspaceRoot is empty (HM run outside `dots apply`) we skip
+  # the link rather than create dangling pointers.
+  xdg.configFile = lib.mkIf (workspaceRoot != "") {
+    "fish/conf.d".source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/fish/conf.d";
+    "fish/functions".source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/fish/functions";
+    "fish/completions".source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/fish/completions";
+    "fish/fish_plugins".source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/fish/fish_plugins";
   };
 }
