@@ -29,9 +29,9 @@ const (
 	stepWelcome stepID = iota
 	stepShell
 	stepTerminal
+	stepFont
 	stepMultiplexer
 	stepEditor
-	stepGit
 	stepConfirm
 	stepScanning
 	stepConflict
@@ -43,8 +43,9 @@ const (
 )
 
 // stepperLabels are the six labels shown in the top stepper during the
-// install flow (post-welcome, pre-scan).
-var stepperLabels = []string{"Shell", "Terminal", "Multiplexer", "Editor", "Git", "Confirm"}
+// install flow (post-welcome, pre-scan). Order mirrors the iota block
+// above; stepperIndex relies on that contiguous layout.
+var stepperLabels = []string{"Shell", "Terminal", "Font", "Multiplexer", "Editor", "Confirm"}
 
 // Model is the wizard's bubbletea model. m.state is the single source
 // of truth for the persona — pillar selections write through it
@@ -150,8 +151,8 @@ func (m Model) View() string {
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.step {
-	case stepWelcome, stepShell, stepTerminal, stepMultiplexer,
-		stepEditor, stepGit, stepConfirm, stepConflict, stepRealizePrompt:
+	case stepWelcome, stepShell, stepTerminal, stepFont, stepMultiplexer,
+		stepEditor, stepConfirm, stepConflict, stepRealizePrompt:
 		return m.handleSelectKey(msg)
 
 	case stepDone, stepFailed, stepAborted:
@@ -201,6 +202,10 @@ var selectionSteps = map[stepID]selectionStep{
 	},
 	stepTerminal: {
 		apply: func(s *state.State, c int) { s.Pillars.Terminal = TerminalOptions[c].Value },
+		next:  stepFont,
+	},
+	stepFont: {
+		apply: func(s *state.State, c int) { s.Capabilities.Font = c == 0 },
 		next:  stepMultiplexer,
 	},
 	stepMultiplexer: {
@@ -209,10 +214,6 @@ var selectionSteps = map[stepID]selectionStep{
 	},
 	stepEditor: {
 		apply: func(s *state.State, c int) { s.Capabilities.Editor = c == 0 },
-		next:  stepGit,
-	},
-	stepGit: {
-		apply: func(s *state.State, c int) { s.Capabilities.Git = c == 0 },
 		next:  stepConfirm,
 	},
 }
@@ -258,10 +259,10 @@ func (m Model) commitOrAbort(action func() (tea.Model, tea.Cmd)) (tea.Model, tea
 // is a forward-only consent gate.
 var previousStep = map[stepID]stepID{
 	stepTerminal:    stepShell,
-	stepMultiplexer: stepTerminal,
+	stepFont:        stepTerminal,
+	stepMultiplexer: stepFont,
 	stepEditor:      stepMultiplexer,
-	stepGit:         stepEditor,
-	stepConfirm:     stepGit,
+	stepConfirm:     stepEditor,
 }
 
 func (m Model) back() (tea.Model, tea.Cmd) {
@@ -287,9 +288,9 @@ func (m Model) transition(s stepID) Model {
 var cursorSeeders = map[stepID]func(Model) int{
 	stepShell:       func(m Model) int { return indexOf(ShellOptions, m.state.Pillars.Shell) },
 	stepTerminal:    func(m Model) int { return indexOf(TerminalOptions, m.state.Pillars.Terminal) },
+	stepFont:        func(m Model) int { return boolToCursor(m.state.Capabilities.Font) },
 	stepMultiplexer: func(m Model) int { return indexOf(MultiplexerOptions, m.state.Pillars.Multiplexer) },
 	stepEditor:      func(m Model) int { return boolToCursor(m.state.Capabilities.Editor) },
-	stepGit:         func(m Model) int { return boolToCursor(m.state.Capabilities.Git) },
 }
 
 func (m Model) initialCursor(s stepID) int {
@@ -407,11 +408,11 @@ func (m Model) personaLine() string {
 
 func (m Model) extrasLine() string {
 	var picks []string
+	if m.state.Capabilities.Font {
+		picks = append(picks, "font")
+	}
 	if m.state.Capabilities.Editor {
 		picks = append(picks, "editor")
-	}
-	if m.state.Capabilities.Git {
-		picks = append(picks, "git")
 	}
 	if len(picks) == 0 {
 		return "(none)"

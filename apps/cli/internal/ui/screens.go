@@ -16,9 +16,9 @@ var layoutBuilders = map[stepID]func(Model) screen.Layout{
 	stepWelcome:       Model.welcomeLayout,
 	stepShell:         Model.pillarLayout,
 	stepTerminal:      Model.pillarLayout,
+	stepFont:          Model.pillarLayout,
 	stepMultiplexer:   Model.pillarLayout,
 	stepEditor:        Model.pillarLayout,
-	stepGit:           Model.pillarLayout,
 	stepConfirm:       Model.confirmLayout,
 	stepConflict:      Model.conflictLayout,
 	stepScanning:      Model.scanningLayout,
@@ -44,9 +44,9 @@ var stepOptions = map[stepID]func(Model) []wizardOption{
 	stepWelcome:       func(m Model) []wizardOption { return welcomeOptions(m.mode) },
 	stepShell:         func(Model) []wizardOption { return asWizardOptions(ShellOptions) },
 	stepTerminal:      func(Model) []wizardOption { return asWizardOptions(TerminalOptions) },
+	stepFont:          func(Model) []wizardOption { return fontOptions() },
 	stepMultiplexer:   func(Model) []wizardOption { return asWizardOptions(MultiplexerOptions) },
 	stepEditor:        func(Model) []wizardOption { return editorOptions() },
-	stepGit:           func(Model) []wizardOption { return gitOptions() },
 	stepConfirm:       func(m Model) []wizardOption { return confirmOptions(m.mode) },
 	stepConflict:      func(Model) []wizardOption { return conflictOptions() },
 	stepRealizePrompt: func(Model) []wizardOption { return realizePromptOptions() },
@@ -104,9 +104,9 @@ func stepperIndex(s stepID) int {
 var pillarTexts = map[stepID]struct{ title, desc string }{
 	stepShell:       {"Shell", "One shell defines the persona. Atuin, zoxide, and starship are baked in regardless."},
 	stepTerminal:    {"Terminal Emulator", "Pick the terminal app to configure."},
+	stepFont:        {"Font", "Iosevka Term Nerd Font (required for icons)."},
 	stepMultiplexer: {"Multiplexer", "Pick one, or 'None' to skip."},
 	stepEditor:      {"Neovim", "Includes LSP, TreeSitter, and the dots Neovim config."},
-	stepGit:         {"Git defaults", "Global git config (identity stays external)."},
 }
 
 func pillarCopy(s stepID) (title, desc string) {
@@ -292,10 +292,10 @@ func editorOptions() []wizardOption {
 	}
 }
 
-func gitOptions() []wizardOption {
+func fontOptions() []wizardOption {
 	return []wizardOption{
-		{Label: "Yes, apply git defaults"},
-		{Label: "No, leave git untouched"},
+		{Label: "Yes, install Iosevka Term Nerd Font"},
+		{Label: "No, I already have it"},
 	}
 }
 
@@ -331,11 +331,11 @@ func realizePromptOptions() []wizardOption {
 // they made on stepEditor, where the label was "Neovim".
 func confirmCapabilities(c state.Capabilities) string {
 	var picks []string
+	if c.Font {
+		picks = append(picks, "font")
+	}
 	if c.Editor {
 		picks = append(picks, "neovim")
-	}
-	if c.Git {
-		picks = append(picks, "git")
 	}
 	if len(picks) == 0 {
 		return "(none)"

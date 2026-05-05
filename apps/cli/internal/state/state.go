@@ -64,6 +64,7 @@ func (p Pillars) Format() string {
 type Capabilities struct {
 	Editor bool
 	Git    bool
+	Font   bool
 }
 
 // Allowed values per pillar — the TUI offers exactly these and the doctor
@@ -81,7 +82,7 @@ func Default() State {
 	return State{
 		SchemaVersion: SchemaVersion,
 		Pillars:       Pillars{Shell: "fish", Terminal: "ghostty", Multiplexer: "zellij"},
-		Capabilities:  Capabilities{Editor: true, Git: true},
+		Capabilities:  Capabilities{Editor: true, Git: true, Font: true},
 	}
 }
 
@@ -161,6 +162,7 @@ func (s State) Validate() error {
 //	[capabilities]
 //	editor = true
 //	git    = true
+//	font   = true
 //
 // Anything outside this shape is ignored — we never want a typo'd key to
 // surface as a parser error and block a deploy. Validate() catches the
@@ -218,6 +220,8 @@ func parse(r io.Reader) (State, error) {
 				out.Capabilities.Editor = b
 			case "git":
 				out.Capabilities.Git = b
+			case "font":
+				out.Capabilities.Font = b
 			}
 		}
 	}
@@ -241,11 +245,12 @@ multiplexer = %q
 [capabilities]
 editor = %v
 git    = %v
+font   = %v
 `
 	_, err := fmt.Fprintf(w, tmpl,
 		s.SchemaVersion,
 		s.Pillars.Shell, s.Pillars.Terminal, s.Pillars.Multiplexer,
-		s.Capabilities.Editor, s.Capabilities.Git)
+		s.Capabilities.Editor, s.Capabilities.Git, s.Capabilities.Font)
 	return err
 }
 

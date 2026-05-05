@@ -25,6 +25,7 @@ type statusProfileJSON struct {
 	Multiplexer string `json:"multiplexer"`
 	Editor      bool   `json:"editor"`
 	Git         bool   `json:"git"`
+	Font        bool   `json:"font"`
 }
 
 // statusLastApplyJSON is the JSON projection of applied.State. Times
@@ -146,6 +147,7 @@ func runStatus(rest []string) int {
 			Multiplexer: s.Pillars.Multiplexer,
 			Editor:      s.Capabilities.Editor,
 			Git:         s.Capabilities.Git,
+			Font:        s.Capabilities.Font,
 		}
 	}
 
@@ -235,7 +237,7 @@ func renderStatusHuman(
 	case profile == nil:
 		fmt.Printf(labelWidth, "profile", "(no .dots-state.toml — run `dots install`)")
 	default:
-		caps := capabilitiesSummary(profile.Editor, profile.Git)
+		caps := capabilitiesSummary(profile.Editor, profile.Git, profile.Font)
 		line := fmt.Sprintf("%s · %s · %s%s",
 			profile.Shell, profile.Terminal, profile.Multiplexer, caps)
 		fmt.Printf(labelWidth, "profile", line)
@@ -283,10 +285,14 @@ func driftLine(kind driftKind, last *statusLastApplyJSON, freshHash string) stri
 
 // capabilitiesSummary renders an inline parenthetical describing which
 // capability flags are on — the human row reads as
-// "fish · ghostty · zellij  (editor, git)" when both are true. An empty
-// string is returned when nothing is enabled, so the line stays clean.
-func capabilitiesSummary(editor, git bool) string {
+// "fish · ghostty · zellij  (font, editor, git)" when all are true. An
+// empty string is returned when nothing is enabled, so the line stays
+// clean.
+func capabilitiesSummary(editor, git, font bool) string {
 	var parts []string
+	if font {
+		parts = append(parts, "font")
+	}
 	if editor {
 		parts = append(parts, "editor")
 	}

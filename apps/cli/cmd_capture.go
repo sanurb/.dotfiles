@@ -26,6 +26,7 @@ type captureProfile struct {
 	Multiplexer string `json:"multiplexer"`
 	Editor      bool   `json:"editor"`
 	Git         bool   `json:"git"`
+	Font        bool   `json:"font"`
 }
 
 // captureDoc is the full envelope serialized to the user. profile is a
@@ -99,6 +100,7 @@ func buildCaptureDoc() captureDoc {
 			Multiplexer: s.Pillars.Multiplexer,
 			Editor:      s.Capabilities.Editor,
 			Git:         s.Capabilities.Git,
+			Font:        s.Capabilities.Font,
 		}
 		// Trust the state file's schema version when present so a
 		// captured doc round-trips faithfully through `dots install`
@@ -169,6 +171,7 @@ func renderCaptureTOML(doc captureDoc) []byte {
 		fmt.Fprintln(&buf, "[capabilities]")
 		fmt.Fprintf(&buf, "editor = %v\n", doc.Profile.Editor)
 		fmt.Fprintf(&buf, "git    = %v\n", doc.Profile.Git)
+		fmt.Fprintf(&buf, "font   = %v\n", doc.Profile.Font)
 	}
 	return buf.Bytes()
 }

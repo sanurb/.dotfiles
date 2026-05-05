@@ -4,7 +4,7 @@ import "fmt"
 
 // stateOverrides lets a test specify just the fields it cares about.
 // Defaults match a realistic dev profile (fish + ghostty + zellij with
-// editor + git enabled), per the data-factory rule's "meaningful
+// editor + git + font enabled), per the data-factory rule's "meaningful
 // domain data, not dummy values".
 type stateOverrides struct {
 	Shell       string
@@ -12,6 +12,7 @@ type stateOverrides struct {
 	Multiplexer string
 	Editor      *bool
 	Git         *bool
+	Font        *bool
 }
 
 // buildStateTOML returns the contents of a `.dots-state.toml` ready
@@ -24,6 +25,7 @@ func buildStateTOML(o stateOverrides) string {
 	multiplexer := nonEmpty(o.Multiplexer, "zellij")
 	editor := boolOr(o.Editor, true)
 	git := boolOr(o.Git, true)
+	font := boolOr(o.Font, true)
 	return fmt.Sprintf(`schema_version = 1
 
 [pillars]
@@ -34,7 +36,8 @@ multiplexer = %q
 [capabilities]
 editor = %v
 git    = %v
-`, shell, terminal, multiplexer, editor, git)
+font   = %v
+`, shell, terminal, multiplexer, editor, git, font)
 }
 
 // nixStubBody is the body of a no-op nix stub. Sole purpose: make
