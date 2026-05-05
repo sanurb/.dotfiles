@@ -104,7 +104,7 @@ func stepperIndex(s stepID) int {
 var pillarTexts = map[stepID]struct{ title, desc string }{
 	stepShell:       {"Shell", "One shell defines the persona. Atuin, zoxide, and starship are baked in regardless."},
 	stepTerminal:    {"Terminal Emulator", "Pick the terminal app to configure."},
-	stepFont:        {"Font", "Iosevka Term Nerd Font (required for icons)."},
+	stepFont:        {"Font", "Iosevka Nerd Font (required for icons)."},
 	stepMultiplexer: {"Multiplexer", "Pick one, or 'None' to skip."},
 	stepEditor:      {"Neovim", "Includes LSP, TreeSitter, and the dots Neovim config."},
 }
@@ -294,7 +294,7 @@ func editorOptions() []wizardOption {
 
 func fontOptions() []wizardOption {
 	return []wizardOption{
-		{Label: "Yes, install Iosevka Term Nerd Font"},
+		{Label: "Yes, install Iosevka Nerd Font"},
 		{Label: "No, I already have it"},
 	}
 }

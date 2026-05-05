@@ -78,14 +78,14 @@ func TestFontStepCopy(t *testing.T) {
 	if got.title != "Font" {
 		t.Fatalf("stepFont title = %q, want %q", got.title, "Font")
 	}
-	if got.desc != "Iosevka Term Nerd Font (required for icons)." {
-		t.Fatalf("stepFont desc = %q, want %q", got.desc, "Iosevka Term Nerd Font (required for icons).")
+	if got.desc != "Iosevka Nerd Font (required for icons)." {
+		t.Fatalf("stepFont desc = %q, want %q", got.desc, "Iosevka Nerd Font (required for icons).")
 	}
 	opts := fontOptions()
 	if len(opts) != 2 {
 		t.Fatalf("fontOptions: %d rows, want 2", len(opts))
 	}
-	if opts[0].Label != "Yes, install Iosevka Term Nerd Font" {
+	if opts[0].Label != "Yes, install Iosevka Nerd Font" {
 		t.Fatalf("fontOptions[0].Label = %q", opts[0].Label)
 	}
 	if opts[1].Label != "No, I already have it" {
