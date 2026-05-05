@@ -54,14 +54,28 @@
   # regardless of which persona shell the user picked.
   home.packages = with pkgs; [ direnv fzf proto ];
 
-  # Proto installs tools to ~/.proto/installs/<tool>/<version>/ and
-  # exposes them via shims at ~/.proto/shims/<tool>. The .proto/bin
-  # directory holds proto's own self-managed binaries. Both must be
-  # ahead of system PATH so a workspace's `.prototools` pin wins
-  # against any system-installed Go/Node/etc.
+  # Source of truth for $PATH additions. home.sessionPath writes
+  # into ~/.config/hm-session-vars.{sh,fish}, sourced by every HM-
+  # managed shell (bash/zsh via /etc/profile-style hookup; fish via
+  # conf.d/hm-session-vars.fish). Any shell-rc-level PATH manipulation
+  # MUST read from here — duplicating dirs in ~/.zshrc, conf.d/path.fish,
+  # etc. is a maintenance trap that causes subtle ordering bugs.
+  #
+  # Proto (~/.proto/{shims,bin}) leads so a workspace's .prototools
+  # pin wins against any system-installed Go/Node/etc. The user-level
+  # package-manager directories follow because their binaries (pipx,
+  # cargo install, go install, bun add -g, deno install) live outside
+  # Nix and need to be reachable without the user editing ~/.zshrc by
+  # hand — a workaround that fails silently when HM owns the shellrc
+  # symlink.
   home.sessionPath = [
     "${config.home.homeDirectory}/.proto/shims"
     "${config.home.homeDirectory}/.proto/bin"
+    "${config.home.homeDirectory}/.local/bin" # pipx, pip --user, generic
+    "${config.home.homeDirectory}/.cargo/bin" # rustup, cargo install
+    "${config.home.homeDirectory}/go/bin" # go install
+    "${config.home.homeDirectory}/.bun/bin" # bun
+    "${config.home.homeDirectory}/.deno/bin" # deno
   ];
 
   programs.direnv = {
