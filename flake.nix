@@ -1,6 +1,30 @@
 {
   description = "dots";
 
+  # Public binary caches advertised to anyone who evaluates this flake.
+  # `dots apply` already runs nh with `--accept-flake-config` (see
+  # apps/cli/cmd_apply.go's activationArgs), so the substituters and
+  # keys below are picked up automatically without prompting. A user
+  # invoking the flake directly (`nix develop`, `nix build .#...`)
+  # will see the standard "do you want to allow these?" prompt unless
+  # they have `accept-flake-config = true` in nix.conf.
+  #
+  #   nix-community: hosts the bulk of nix-community packages
+  #     (home-manager activations, neovim wrappers, etc.) — major
+  #     hit-rate win on first activation of a fresh host.
+  #   colmena: deployment tooling cache; pulled in transitively via
+  #     some home-manager modules.
+  nixConfig = {
+    extra-substituters = [
+      "https://nix-community.cachix.org"
+      "https://colmena.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "colmena.cachix.org-1:7BzpDnjjH8ki2CT3f6GdOk7QAzPOl+1t3LvTLXqYcSg="
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
