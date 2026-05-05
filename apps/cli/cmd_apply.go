@@ -17,6 +17,7 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/loginshell"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/nix"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/preflight"
@@ -172,6 +173,16 @@ func runApply(rest []string) int {
 			}
 			if code := runHomeActivation(p.Profile, env); code != exitcode.Success {
 				return code
+			}
+			// Wire the wizard's pillar shell selection onto the OS
+			// login shell. Without this, picking fish in `dots install`
+			// drops fish into ~/.nix-profile/bin but leaves /bin/zsh
+			// as the user's login shell — the symptom users describe
+			// as "fish was selected but did not end up installed."
+			// p.Profile is the pillar shell name (see
+			// readProfileFromState in plan_compute.go).
+			if _, err := loginshell.Apply(context.Background(), p.Profile, os.Stderr); err != nil {
+				fmt.Fprintln(os.Stderr, "login-shell:", err)
 			}
 
 		case plan.KindInstallRuntimes:
