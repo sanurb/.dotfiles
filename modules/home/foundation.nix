@@ -126,7 +126,7 @@
   # case), hyperfine (statistical command benchmarks). Persona-
   # agnostic, so they sit alongside direnv/fzf/proto rather than in
   # any per-shell module.
-  home.packages = with pkgs; [ direnv fzf proto bat fd sd hyperfine eza ];
+  home.packages = with pkgs; [ direnv fzf proto bat fd sd hyperfine eza just watchexec ];
 
   # Source of truth for $PATH additions. home.sessionPath writes
   # into ~/.config/hm-session-vars.{sh,fish}, sourced by every HM-
