@@ -93,7 +93,7 @@
   # for the single-pass-replace case), hyperfine (statistical command
   # benchmarks), eza (ls replacement). Persona-agnostic, so they sit
   # alongside direnv/fzf/proto rather than in any per-shell module.
-  home.packages = with pkgs; [ direnv fzf proto fd sd hyperfine eza just watchexec ];
+  home.packages = with pkgs; [ direnv fzf proto fd sd hyperfine eza just watchexec xh d2 ];
 
   # Source of truth for $PATH additions. home.sessionPath writes
   # into ~/.config/hm-session-vars.{sh,fish}, sourced by every HM-
