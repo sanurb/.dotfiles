@@ -1,46 +1,27 @@
-# Fish-import follow-ups
+# Fish follow-ups
 
-These came up while landing the dmmulroy fish import + wizard-fish wiring
-fixes; they're surfaced here rather than mixed into the same session.
+Loose ends from wiring up `config/fish/` and the wizard→login-shell
+fix. Surfaced here, not fixed inline.
 
-## 1. Pre-existing `homeModules.font` reference is broken
+## 1. Pre-existing `homeModules.font` reference
 
-`modules/profiles/home.nix` (uncommitted local WIP at the time of the
-fish import) imports `homeModules.font` and a corresponding `font`
-capability, but `modules/home/font.nix` is untracked. With a clean git
-working tree, the flake cannot evaluate (`nix build .#homeActivation`
-errors with "attribute 'font' missing"). Either commit `modules/home/font.nix`
-or revert the `home.nix` reference. **Not fixed in this session because
-it's WIP from a different feature branch.**
-
-Symptom (verbatim):
+`modules/profiles/home.nix` imports `homeModules.font` and a
+matching `font` capability. The `modules/home/font.nix` file did not
+yet exist when the fish work landed, so the flake could not evaluate
+on a clean working tree. Resolved separately when `font.nix` was
+committed; left here in case the same shape recurs:
 
 ```
 error: attribute 'font' missing
-       at modules/profiles/home.nix:71:
+       at modules/profiles/home.nix:
         ++ lib.optional (caps.font or true) homeModules.font;
                                             ^
 ```
 
-## 2. fish module overrides whole `~/.config/fish` directory
+The lesson: any new pillar/capability under `caps.<name>` must land
+the matching `modules/home/<name>.nix` in the same commit.
 
-`modules/home/shells/fish.nix` now sets
-`xdg.configFile."fish".source = mkOutOfStoreSymlink ".../config/fish"`.
-That replaces the entire HM-managed fish config directory, including
-the auto-generated `conf.d/hm-session-vars.fish` that bridges
-`home.sessionPath` into fish's $PATH.
-
-Mitigation already in place: `config/fish/conf.d/path.fish` mirrors the
-`home.sessionPath` list and adds the missing dirs at fish startup.
-
-Drawback: `programs.fish.shellAbbrs` and `programs.fish.shellAliases`
-declared in `fish.nix` are silently dropped because HM's generated
-`config.fish` is shadowed by the symlink. The current abbrs (`g`, `ll`,
-`lt`) and the `nix=nom` alias need to be migrated into
-`config/fish/conf.d/` if they are still wanted. **Not fixed here**: the
-import session was scoped to the dmmulroy tree + wiring fixes.
-
-## 3. Adding fish to `/etc/shells` requires sudo
+## 2. Adding fish to `/etc/shells` requires sudo
 
 `internal/loginshell` skips with `SkipNotInEtcShells` when fish is
 installed but not registered in `/etc/shells`. The user-facing hint
