@@ -23,6 +23,22 @@
 
   programs.zoxide.enable = true;
 
+  # nix-index — pre-built database from nix-community/nix-index-database
+  # (input wired in flake.nix). Together with the comma helper enabled
+  # below, an unknown command (e.g., `cowsay foo`) prints the matching
+  # nix-run / `, cowsay foo` suggestion instead of "command not found".
+  # No live `nix-index` build runs at activation; the input ships the
+  # database pre-built for the channel.
+  #
+  # Per-shell command-not-found hooks (enable{Bash,Fish,Nushell,Zsh}-
+  # Integration) default to true on this module, but the explicit
+  # toggles live in modules/home/shells/{fish,zsh,nushell}.nix beside
+  # the matching atuin/zoxide flips — same boundary. Bash has no
+  # per-shell module; its hook is implicit via the default. See
+  # docs/notes/nix-index-followups.md.
+  programs.nix-index.enable = true;
+  programs.nix-index-database.comma.enable = true;
+
   # ripgrep — declarative config via home-manager's `arguments` list.
   # Flags here are baked into a generated ripgreprc and exposed via
   # RIPGREP_CONFIG_PATH, so every shell sees the same defaults whether

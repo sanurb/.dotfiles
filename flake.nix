@@ -60,9 +60,18 @@
 
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Pre-built nix-index database from nix-community. Wired into the
+    # HM module list below so `programs.nix-index.enable = true` (in
+    # foundation.nix) reads its index from the input rather than
+    # building one at activation time. nixpkgs.follows keeps the
+    # closure honest — we don't want a second nixpkgs evaluation just
+    # for the database build.
+    nix-index-database.url = "github:nix-community/nix-index-database";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-edge, flake-parts, devenv, home-manager, ... }:
+  outputs = inputs@{ self, nixpkgs, nixpkgs-edge, flake-parts, devenv, home-manager, nix-index-database, ... }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
 
@@ -76,7 +85,10 @@
         let pkgs = nixpkgs.legacyPackages.${system};
         in home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
-          modules = [ ./modules/profiles/home.nix ];
+          modules = [
+            ./modules/profiles/home.nix
+            nix-index-database.homeModules.nix-index
+          ];
           extraSpecialArgs = {
             inherit inputs system;
             # Modules pull from `pkgsPins.<name>` when they need a different
@@ -157,8 +169,14 @@
           # foundation (starship). Anything pillar-conditional that
           # *isn't* a default (e.g., wezterm, nushell) needs its own
           # minimal HM eval so the module is loaded regardless of pillar
-          # selection.
-          profileModules = [ ./modules/profiles/home.nix ];
+          # selection. The nix-index-database HM module rides alongside
+          # the profile because foundation.nix references its options
+          # (programs.nix-index.*) — the synthetic eval would otherwise
+          # report them as unknown.
+          profileModules = [
+            ./modules/profiles/home.nix
+            nix-index-database.homeModules.nix-index
+          ];
           soloModule = path: [
             path
             {
