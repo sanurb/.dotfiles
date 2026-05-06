@@ -67,7 +67,16 @@ in
     # Git is mandatory infrastructure (identity is sourced externally per
     # modules/home/git.nix); the wizard never asks about it. Editor and
     # font remain user-toggleable capabilities.
-    [ homeModules.foundation homeModules.git shellModule terminalModule ]
+    [
+      homeModules.foundation
+      homeModules.git
+      homeModules.delta
+      homeModules.gh
+      homeModules.bat
+      homeModules.opencode
+      shellModule
+      terminalModule
+    ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
     ++ lib.optional (caps.editor or true) homeModules.editor
     ++ lib.optional (caps.font   or true) homeModules.font;

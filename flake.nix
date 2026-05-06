@@ -294,6 +294,13 @@
               fixHint = "modules/home/editor.nix must declare xdg.configFile.\"nvim\" via mkOutOfStoreSymlink";
             };
 
+            opencode-config-wired = mkConfigWiredCheck {
+              name = "opencode-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "opencode" ];
+              fixHint = "modules/home/opencode.nix must declare xdg.configFile.\"opencode\" via mkOutOfStoreSymlink";
+            };
+
             # Wezterm and nushell are pillar-conditional and not the
             # defaults (terminal=ghostty, shell=fish), so the profile-
             # level synthetic doesn't import them. Each gets its own
