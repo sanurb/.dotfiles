@@ -1,20 +1,18 @@
 { config, pkgs, lib, workspaceRoot, ... }: {
   programs.fish = {
     enable = true;
+    # EDITOR / MANPAGER live in modules/home/editor.nix via
+    # home.sessionVariables, which fish picks up through
+    # ~/.config/hm-session-vars.fish. nix=nom lives in foundation.nix
+    # via home.shellAliases. Only fish-specific behavior stays here.
     interactiveShellInit = ''
       set -g fish_greeting ""
-      set -gx EDITOR 'nvim'
-      set -gx MANPAGER 'nvim +Man!'
     '';
     shellAbbrs = {
       g = "git";
       ll = "eza -la";
       lt = "eza --tree";
     };
-    # Route nix through nom (nix-output-monitor). nom is a transparent
-    # drop-in: it forwards any subcommand to nix and renders a live
-    # build graph for the build/develop/shell/run paths.
-    shellAliases.nix = "nom";
   };
 
   # Foundation integrations — atuin/zoxide/starship are all enabled in

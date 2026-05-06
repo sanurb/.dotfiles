@@ -27,9 +27,8 @@
       fi
       [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
     '';
-
-    shellAliases.nix = "nom";
   };
+  # nix=nom lives in foundation.nix via home.shellAliases.
 
   programs.atuin.enableZshIntegration = true;
   programs.zoxide.enableZshIntegration = true;

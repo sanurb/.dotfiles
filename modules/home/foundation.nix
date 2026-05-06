@@ -171,11 +171,14 @@
       command -v starship >/dev/null && eval "$(starship init bash)"
       command -v direnv   >/dev/null && eval "$(direnv hook bash)"
     '';
-    shellAliases.nix = "nom";
   };
 
-  programs.zsh = {
-    enable = true;
-    shellAliases.nix = "nom";
-  };
+  programs.zsh.enable = true;
+
+  # Route `nix` through nom (nix-output-monitor). Declared once in
+  # home.shellAliases — HM propagates it to bash, zsh, fish, and
+  # nushell automatically, so per-shell modules don't need to repeat
+  # it. nom is a transparent drop-in: forwards every subcommand to
+  # nix and renders a live build graph for build/develop/shell/run.
+  home.shellAliases.nix = "nom";
 }

@@ -52,10 +52,16 @@
     stylua
   ];
 
-  # Default editor — what `programs.neovim.defaultEditor = true` used
-  # to wire. Set explicitly here so $EDITOR resolves to nvim in every
-  # HM-managed shell session (git, less, sudoedit, etc. all read it).
-  home.sessionVariables.EDITOR = "nvim";
+  # Default editor + man-page reader — what `programs.neovim.defaultEditor
+  # = true` used to wire (only EDITOR; MANPAGER is added explicitly).
+  # home.sessionVariables writes ~/.config/hm-session-vars.{sh,fish}
+  # which every HM-managed shell sources, so $EDITOR / $MANPAGER
+  # resolve to nvim in git, less, sudoedit, man, etc. without
+  # duplicating the binding in each shell's interactiveShellInit.
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    MANPAGER = "nvim +Man!";
+  };
 
   # vi / vim aliases — replaces `programs.neovim.{viAlias,vimAlias}`.
   # home.shellAliases propagates to every enabled shell module

@@ -8,8 +8,10 @@
     # configFile.text would force a full home-manager rebuild for every
     # tweak; the live-edit symlink avoids that.
 
+    # nix=nom lives in foundation.nix via home.shellAliases (HM
+    # propagates it to nushell). Only nushell-specific shell-level
+    # rebindings stay here.
     shellAliases = {
-      nix = "nom";
       g = "git";
       ll = "eza -la";
     };
