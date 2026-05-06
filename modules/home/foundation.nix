@@ -75,6 +75,45 @@
     };
   };
 
+  # bottom — persona-agnostic system monitor, pure TUI. Defaults tuned
+  # for triage rather than glanceable graphs: mem_as_value surfaces
+  # absolute MB/GB (a "73%" reading on a 64 GB machine tells you
+  # nothing; "23.4 GB" tells you the leak), group_processes collapses
+  # the N node/python/rust-analyzer workers a dev box spawns, and
+  # default_widget_type lands on the process table — what users
+  # actually open btm to see. Colors left to auto-detect so we respect
+  # the terminal palette instead of fighting it; override per-machine
+  # if the default clashes.
+  programs.bottom = {
+    enable = true;
+    settings = {
+      flags = {
+        rate = 1000;
+        mem_as_value = true;
+        group_processes = true;
+        tree = false;
+        temperature_type = "celsius";
+        time_delta = 15000;
+        default_widget_type = "proc";
+        hide_table_gap = true;
+      };
+
+      colors = { };
+
+      processes = {
+        columns = [
+          "PID"
+          "Name"
+          "CPU%"
+          "Mem%"
+          "R/s"
+          "W/s"
+          "State"
+        ];
+      };
+    };
+  };
+
   # direnv + fzf + proto live here because they're persona-agnostic
   # baseline ergonomics. Proto is the runtime version manager: per
   # ADR-0008 it owns Go/Bun/Node/Rust/etc., and AGENTS.md commits to
