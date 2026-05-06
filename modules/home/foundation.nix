@@ -46,6 +46,35 @@
   programs.starship.enable = true;
   xdg.configFile."starship.toml".source = ./assets/starship.toml;
 
+  # Jujutsu — Git-compatible VCS, persona-agnostic infrastructure like
+  # the rest of this cluster. No shell-hook story (pure CLI), config
+  # small enough that programs.jujutsu.settings beats a live-editable
+  # symlink. Identity intentionally omitted: jj falls back to
+  # ~/.config/git/config for user.name / user.email when its own values
+  # are unset, and `dots install` owns git identity — duplicating it
+  # here would drift the two. auto-local-bookmark is non-negotiable for
+  # the `jj git init --colocate` workflow that's the dominant deployment
+  # in 2026; without it, branches created in git don't show up as jj
+  # bookmarks. Pager pinned to ":builtin" because letting jj inherit
+  # $PAGER misrenders ANSI when bat is the system pager.
+  programs.jujutsu = {
+    enable = true;
+    settings = {
+      ui = {
+        default-command = "log";
+        pager = ":builtin";
+        diff.format = "git";
+      };
+      git.auto-local-bookmark = true;
+      revsets.log = "@ | ancestors(immutable_heads().., 2) | trunk()";
+      aliases = {
+        l = [ "log" ];
+        st = [ "status" ];
+        d = [ "diff" ];
+      };
+    };
+  };
+
   # direnv + fzf + proto live here because they're persona-agnostic
   # baseline ergonomics. Proto is the runtime version manager: per
   # ADR-0008 it owns Go/Bun/Node/Rust/etc., and AGENTS.md commits to
