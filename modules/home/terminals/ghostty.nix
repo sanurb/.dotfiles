@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }: {
+{ config, pkgs, lib, workspaceRoot, ... }: {
   # Ghostty — config managed as a plain text file so it remains portable
   # to a non-Nix host (just copy the file). The upstream `pkgs.ghostty`
   # is Linux-only as of nixpkgs 26.05 (Zig + macOS toolchain mismatch),
@@ -6,15 +6,17 @@
   # Homebrew Cask. This honors the dots promise that selecting a
   # terminal in the wizard installs it — even when the install happens
   # outside Nix on macOS.
-  xdg.configFile."ghostty/config".text = ''
-    theme = tokyonight
-    font-family = JetBrainsMono Nerd Font
-    font-size = 14
-    window-decoration = false
-    cursor-style = block
-    shell-integration = detect
-    confirm-close-surface = false
-  '';
+  #
+  # Live-editable seam — same pattern as modules/home/editor.nix and
+  # modules/home/multiplexers/tmux.nix. Editing config/ghostty/config
+  # in the repo is picked up the next time ghostty reloads its config;
+  # no `dots apply` round-trip required. When workspaceRoot is empty
+  # (HM run outside `dots apply`) we skip the link rather than emit a
+  # dangling pointer.
+  xdg.configFile."ghostty/config" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/ghostty/config";
+  };
 
   # Activation hook: ensure Ghostty.app exists on macOS. Idempotent —
   # checks both /Applications and ~/Applications before invoking brew.

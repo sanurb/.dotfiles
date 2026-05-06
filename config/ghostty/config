@@ -1,0 +1,7 @@
+theme = tokyonight
+font-family = JetBrainsMono Nerd Font
+font-size = 14
+window-decoration = false
+cursor-style = block
+shell-integration = detect
+confirm-close-surface = false

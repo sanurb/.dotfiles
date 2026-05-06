@@ -105,6 +105,72 @@
           devenvRootContent = builtins.readFile inputs.devenv-root.outPath;
           devenvRoot = nixpkgs.lib.removeSuffix "\n" devenvRootContent;
           haveDevenvRoot = devenvRoot != "";
+
+          # Doctor helpers: assert that a given set of xdg.configFile keys
+          # land in the resolved Home Manager config. Each live-edit surface
+          # (fish/ghostty/zellij/wezterm/nushell/starship) routes through
+          # mkOutOfStoreSymlink so edits to config/<tool>/ skip Nix eval; if
+          # a future refactor drops the xdg.configFile entry, the file would
+          # silently fall back to the slow `programs.<tool>.extraConfig`
+          # path. This gate fails the PR before that lands.
+          #
+          # `nix flake check` runs in pure mode where `getEnv
+          # "DOTS_WORKSPACE_ROOT"` returns "", which would collapse the
+          # `lib.mkIf (workspaceRoot != "")` gate inside each module and
+          # mask a missing entry. Forcing workspaceRoot to a synthetic
+          # value makes the body evaluate so the assertion is meaningful.
+          #
+          # mkSyntheticConfig is factored out of mkConfigWiredCheck so
+          # multiple checks against the same module set share one HM
+          # evaluation — `homeManagerConfiguration` is one of the most
+          # expensive nix-eval operations in the repo, and previously
+          # each profile-level check was paying the cost independently.
+          mkSyntheticConfig = modules: (home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+            modules = modules ++ [
+              { _module.args.workspaceRoot = nixpkgs.lib.mkForce "/synthetic/dots"; }
+            ];
+            extraSpecialArgs = {
+              inherit inputs system;
+              pkgsPins.edge = nixpkgs-edge.legacyPackages.${system};
+            };
+          }).config;
+
+          mkConfigWiredCheck = { name, evaluated, expectedKeys, fixHint }:
+            let
+              missing = builtins.filter
+                (k: !(evaluated.xdg.configFile ? "${k}"))
+                expectedKeys;
+            in
+            pkgs.runCommand name { } (
+              if missing == [ ] then ''
+                echo "ok: ${name} wires ${nixpkgs.lib.concatStringsSep " " expectedKeys}" > $out
+              '' else ''
+                echo "${name}: missing xdg.configFile keys: ${nixpkgs.lib.concatStringsSep " " missing}" >&2
+                echo "  why: without them, edits to the corresponding config/ dir never reach ~/.config/" >&2
+                echo "  fix: ${fixHint}" >&2
+                exit 1
+              ''
+            );
+
+          # The pillar-default profile imports fish/ghostty/zellij plus
+          # foundation (starship). Anything pillar-conditional that
+          # *isn't* a default (e.g., wezterm, nushell) needs its own
+          # minimal HM eval so the module is loaded regardless of pillar
+          # selection.
+          profileModules = [ ./modules/profiles/home.nix ];
+          soloModule = path: [
+            path
+            {
+              home.username = "synthetic";
+              home.homeDirectory = "/tmp/synthetic";
+              home.stateVersion = "26.05";
+            }
+          ];
+
+          # Shared evaluation for every check that asserts against the
+          # default-pillar profile. Computed once, queried four times.
+          profileEvaluated = mkSyntheticConfig profileModules;
         in
         {
           devShells.default =
@@ -180,57 +246,66 @@
             # they reach a user's `dots apply`.
             home-activation = (mkHome system).activationPackage;
 
-            # Persona-shell ↔ source-tree linkage. The wizard's "fish"
-            # selection has to land both as a binary (programs.fish.enable)
-            # and as a config-tree symlink (xdg.configFile."fish") — the
-            # latter is what makes the imported config/fish/ tree
-            # actually reach ~/.config/fish/ at activation time. A
-            # missing xdg.configFile."fish" entry is exactly the bug the
-            # user reported as "fish was selected but did not end up
-            # installed": the binary lands but their abbreviations,
-            # functions, and conf.d entries do not.
+            # Live-edit symlink wiring. Each tool that surfaces its
+            # config via mkOutOfStoreSymlink has to declare the matching
+            # xdg.configFile entry; without it, the binary lands but the
+            # imported config/<tool>/ tree never reaches ~/.config/.
+            # That regression was originally reported against fish ("fish
+            # was selected but did not end up installed" — abbreviations,
+            # functions, conf.d entries missing). The same vector exists
+            # for every live-edit surface we add; these gates fail a PR
+            # the moment a refactor drops one of the entries.
             #
-            # We assert the wiring by inspecting the resolved HM config
-            # (no rebuild — just a property of the eval result) for the
-            # presence of the "fish" key under config.xdg.configFile.
-            fish-config-wired =
-              let
-                # Build an HM config with a non-empty workspaceRoot so
-                # the lib.mkIf gate inside fish.nix actually evaluates
-                # its body. `nix flake check` runs in pure mode where
-                # builtins.getEnv "DOTS_WORKSPACE_ROOT" returns "" —
-                # without the override, the mkIf would collapse and
-                # the check would always pass whether or not fish.nix
-                # declares the entry.
-                evaluated = (home-manager.lib.homeManagerConfiguration {
-                  inherit pkgs;
-                  modules = [
-                    ./modules/profiles/home.nix
-                    { _module.args.workspaceRoot = pkgs.lib.mkForce "/synthetic/dots"; }
-                  ];
-                  extraSpecialArgs = {
-                    inherit inputs system;
-                    pkgsPins.edge = nixpkgs-edge.legacyPackages.${system};
-                  };
-                }).config;
-                # The fish module symlinks per-subtree rather than the
-                # whole fish directory (HM owns config.fish), so we
-                # assert that at least conf.d and functions are wired.
-                # Either missing means the user's curated tree won't
-                # reach ~/.config/fish/.
-                ok = evaluated.xdg.configFile ? "fish/conf.d"
-                  && evaluated.xdg.configFile ? "fish/functions";
-              in
-              pkgs.runCommand "fish-config-wired" { } (
-                if ok then ''
-                  echo "ok: modules/home/shells/fish.nix wires fish/conf.d + fish/functions" > $out
-                '' else ''
-                  echo "modules/home/shells/fish.nix is missing xdg.configFile entries for fish subtrees" >&2
-                  echo "  why: without them, config/fish/ is never linked into ~/.config/fish/" >&2
-                  echo "  fix: declare xdg.configFile.\"fish/conf.d\" and \"fish/functions\" via mkOutOfStoreSymlink" >&2
-                  exit 1
-                ''
-              );
+            # The fish module symlinks per-subtree (HM owns config.fish
+            # itself), so we assert conf.d + functions; the others use a
+            # single key per tool.
+            fish-config-wired = mkConfigWiredCheck {
+              name = "fish-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "fish/conf.d" "fish/functions" ];
+              fixHint = "modules/home/shells/fish.nix must declare xdg.configFile.\"fish/conf.d\" and \"fish/functions\" via mkOutOfStoreSymlink";
+            };
+
+            ghostty-config-wired = mkConfigWiredCheck {
+              name = "ghostty-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "ghostty/config" ];
+              fixHint = "modules/home/terminals/ghostty.nix must declare xdg.configFile.\"ghostty/config\" via mkOutOfStoreSymlink";
+            };
+
+            zellij-config-wired = mkConfigWiredCheck {
+              name = "zellij-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "zellij/config.kdl" ];
+              fixHint = "modules/home/multiplexers/zellij.nix must declare xdg.configFile.\"zellij/config.kdl\" via mkOutOfStoreSymlink";
+            };
+
+            starship-config-wired = mkConfigWiredCheck {
+              name = "starship-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "starship.toml" ];
+              fixHint = "modules/home/foundation.nix must declare xdg.configFile.\"starship.toml\" via mkOutOfStoreSymlink";
+            };
+
+            # Wezterm and nushell are pillar-conditional and not the
+            # defaults (terminal=ghostty, shell=fish), so the profile-
+            # level synthetic doesn't import them. Each gets its own
+            # minimal HM eval — same regression vector, different
+            # load path; can't share evaluations because each loads a
+            # different module.
+            wezterm-config-wired = mkConfigWiredCheck {
+              name = "wezterm-config-wired";
+              evaluated = mkSyntheticConfig (soloModule ./modules/home/terminals/wezterm.nix);
+              expectedKeys = [ "wezterm/wezterm.lua" ];
+              fixHint = "modules/home/terminals/wezterm.nix must declare xdg.configFile.\"wezterm/wezterm.lua\" via mkOutOfStoreSymlink";
+            };
+
+            nushell-config-wired = mkConfigWiredCheck {
+              name = "nushell-config-wired";
+              evaluated = mkSyntheticConfig (soloModule ./modules/home/shells/nushell.nix);
+              expectedKeys = [ "nushell/config.nu" ];
+              fixHint = "modules/home/shells/nushell.nix must declare xdg.configFile.\"nushell/config.nu\" via mkOutOfStoreSymlink";
+            };
           };
 
           formatter = pkgs.nixpkgs-fmt;

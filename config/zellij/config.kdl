@@ -1,0 +1,6 @@
+theme "tokyonight"
+default_layout "compact"
+pane_frames false
+copy_command "pbcopy"
+mouse_mode true
+scroll_buffer_size 50000

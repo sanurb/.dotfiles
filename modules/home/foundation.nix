@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }: {
+{ config, pkgs, lib, workspaceRoot, ... }: {
   # Foundation — the "air" the environment breathes. These three tools
   # (Atuin, Zoxide, Starship) are mandatory infrastructure for every
   # persona, regardless of which shell / terminal / multiplexer the user
@@ -37,14 +37,21 @@
     ];
   };
 
-  # Starship — config held as a TOML asset and projected as a read-only
-  # symlink into ~/.config/starship.toml. Editing the live file is a
-  # no-op; the only path to change is editing the asset and re-deploying.
+  # Starship — live-editable seam to config/starship/starship.toml,
+  # same pattern as modules/home/editor.nix and the per-shell modules.
+  # Editing the file in the repo is picked up by the next prompt render
+  # (starship reads its config on each draw); no `dots apply` round-trip.
+  # When workspaceRoot is empty (HM run outside `dots apply`) we skip
+  # the link rather than emit a dangling pointer — starship falls back
+  # to its built-in default prompt.
   # Note: when zsh is the chosen shell, modules/shells/zsh.nix sets
   # programs.starship.enableZshIntegration = false so Powerlevel10k owns
   # the prompt — starship still ships its config but doesn't bind.
   programs.starship.enable = true;
-  xdg.configFile."starship.toml".source = ./assets/starship.toml;
+  xdg.configFile."starship.toml" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/starship/starship.toml";
+  };
 
   # Jujutsu — Git-compatible VCS, persona-agnostic infrastructure like
   # the rest of this cluster. No shell-hook story (pure CLI), config
@@ -75,45 +82,6 @@
     };
   };
 
-  # bottom — persona-agnostic system monitor, pure TUI. Defaults tuned
-  # for triage rather than glanceable graphs: mem_as_value surfaces
-  # absolute MB/GB (a "73%" reading on a 64 GB machine tells you
-  # nothing; "23.4 GB" tells you the leak), group_processes collapses
-  # the N node/python/rust-analyzer workers a dev box spawns, and
-  # default_widget_type lands on the process table — what users
-  # actually open btm to see. Colors left to auto-detect so we respect
-  # the terminal palette instead of fighting it; override per-machine
-  # if the default clashes.
-  programs.bottom = {
-    enable = true;
-    settings = {
-      flags = {
-        rate = 1000;
-        mem_as_value = true;
-        group_processes = true;
-        tree = false;
-        temperature_type = "celsius";
-        time_delta = 15000;
-        default_widget_type = "proc";
-        hide_table_gap = true;
-      };
-
-      colors = { };
-
-      processes = {
-        columns = [
-          "PID"
-          "Name"
-          "CPU%"
-          "Mem%"
-          "R/s"
-          "W/s"
-          "State"
-        ];
-      };
-    };
-  };
-
   # direnv + fzf + proto live here because they're persona-agnostic
   # baseline ergonomics. Proto is the runtime version manager: per
   # ADR-0008 it owns Go/Bun/Node/Rust/etc., and AGENTS.md commits to
@@ -121,12 +89,11 @@
   # the binary AND its shim directories on every shell's PATH,
   # regardless of which persona shell the user picked.
   # Modern CLI ergonomics — drop-ins / superchargers for tools every
-  # shell session reaches for: bat (cat with syntax + paging), fd
-  # (find with sane defaults), sd (sed for the single-pass-replace
-  # case), hyperfine (statistical command benchmarks). Persona-
-  # agnostic, so they sit alongside direnv/fzf/proto rather than in
-  # any per-shell module.
-  home.packages = with pkgs; [ direnv fzf proto bat fd sd hyperfine eza just watchexec ];
+  # shell session reaches for: fd (find with sane defaults), sd (sed
+  # for the single-pass-replace case), hyperfine (statistical command
+  # benchmarks), eza (ls replacement). Persona-agnostic, so they sit
+  # alongside direnv/fzf/proto rather than in any per-shell module.
+  home.packages = with pkgs; [ direnv fzf proto fd sd hyperfine eza just watchexec ];
 
   # Source of truth for $PATH additions. home.sessionPath writes
   # into ~/.config/hm-session-vars.{sh,fish}, sourced by every HM-
@@ -155,6 +122,40 @@
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
+
+    # Global behavior. load_dotenv lets a project's .env sit alongside
+    # .envrc and be picked up automatically — useful for projects that
+    # ship a .env.example without insisting on an envrc shim. strict_env
+    # stays off because some upstream envrc templates reference unset
+    # vars; turning it on hard-fails those rather than warning. warn_
+    # timeout surfaces slow envrcs at 5s, which in practice catches
+    # nix-direnv cache misses early (a cold `use flake` is multi-second,
+    # a warm one is sub-second — the warning is the signal that the
+    # cache got blown away).
+    #
+    # Per-shell `enable<Shell>Integration` toggles intentionally do NOT
+    # live here — same boundary as starship/atuin/zoxide. Foundation is
+    # persona-agnostic, and the per-shell modules under
+    # modules/home/shells/ own those flags. Bash/Zsh/Fish pick up
+    # direnv via home-manager's defaults today; explicit toggles (and
+    # nushell coverage) are tracked as a follow-up.
+    config = {
+      global = {
+        load_dotenv = true;
+        strict_env = false;
+        warn_timeout = "5s";
+      };
+
+      # Auto-trust envrcs under our standard project roots. Anything
+      # outside these prefixes still requires `direnv allow` — the
+      # whitelist is a convenience for trees we already own, not a
+      # blanket permission.
+      whitelist.prefix = [
+        "${config.home.homeDirectory}/code"
+        "${config.home.homeDirectory}/projects"
+        "${config.home.homeDirectory}/work"
+      ];
+    };
   };
 
   # Bash and Zsh always available — non-interactive fallback (bash)

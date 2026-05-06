@@ -1,18 +1,17 @@
-{ pkgs, lib, ... }: {
-  programs.wezterm = {
-    enable = true;
-    extraConfig = ''
-      local wezterm = require 'wezterm'
-      return {
-        color_scheme = "Tokyo Night",
-        font = wezterm.font("JetBrainsMono Nerd Font"),
-        font_size = 14.0,
-        window_decorations = "RESIZE",
-        hide_tab_bar_if_only_one_tab = true,
-        audible_bell = "Disabled",
-        enable_scroll_bar = false,
-        use_fancy_tab_bar = false,
-      }
-    '';
+{ config, pkgs, lib, workspaceRoot, ... }: {
+  # Install wezterm directly via home.packages rather than programs.wezterm,
+  # because programs.wezterm.enable = true authors ~/.config/wezterm/wezterm.lua
+  # itself (rendered from extraConfig) and would collide with the live-edit
+  # symlink below. Inlining the lua as an extraConfig string forces a full
+  # home-manager rebuild on every keystroke; the symlink avoids that.
+  home.packages = with pkgs; [ wezterm ];
+
+  # Live-editable seam — same pattern as modules/home/editor.nix and
+  # modules/home/multiplexers/tmux.nix. Single-file symlink so anything
+  # wezterm writes alongside the config (state, cache) stays outside
+  # the symlink chain.
+  xdg.configFile."wezterm/wezterm.lua" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/wezterm/wezterm.lua";
   };
 }

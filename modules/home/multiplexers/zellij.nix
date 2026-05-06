@@ -1,13 +1,11 @@
-{ pkgs, lib, ... }: {
-  # Zellij — KDL config. Compact layout matches the previous baked-in
-  # default; the asset-vs-text decision mirrors ghostty (text-only so
-  # it remains portable to a non-Nix host by copy).
-  xdg.configFile."zellij/config.kdl".text = ''
-    theme "tokyonight"
-    default_layout "compact"
-    pane_frames false
-    copy_command "pbcopy"
-    mouse_mode true
-    scroll_buffer_size 50000
-  '';
+{ config, pkgs, lib, workspaceRoot, ... }: {
+  # Zellij — KDL config. Live-editable seam, same pattern as
+  # modules/home/multiplexers/tmux.nix. Edits to config/zellij/config.kdl
+  # are picked up the next time zellij is launched; no `dots apply`
+  # round-trip required. When workspaceRoot is empty (HM run outside
+  # `dots apply`) we skip the link rather than emit a dangling pointer.
+  xdg.configFile."zellij/config.kdl" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink
+      "${workspaceRoot}/config/zellij/config.kdl";
+  };
 }
