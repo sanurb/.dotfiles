@@ -1,72 +1,68 @@
 { config, pkgs, lib, pkgsPins, workspaceRoot, ... }: {
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-    viAlias = true;
-    vimAlias = true;
+  # Editor — wrapper-free path. We install neovim plus its runtime
+  # toolchain via home.packages and point ~/.config/nvim at the live
+  # workspace tree via a single out-of-store symlink. No
+  # `programs.neovim` block on purpose: HM's wrapper unconditionally
+  # authors ~/.config/nvim/init.lua (its luaRcContent is non-empty as
+  # soon as viAlias / package / withNodeJs / etc. are set), and that
+  # per-file rule collides with the directory symlink below — HM walks
+  # the file, its `realpath -m` follows the dir symlink off-tree, and
+  # home-manager-files bails with "Error installing file ... outside
+  # $HOME". See nix-community/home-manager modules/files.nix line ~398
+  # for the realpath-stays-under-output check.
+  #
+  # Trade-off: LSPs / formatters / rg / fd land on the user's
+  # interactive PATH instead of being wrapper-private. In practice
+  # nvim invokes them by name and so does the shell, so the
+  # difference is cosmetic.
+  home.packages = with pkgs; [
+    # Neovim itself — pinned to pkgsPins.edge for plugin compat with
+    # lazy.nvim's HEAD ecosystem (nixos-unstable's hydra gating lags).
+    # Wrapped variant on purpose; outside `programs.neovim.package`
+    # there's no double-wrap risk, and the wrapper provides the
+    # XDG_DATA_DIRS / runtimepath plumbing nvim expects.
+    pkgsPins.edge.neovim
 
-    # Pass the *unwrapped* neovim. `programs.neovim.package` expects
-    # the bare binary derivation; home-manager's job is to be the
-    # wrapper (injecting plugins, providers, the rplugin manifest).
-    # Passing the already-wrapped `pkgsPins.edge.neovim` made HM wrap
-    # a wrap, and the outer wrap's manifest step `touch`ed
-    # rplugin.vim inside the inner wrap's already-sealed $out — the
-    # "Permission denied" we'd been chasing.
-    #
-    # Pinned to `pkgsPins.edge` — the editor cycles upstream faster than
-    # nixos-unstable's hydra gating, and the lag has bitten plugin compat
-    # before. See docs/maintenance.md for the divergence log; collapse this
-    # back to `pkgs.neovim-unwrapped` if no divergence is recorded for 90 days.
-    package = pkgsPins.edge.neovim-unwrapped;
+    # Telescope / oil / treesitter externals
+    ripgrep
+    fd
+    tree-sitter
 
-    # Tools nvim invokes from inside its own session (LSP `cmd` arrays,
-    # treesitter parser builds, telescope's rg/fd backends). These land
-    # on the wrapped nvim's PATH but stay out of the user's interactive
-    # PATH — keeps `which gopls` honest about the editor environment
-    # vs. the shell environment.
-    extraPackages = with pkgs; [
-      # Telescope / oil / treesitter externals
-      ripgrep
-      fd
-      tree-sitter
+    # LSPs from nixpkgs — every server with a stable package goes
+    # here. The handful that remain on Mason (oxlint, oxfmt) don't
+    # have nixpkgs derivations at the cadence we need; see
+    # config/nvim/lua/plugins/lsp.lua's `nix_provided` map for the
+    # boundary.
+    bash-language-server
+    biome
+    vscode-langservers-extracted # eslint, cssls, html, jsonls
+    lua-language-server
+    marksman
+    sqls
+    tailwindcss-language-server
+    yaml-language-server
+    zls
+    svelte-language-server
+    rust-analyzer
 
-      # LSPs from nixpkgs — every server with a stable package goes
-      # here. The handful that remain on Mason (oxlint, oxfmt) don't
-      # have nixpkgs derivations at the cadence we need; see
-      # config/nvim/lua/plugins/lsp.lua's `nix_provided` map for the
-      # boundary.
-      bash-language-server
-      biome
-      vscode-langservers-extracted # provides eslint, cssls, html, jsonls
-      lua-language-server
-      marksman
-      sqls
-      tailwindcss-language-server
-      yaml-language-server
-      zls
-      svelte-language-server
-      rust-analyzer
+    # Formatters
+    prettierd
+    stylua
+  ];
 
-      # Formatters
-      prettierd
-      stylua
-    ];
+  # Default editor — what `programs.neovim.defaultEditor = true` used
+  # to wire. Set explicitly here so $EDITOR resolves to nvim in every
+  # HM-managed shell session (git, less, sudoedit, etc. all read it).
+  home.sessionVariables.EDITOR = "nvim";
 
-    # Remote-provider scaffolding off. We don't currently use Python,
-    # Ruby, or Node remote plugins; turning these off keeps HM's
-    # wrapper from carrying their interpreters into the closure and
-    # sidesteps the rplugin.vim manifest-rewrite race that bit us in
-    # the v0.4.x activation saga.
-    withNodeJs = false;
-    withPython3 = false;
-    withRuby = false;
-
-    # No initLua / extraConfig — leaving both empty makes HM author no
-    # init.lua of its own, so nvim picks up the dir-level
-    # mkOutOfStoreSymlink at xdg.configFile."nvim" below as the single
-    # source of truth. Setting initLua here would have HM emit
-    # ~/.config/nvim/init.lua into the Nix store, colliding with the
-    # symlink target.
+  # vi / vim aliases — replaces `programs.neovim.{viAlias,vimAlias}`.
+  # home.shellAliases propagates to every enabled shell module
+  # (bash/zsh/fish). Scripts that hardcode `/usr/bin/vi` are unaffected
+  # by design; adding binary symlinks would shadow system tools the
+  # OS may expect at fixed paths under SSH.
+  home.shellAliases = {
+    vi = "nvim";
+    vim = "nvim";
   };
 
   # Live-editable seam. The whole config/nvim/ directory becomes
