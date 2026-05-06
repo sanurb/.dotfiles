@@ -19,8 +19,10 @@
     # Neovim itself — pinned to pkgsPins.edge for plugin compat with
     # lazy.nvim's HEAD ecosystem (nixos-unstable's hydra gating lags).
     # Wrapped variant on purpose; outside `programs.neovim.package`
-    # there's no double-wrap risk, and the wrapper provides the
-    # XDG_DATA_DIRS / runtimepath plumbing nvim expects.
+    # there's no double-wrap risk, and the wrapper's
+    # `--cmd "lua vim.g.loaded_{node,perl,ruby,python3}_provider=0"`
+    # is the modern equivalent of the old `withNodeJs/withPython3/
+    # withRuby = false` flags — providers stay out of the closure.
     pkgsPins.edge.neovim
 
     # Telescope / oil / treesitter externals
@@ -57,9 +59,9 @@
 
   # vi / vim aliases — replaces `programs.neovim.{viAlias,vimAlias}`.
   # home.shellAliases propagates to every enabled shell module
-  # (bash/zsh/fish). Scripts that hardcode `/usr/bin/vi` are unaffected
-  # by design; adding binary symlinks would shadow system tools the
-  # OS may expect at fixed paths under SSH.
+  # (bash/zsh/fish) but only fires in interactive shells, so
+  # non-interactive scripts running bare `vi` (cron, sudoedit) get
+  # system vi by design — POSIX semantics preserved.
   home.shellAliases = {
     vi = "nvim";
     vim = "nvim";

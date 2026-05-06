@@ -287,6 +287,13 @@
               fixHint = "modules/home/foundation.nix must declare xdg.configFile.\"starship.toml\" via mkOutOfStoreSymlink";
             };
 
+            nvim-config-wired = mkConfigWiredCheck {
+              name = "nvim-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "nvim" ];
+              fixHint = "modules/home/editor.nix must declare xdg.configFile.\"nvim\" via mkOutOfStoreSymlink";
+            };
+
             # Wezterm and nushell are pillar-conditional and not the
             # defaults (terminal=ghostty, shell=fish), so the profile-
             # level synthetic doesn't import them. Each gets its own
