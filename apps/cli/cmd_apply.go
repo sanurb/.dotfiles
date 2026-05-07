@@ -117,6 +117,13 @@ func runApply(rest []string) int {
 	// every helper call.
 	env := activationEnv()
 
+	// JSON path: separate streaming loop in cmd_apply_stream.go.
+	// Diverging here keeps the prose loop below untouched so TTY
+	// behavior is exactly preserved across this commit.
+	if common.JSON {
+		return runApplyStreaming(p, env, profile, rest, noPreflight)
+	}
+
 	// apply-profile (HM activation) and install-runtimes (proto
 	// downloads) write to disjoint trees and share only network +
 	// CPU, so overlapping them collapses wall time to max(activate,
