@@ -1,5 +1,7 @@
 package envelope
 
+import "slices"
+
 // Code is the SCREAMING_SNAKE error identifier emitted as
 // .error.code in every error envelope. The set is closed: every
 // possible error path in the dots CLI maps to exactly one Code.
@@ -164,11 +166,6 @@ func AllCodes() []Code {
 	for c := range catalog {
 		out = append(out, c)
 	}
-	// Sort for determinism in tests and golden files.
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j-1] > out[j]; j-- {
-			out[j-1], out[j] = out[j], out[j-1]
-		}
-	}
+	slices.Sort(out)
 	return out
 }

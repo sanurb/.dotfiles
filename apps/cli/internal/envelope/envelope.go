@@ -110,16 +110,18 @@ type StreamEvent struct {
 	DurationMs int64  `json:"duration_ms,omitempty"`
 }
 
-// Stream event Type values. Adding a new event type is additive and
-// safe; renaming or removing one is a contract break.
+// Stream event Type values. Unexported because callers reach the
+// streaming protocol through the Stream methods, not by hand-rolling
+// events. Adding a new event type is additive and safe; renaming or
+// removing one is a contract break.
 const (
-	EventStart = "start"
-	EventStep  = "step"
+	eventStart = "start"
+	eventStep  = "step"
 )
 
 // Step status values. Same evolution rules as event types.
 const (
-	StepStarted   = "started"
-	StepCompleted = "completed"
-	StepFailed    = "failed"
+	stepStarted   = "started"
+	stepCompleted = "completed"
+	stepFailed    = "failed"
 )

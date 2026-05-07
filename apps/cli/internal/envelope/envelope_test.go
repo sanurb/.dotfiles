@@ -144,7 +144,7 @@ func TestUnknownCodeFallsBackToInternal(t *testing.T) {
 // stream event must always carry one.
 func TestStreamEventShape(t *testing.T) {
 	var buf bytes.Buffer
-	if err := EmitEvent(&buf, StreamEvent{Type: EventStart, Command: "dots apply"}); err != nil {
+	if err := EmitEvent(&buf, StreamEvent{Type: eventStart, Command: "dots apply"}); err != nil {
 		t.Fatalf("EmitEvent: %v", err)
 	}
 	var raw map[string]any

@@ -18,18 +18,6 @@ import (
 // extend list/use.
 const cmdProfileSummary = "Inspect the active profile (use <name> reserved for a future release)"
 
-// profileShowJSON is the result body nested under envelope.OK for
-// `profile show --json`. Mirrors the field set the human renderer
-// prints; the JSON consumer wants the same data plus stable types
-// (booleans, not "true"/"false" strings).
-type profileShowJSON struct {
-	Shell       string `json:"shell"`
-	Terminal    string `json:"terminal"`
-	Multiplexer string `json:"multiplexer"`
-	Editor      bool   `json:"editor"`
-	Font        bool   `json:"font"`
-}
-
 // runProfile dispatches over the subcommand. We hand-roll the dispatch
 // rather than registering nested FlagSets because (a) the surface is
 // tiny, and (b) `--json` only applies to `show`; binding it on `list`
@@ -128,7 +116,7 @@ func runProfileShow(rest []string) int {
 	root, err := workspace.Root()
 	if err != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, profileShowCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("profile show", rest),
 				envelope.Wrap(envelope.CodeWorkspaceNotFound, err).
 					WithNextActions(envelope.Action{
 						Command:     "dots init",
@@ -145,7 +133,7 @@ func runProfileShow(rest []string) int {
 	s, found, err := state.Load(state.Path(root))
 	if err != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, profileShowCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("profile show", rest),
 				envelope.Wrap(envelope.CodeStateParseFailed, err))
 			return exitcode.Failure
 		}
@@ -157,7 +145,7 @@ func runProfileShow(rest []string) int {
 			// "No profile" is informational, not an error: the file
 			// simply hasn't been written yet. Emit a success envelope
 			// with result=null and a clear next-action.
-			_ = envelope.OK(os.Stdout, profileShowCommandLine(rest), nil, []envelope.Action{
+			_ = envelope.OK(os.Stdout, commandLine("profile show", rest), nil, []envelope.Action{
 				{Command: "dots init", Description: "Run the install wizard to capture a persona."},
 			})
 			return exitcode.Success
@@ -167,14 +155,7 @@ func runProfileShow(rest []string) int {
 	}
 
 	if common.JSON {
-		body := profileShowJSON{
-			Shell:       s.Pillars.Shell,
-			Terminal:    s.Pillars.Terminal,
-			Multiplexer: s.Pillars.Multiplexer,
-			Editor:      s.Capabilities.Editor,
-			Font:        s.Capabilities.Font,
-		}
-		_ = envelope.OK(os.Stdout, profileShowCommandLine(rest), body, []envelope.Action{
+		_ = envelope.OK(os.Stdout, commandLine("profile show", rest), personaJSONFromState(s), []envelope.Action{
 			{Command: "dots apply", Description: "Realize this profile."},
 			{Command: "dots init", Description: "Re-run the wizard to change the profile."},
 		})
@@ -188,15 +169,6 @@ func runProfileShow(rest []string) int {
 	fmt.Printf("editor          %v\n", s.Capabilities.Editor)
 	fmt.Printf("font            %v\n", s.Capabilities.Font)
 	return exitcode.Success
-}
-
-// profileShowCommandLine reconstructs the as-invoked command for the
-// envelope's `command` field; mirrors statusCommandLine's contract.
-func profileShowCommandLine(rest []string) string {
-	if len(rest) == 0 {
-		return "dots profile show"
-	}
-	return "dots profile show " + joinArgs(rest)
 }
 
 // runProfileUse is the documented stub. Exit 2 (misuse): the verb is

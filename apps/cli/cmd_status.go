@@ -16,17 +16,6 @@ import (
 
 const cmdStatusSummary = "Show profile, workspace, and last-applied receipt"
 
-// statusProfileJSON is the JSON projection of state.State's
-// user-visible fields. Kept in this file because it is specific to the
-// status verb's output shape; capture has its own equivalent.
-type statusProfileJSON struct {
-	Shell       string `json:"shell"`
-	Terminal    string `json:"terminal"`
-	Multiplexer string `json:"multiplexer"`
-	Editor      bool   `json:"editor"`
-	Font        bool   `json:"font"`
-}
-
 // statusLastApplyJSON is the JSON projection of applied.State. Times
 // are emitted in RFC3339 to match what `applied` writes on disk.
 type statusLastApplyJSON struct {
@@ -41,7 +30,7 @@ type statusLastApplyJSON struct {
 // trivial for jq consumers to branch on.
 type statusDocJSON struct {
 	Workspace string               `json:"workspace"`
-	Profile   *statusProfileJSON   `json:"profile"`
+	Profile   *personaJSON         `json:"profile"`
 	LastApply *statusLastApplyJSON `json:"lastApply"`
 	Drift     *statusDriftJSON     `json:"drift"`
 }
@@ -124,7 +113,7 @@ func runStatus(rest []string) int {
 		// answer "is dots installed on this host?" — the answer is
 		// "yes, but nothing to report" rather than a usage error.
 		if common.JSON {
-			_ = envelope.OK(os.Stdout, statusCommandLine(rest), statusDocJSON{}, statusNoWorkspaceActions())
+			_ = envelope.OK(os.Stdout, commandLine("status", rest), statusDocJSON{}, statusNoWorkspaceActions())
 		} else {
 			fmt.Fprintln(os.Stderr, "status: no workspace; nothing to report")
 		}
@@ -134,18 +123,13 @@ func runStatus(rest []string) int {
 	// Profile: load .dots-state.toml. Validate before returning so we
 	// don't print obviously-corrupt values; on validation error we
 	// surface it but still emit the rest of the report.
-	var profilePtr *statusProfileJSON
+	var profilePtr *personaJSON
 	var profileErr error
 	if s, found, err := state.Load(state.Path(root)); err != nil {
 		profileErr = err
 	} else if found {
-		profilePtr = &statusProfileJSON{
-			Shell:       s.Pillars.Shell,
-			Terminal:    s.Pillars.Terminal,
-			Multiplexer: s.Pillars.Multiplexer,
-			Editor:      s.Capabilities.Editor,
-			Font:        s.Capabilities.Font,
-		}
+		p := personaJSONFromState(s)
+		profilePtr = &p
 	}
 
 	// Last apply: read from the XDG-rooted applied.toml.
@@ -196,23 +180,12 @@ func runStatus(rest []string) int {
 			LastApply: lastPtr,
 			Drift:     driftPtr,
 		}
-		_ = envelope.OK(os.Stdout, statusCommandLine(rest), body, statusActions(drift, root))
+		_ = envelope.OK(os.Stdout, commandLine("status", rest), body, statusActions(drift, root))
 		return exitcode.Success
 	}
 
 	renderStatusHuman(root, profilePtr, lastPtr, profileErr, appliedErr, drift, freshHash)
 	return exitcode.Success
-}
-
-// statusCommandLine reconstructs the as-invoked command for the
-// envelope's `command` field. Snapshot verbs render this verbatim so
-// agents can correlate the response with the request without keeping
-// their own bookkeeping.
-func statusCommandLine(rest []string) string {
-	if len(rest) == 0 {
-		return "dots status"
-	}
-	return "dots status " + joinArgs(rest)
 }
 
 // statusNoWorkspaceActions are the next-step affordances when status
@@ -256,7 +229,7 @@ func statusActions(drift driftKind, _ string) []envelope.Action {
 // up parse-error noise.
 func renderStatusHuman(
 	root string,
-	profile *statusProfileJSON,
+	profile *personaJSON,
 	last *statusLastApplyJSON,
 	profileErr, appliedErr error,
 	drift driftKind,

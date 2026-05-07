@@ -44,7 +44,7 @@ func runPlan(rest []string) int {
 	p, err := computePlan(profile)
 	if err != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, planCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("plan", rest),
 				envelope.Wrap(envelope.CodeInternalError, err).
 					WithFix("Re-run with -v to see more, or check $HOME readability."))
 			return exitcode.Failure
@@ -64,7 +64,7 @@ func runPlan(rest []string) int {
 		f, err := os.Create(outPath)
 		if err != nil {
 			if common.JSON {
-				_ = envelope.Fail(os.Stdout, planCommandLine(rest),
+				_ = envelope.Fail(os.Stdout, commandLine("plan", rest),
 					envelope.Wrap(envelope.CodeInvalidArgument, fmt.Errorf("open %s: %w", outPath, err)))
 				return exitcode.Failure
 			}
@@ -74,7 +74,7 @@ func runPlan(rest []string) int {
 		if encErr := p.Encode(f); encErr != nil {
 			_ = f.Close()
 			if common.JSON {
-				_ = envelope.Fail(os.Stdout, planCommandLine(rest),
+				_ = envelope.Fail(os.Stdout, commandLine("plan", rest),
 					envelope.Wrap(envelope.CodeInternalError, encErr))
 				return exitcode.Failure
 			}
@@ -85,7 +85,7 @@ func runPlan(rest []string) int {
 			fmt.Fprintln(os.Stderr, "plan: close:", cerr)
 		}
 		if common.JSON {
-			_ = envelope.OK(os.Stdout, planCommandLine(rest),
+			_ = envelope.OK(os.Stdout, commandLine("plan", rest),
 				planSummaryJSON(p, outPath),
 				planActionsWithFile(outPath))
 			return exitcode.Success
@@ -96,7 +96,7 @@ func runPlan(rest []string) int {
 	}
 
 	if common.JSON {
-		_ = envelope.OK(os.Stdout, planCommandLine(rest), p, planActions())
+		_ = envelope.OK(os.Stdout, commandLine("plan", rest), p, planActions())
 		return exitcode.Success
 	}
 
@@ -104,15 +104,6 @@ func runPlan(rest []string) int {
 	fmt.Println()
 	fmt.Println("Run `dots apply` to execute, or `dots plan --out FILE` to save.")
 	return exitcode.Success
-}
-
-// planCommandLine reconstructs the as-invoked command for the
-// envelope's `command` field.
-func planCommandLine(rest []string) string {
-	if len(rest) == 0 {
-		return "dots plan"
-	}
-	return "dots plan " + joinArgs(rest)
 }
 
 // planSummaryJSON is the result body when --out wrote the plan to a

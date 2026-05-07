@@ -38,22 +38,15 @@ func Wrap(code Code, err error) *Problem {
 	return &Problem{Code: code, err: err}
 }
 
-// WithFix returns p with Fix replaced. Returns p (mutated) so the
-// builder pattern composes inline at the call site without reaching
-// for a fluent-builder type.
 func (p *Problem) WithFix(fix string) *Problem { p.Fix = fix; return p }
 
-// WithNextActions returns p with NextActions replaced.
 func (p *Problem) WithNextActions(a ...Action) *Problem { p.NextActions = a; return p }
 
-// WithRunID is used by long-running command paths to attach the
-// run_id (and, transitively, the log_path) before emitting the
-// terminal error envelope.
+// WithRunID attaches the run_id to a Problem before its surrounding
+// Stream exists. Used by the long-running paths' early-failure
+// branches (e.g., log file open failed) where there is no stream to
+// auto-populate the field.
 func (p *Problem) WithRunID(id string) *Problem { p.RunID = id; return p }
-
-// WithLogPath attaches the per-run log path. Only meaningful for
-// long-running verbs; snapshot verbs leave this empty.
-func (p *Problem) WithLogPath(path string) *Problem { p.LogPath = path; return p }
 
 func (p *Problem) Error() string {
 	if p.Message != "" {

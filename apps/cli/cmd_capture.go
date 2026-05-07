@@ -18,24 +18,13 @@ import (
 
 const cmdCaptureSummary = "Extract host metadata and current profile to TOML/JSON"
 
-// captureProfile mirrors state.State for the JSON encoder. The state
-// package's own struct fields are not JSON-tagged (it speaks TOML on
-// disk only), so we project into a small JSON-friendly view here.
-type captureProfile struct {
-	Shell       string `json:"shell"`
-	Terminal    string `json:"terminal"`
-	Multiplexer string `json:"multiplexer"`
-	Editor      bool   `json:"editor"`
-	Font        bool   `json:"font"`
-}
-
 // captureDoc is the full envelope serialized to the user. profile is a
 // pointer so JSON emits null (not a zero struct) when no state file is
 // reachable; the human/TOML renderer treats nil as "[profile] omitted".
 type captureDoc struct {
-	SchemaVersion int             `json:"schemaVersion"`
-	Host          plan.Host       `json:"host"`
-	Profile       *captureProfile `json:"profile"`
+	SchemaVersion int          `json:"schemaVersion"`
+	Host          plan.Host    `json:"host"`
+	Profile       *personaJSON `json:"profile"`
 }
 
 // runCapture implements `dots capture [--output PATH] [--json]`. Default
@@ -62,7 +51,7 @@ func runCapture(rest []string) int {
 		body, err := renderCapture(doc, common.JSON)
 		if err != nil {
 			if common.JSON {
-				_ = envelope.Fail(os.Stdout, captureCommandLine(rest),
+				_ = envelope.Fail(os.Stdout, commandLine("capture", rest),
 					envelope.Wrap(envelope.CodeInternalError, err))
 				return exitcode.Failure
 			}
@@ -71,7 +60,7 @@ func runCapture(rest []string) int {
 		}
 		if err := writeCaptureFile(*output, body); err != nil {
 			if common.JSON {
-				_ = envelope.Fail(os.Stdout, captureCommandLine(rest),
+				_ = envelope.Fail(os.Stdout, commandLine("capture", rest),
 					envelope.Wrap(envelope.CodeInvalidArgument, fmt.Errorf("write %s: %w", *output, err)).
 						WithFix("Confirm the parent directory exists and is writable, or pick a different --output path."))
 				return exitcode.Failure
@@ -81,7 +70,7 @@ func runCapture(rest []string) int {
 			return exitcode.Failure
 		}
 		if common.JSON {
-			_ = envelope.OK(os.Stdout, captureCommandLine(rest),
+			_ = envelope.OK(os.Stdout, commandLine("capture", rest),
 				captureSummary(doc, *output),
 				captureActionsWithFile(*output))
 			return exitcode.Success
@@ -91,7 +80,7 @@ func runCapture(rest []string) int {
 
 	// stdout sink:
 	if common.JSON {
-		_ = envelope.OK(os.Stdout, captureCommandLine(rest), doc, captureActions())
+		_ = envelope.OK(os.Stdout, commandLine("capture", rest), doc, captureActions())
 		return exitcode.Success
 	}
 	body, err := renderCapture(doc, false)
@@ -101,15 +90,6 @@ func runCapture(rest []string) int {
 	}
 	_, _ = os.Stdout.Write(body)
 	return exitcode.Success
-}
-
-// captureCommandLine reconstructs the as-invoked command for the
-// envelope's `command` field.
-func captureCommandLine(rest []string) string {
-	if len(rest) == 0 {
-		return "dots capture"
-	}
-	return "dots capture " + joinArgs(rest)
 }
 
 // captureSummaryBody is the result body when --output wrote the doc
@@ -175,13 +155,8 @@ func buildCaptureDoc() captureDoc {
 		if err != nil || !found {
 			continue
 		}
-		doc.Profile = &captureProfile{
-			Shell:       s.Pillars.Shell,
-			Terminal:    s.Pillars.Terminal,
-			Multiplexer: s.Pillars.Multiplexer,
-			Editor:      s.Capabilities.Editor,
-			Font:        s.Capabilities.Font,
-		}
+		p := personaJSONFromState(s)
+		doc.Profile = &p
 		// Trust the state file's schema version when present so a
 		// captured doc round-trips faithfully through `dots install`
 		// on a peer host.

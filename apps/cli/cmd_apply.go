@@ -339,21 +339,10 @@ func needsInteractiveConsent(p plan.Plan) bool {
 // follow-up is `dots apply` (commit) or `dots plan --out` (replay).
 func emitPlan(p plan.Plan, common cliflags.Common, rest []string) {
 	if common.JSON {
-		_ = envelope.OK(os.Stdout, applyDryRunCommandLine(rest), p, applyDryRunActions())
+		_ = envelope.OK(os.Stdout, commandLine("apply", rest), p, applyDryRunActions())
 		return
 	}
 	renderPlan(os.Stdout, p, !common.NoColor)
-}
-
-// applyDryRunCommandLine reconstructs the as-invoked command for the
-// envelope's `command` field. dry-run is the only --json path
-// reachable through `runApply`; the streaming path (commit 3) builds
-// its own command line.
-func applyDryRunCommandLine(rest []string) string {
-	if len(rest) == 0 {
-		return "dots apply --dry-run"
-	}
-	return "dots apply " + joinArgs(rest)
 }
 
 // applyDryRunActions returns the contextual next_actions for a

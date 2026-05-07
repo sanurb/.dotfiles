@@ -53,7 +53,7 @@ func runWhy(rest []string) int {
 	args := flagSet.Args()
 	if len(args) == 0 {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("why", rest),
 				envelope.New(envelope.CodeInvalidArgument, "why: path required").
 					WithFix("Pass exactly one path: `dots why <path>`."))
 			return exitcode.Misuse
@@ -63,7 +63,7 @@ func runWhy(rest []string) int {
 	}
 	if len(args) > 1 {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("why", rest),
 				envelope.New(envelope.CodeInvalidArgument, "why: too many arguments").
 					WithFix("Pass exactly one path: `dots why <path>`."))
 			return exitcode.Misuse
@@ -75,7 +75,7 @@ func runWhy(rest []string) int {
 	root, err := workspace.Root()
 	if err != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("why", rest),
 				envelope.Wrap(envelope.CodeWorkspaceNotFound, err).
 					WithNextActions(envelope.Action{
 						Command:     "dots init",
@@ -92,7 +92,7 @@ func runWhy(rest []string) int {
 	target, err := resolveQueryPath(args[0])
 	if err != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("why", rest),
 				envelope.Wrap(envelope.CodeInvalidArgument, fmt.Errorf("resolve %q: %w", args[0], err)))
 			return exitcode.Failure
 		}
@@ -103,7 +103,7 @@ func runWhy(rest []string) int {
 	owner, ferr := findOwner(root, target)
 	if ferr != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+			_ = envelope.Fail(os.Stdout, commandLine("why", rest),
 				envelope.Wrap(envelope.CodeInternalError, ferr))
 			return exitcode.Failure
 		}
@@ -116,7 +116,7 @@ func runWhy(rest []string) int {
 		if owner != "" {
 			body.Status = "managed"
 		}
-		_ = envelope.OK(os.Stdout, whyCommandLine(rest), body, whyActions(owner))
+		_ = envelope.OK(os.Stdout, commandLine("why", rest), body, whyActions(owner))
 		return exitcode.Success
 	}
 	if owner == "" {
@@ -125,15 +125,6 @@ func runWhy(rest []string) int {
 	}
 	fmt.Printf("managed: %s\n", owner)
 	return exitcode.Success
-}
-
-// whyCommandLine reconstructs the as-invoked command for the
-// envelope's `command` field.
-func whyCommandLine(rest []string) string {
-	if len(rest) == 0 {
-		return "dots why"
-	}
-	return "dots why " + joinArgs(rest)
 }
 
 // whyActions returns the contextual next_actions for a why response.

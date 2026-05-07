@@ -191,7 +191,7 @@ func runInstall(rest []string) int {
 			// the cliflags contract: "refuse to prompt; exit 2 if
 			// a prompt is needed."
 			if common.JSON {
-				_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+				_ = envelope.Fail(os.Stdout, commandLine("init", rest),
 					envelope.New(envelope.CodeBootstrapRequired,
 						"workspace not found and bootstrap requires interactive consent"))
 				return exitcode.Misuse
@@ -208,7 +208,7 @@ func runInstall(rest []string) int {
 	root, err := workspace.Root()
 	if err != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+			_ = envelope.Fail(os.Stdout, commandLine("init", rest),
 				envelope.Wrap(envelope.CodeWorkspaceNotFound, err))
 			return exitcode.Failure
 		}
@@ -222,7 +222,7 @@ func runInstall(rest []string) int {
 			if errors.Is(err, errConfigNotFound) {
 				code = envelope.CodeConfigNotFound
 			}
-			_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+			_ = envelope.Fail(os.Stdout, commandLine("init", rest),
 				envelope.Wrap(code, err))
 			return exitcode.Misuse
 		}
@@ -232,7 +232,7 @@ func runInstall(rest []string) int {
 	deps, err := newWizardDeps(initial)
 	if err != nil {
 		if common.JSON {
-			_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+			_ = envelope.Fail(os.Stdout, commandLine("init", rest),
 				envelope.Wrap(envelope.CodeInternalError, err))
 			return exitcode.Failure
 		}

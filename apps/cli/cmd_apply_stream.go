@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/activation"
@@ -23,19 +22,15 @@ import (
 // runApplyStreaming is the --json path of `dots apply`. It mirrors
 // the canonical step loop in runApply but emits NDJSON events rather
 // than prose, captures subprocess stderr to a per-run log file, and
-// terminates with a typed success or error envelope. The
-// corresponding human-path loop in runApply is intentionally left
-// unchanged so TTY users see exactly what they saw before this
-// commit.
+// terminates with a typed success or error envelope.
 //
 // Bootstrap steps (KindBootstrapNix, KindCloneWorkspace) are
-// excluded from the streaming path: both require interactive stdin
-// consent, which is fundamentally incompatible with NDJSON-on-stdout
-// mode. If the plan contains either, we emit a BOOTSTRAP_REQUIRED
-// error envelope before opening the stream — agents should resolve
-// the prereq and retry.
+// excluded: both require interactive stdin consent, which is
+// incompatible with NDJSON-on-stdout. If the plan contains either,
+// we emit a BOOTSTRAP_REQUIRED error envelope before opening the
+// stream — agents resolve the prereq and retry.
 func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string, noPreflight bool) int {
-	command := applyCommandLineStreaming(rest)
+	command := commandLine("apply", rest)
 
 	if needsInteractiveConsent(p) {
 		_ = envelope.Fail(os.Stdout, command,
@@ -73,7 +68,7 @@ func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string,
 	}
 
 	for _, step := range p.Steps {
-		stepName := string(step.Kind)
+		stepName := step.Kind
 		_ = stream.StepStarted(stepName)
 
 		var problem *envelope.Problem
@@ -168,17 +163,6 @@ func applyStreamingActions() []envelope.Action {
 		{Command: "dots status", Description: "Confirm the apply landed and the system is converged."},
 		{Command: "dots doctor", Description: "Audit the realized environment against the declared persona."},
 	}
-}
-
-// applyCommandLineStreaming reconstructs the as-invoked command for
-// the envelope. We re-build from rest rather than storing the raw
-// argv because flag parsing has already happened by the time we
-// reach this function.
-func applyCommandLineStreaming(rest []string) string {
-	if len(rest) == 0 {
-		return "dots apply"
-	}
-	return "dots apply " + strings.Join(rest, " ")
 }
 
 // mapCodeToExit maps an error code back to the existing exit-code

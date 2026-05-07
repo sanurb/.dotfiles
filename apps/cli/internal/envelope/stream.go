@@ -20,10 +20,9 @@ type Stream struct {
 	logPath string
 	now     func() time.Time
 
-	// Per-step bookkeeping for duration_ms. Reset on each
+	// Per-step start time for duration_ms. Reset on each
 	// StepStarted; consumed and zeroed on each StepCompleted or
 	// StepFailed.
-	stepName  string
 	stepStart time.Time
 }
 
@@ -44,14 +43,7 @@ func NewStream(out io.Writer, command, runID, logPath string, now func() time.Ti
 	}
 }
 
-// RunID returns the run identifier the streamer is tagging events
-// with. Useful for callers that need to tag log lines or filenames
-// with the same id the consumer sees on the wire.
-func (s *Stream) RunID() string { return s.runID }
-
-// LogPath returns the per-run log file path the terminal envelope
-// will reference. Callers tee subprocess stderr to this path so the
-// stream stays compact and the diagnostic detail lives in the file.
+func (s *Stream) RunID() string   { return s.runID }
 func (s *Stream) LogPath() string { return s.logPath }
 
 // Start emits the opening event of the stream. Idempotent in the
@@ -59,7 +51,7 @@ func (s *Stream) LogPath() string { return s.logPath }
 // the protocol does not require uniqueness, only ordering.
 func (s *Stream) Start() error {
 	return EmitEvent(s.out, StreamEvent{
-		Type:      EventStart,
+		Type:      eventStart,
 		Timestamp: s.now(),
 		Command:   s.command,
 	})
@@ -69,13 +61,12 @@ func (s *Stream) Start() error {
 // corresponding step event. A subsequent StepCompleted / StepFailed
 // computes duration_ms from the recorded start.
 func (s *Stream) StepStarted(name string) error {
-	s.stepName = name
 	s.stepStart = s.now()
 	return EmitEvent(s.out, StreamEvent{
-		Type:      EventStep,
+		Type:      eventStep,
 		Timestamp: s.stepStart,
 		Name:      name,
-		Status:    StepStarted,
+		Status:    stepStarted,
 	})
 }
 
@@ -85,12 +76,12 @@ func (s *Stream) StepStarted(name string) error {
 func (s *Stream) StepCompleted(name string) error {
 	end := s.now()
 	dur := s.elapsed(end)
-	s.stepName, s.stepStart = "", time.Time{}
+	s.stepStart = time.Time{}
 	return EmitEvent(s.out, StreamEvent{
-		Type:       EventStep,
+		Type:       eventStep,
 		Timestamp:  end,
 		Name:       name,
-		Status:     StepCompleted,
+		Status:     stepCompleted,
 		DurationMs: dur,
 	})
 }
@@ -102,12 +93,12 @@ func (s *Stream) StepCompleted(name string) error {
 func (s *Stream) StepFailed(name string) error {
 	end := s.now()
 	dur := s.elapsed(end)
-	s.stepName, s.stepStart = "", time.Time{}
+	s.stepStart = time.Time{}
 	return EmitEvent(s.out, StreamEvent{
-		Type:       EventStep,
+		Type:       eventStep,
 		Timestamp:  end,
 		Name:       name,
-		Status:     StepFailed,
+		Status:     stepFailed,
 		DurationMs: dur,
 	})
 }
