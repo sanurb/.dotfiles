@@ -39,7 +39,7 @@ let
     schema_version = schemaVersion;
     pillars = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
     capabilities = { editor = true; font = true; };
-    modules = { bat = true; delta = true; gh = true; opencode = true; };
+    modules = { bat = true; delta = true; gh = true; lazygit = true; opencode = true; };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
   state =
@@ -73,9 +73,9 @@ in
     # Foundation + git are mandatory infrastructure (identity is sourced
     # externally per modules/home/git.nix); the wizard never asks about
     # them. Editor and font remain user-toggleable capabilities.
-    # Satellite tools (bat, delta, gh, opencode) default-true via
-    # `modules.<name> or true`, preserving v1 behavior on hosts whose
-    # state file predates the [modules] section.
+    # Satellite tools (bat, delta, gh, lazygit, opencode) default-true
+    # via `modules.<name> or true`, preserving v1 behavior on hosts
+    # whose state file predates the [modules] section.
     [
       homeModules.foundation
       homeModules.git
@@ -88,6 +88,7 @@ in
     ++ lib.optional (modules.bat      or true) homeModules.bat
     ++ lib.optional (modules.delta    or true) homeModules.delta
     ++ lib.optional (modules.gh       or true) homeModules.gh
+    ++ lib.optional (modules.lazygit  or true) homeModules.lazygit
     ++ lib.optional (modules.opencode or true) homeModules.opencode;
 
   home.username = if envUser != "" then envUser else "dots";

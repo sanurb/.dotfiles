@@ -319,6 +319,13 @@
               fixHint = "modules/home/opencode.nix must declare xdg.configFile.\"opencode\" via mkOutOfStoreSymlink";
             };
 
+            lazygit-config-wired = mkConfigWiredCheck {
+              name = "lazygit-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "lazygit/config.yml" ];
+              fixHint = "modules/home/lazygit.nix must declare xdg.configFile.\"lazygit/config.yml\" via mkOutOfStoreSymlink";
+            };
+
             # Wezterm and nushell are pillar-conditional and not the
             # defaults (terminal=ghostty, shell=fish), so the profile-
             # level synthetic doesn't import them. Each gets its own
