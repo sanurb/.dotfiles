@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/dym"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
@@ -164,22 +165,56 @@ func allKnownNames() []string {
 	return out
 }
 
-func runInstall([]string) int {
+func runInstall(rest []string) int {
 	// One install path. If prereqs (Nix, workspace clone) are missing,
 	// they are bootstrapped here behind explicit per-prereq consent —
 	// the same Honesty-gated subprocess flow `dots apply` uses. The
 	// wizard then runs against a real workspace; the binary no longer
 	// ships a "standalone" branch that produces a TOML artifact and
 	// three manual steps.
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var common cliflags.Common
+	common.Bind(fs)
+	if code, exit := cliflags.MapParseErr(fs.Parse(rest)); exit {
+		return code
+	}
+	common.Resolve()
+
 	if _, err := workspace.Root(); err != nil {
+		if common.NonInteractive {
+			// Bootstrap (Nix install, workspace clone) requires
+			// per-prereq consent on stdin. Headless callers must
+			// satisfy those prereqs out-of-band — exit 2 matches
+			// the cliflags contract: "refuse to prompt; exit 2 if
+			// a prompt is needed."
+			fmt.Fprintln(os.Stderr, "init: bootstrap requires interactive consent (workspace not found).")
+			fmt.Fprintln(os.Stderr, "      Clone the repo and re-run, or drop --non-interactive.")
+			return exitcode.Misuse
+		}
 		if code, ok := bootstrapForInstall(); !ok {
 			return code
 		}
 	}
-	deps, err := newWizardDeps()
+
+	root, err := workspace.Root()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "init:", err)
 		return exitcode.Failure
+	}
+	initial, err := resolveInitialState(root, common.Config)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "init:", err)
+		return exitcode.Misuse
+	}
+	deps, err := newWizardDeps(initial)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "init:", err)
+		return exitcode.Failure
+	}
+
+	if common.NonInteractive {
+		return runHeadlessInstall(deps, common)
 	}
 	return runWithRealize(ui.ModeInstall, deps)
 }
@@ -223,12 +258,31 @@ func bootstrapForInstall() (int, bool) {
 	return exitcode.Success, true
 }
 
-func runSync([]string) int {
+func runSync(rest []string) int {
 	// Reconcile .git/hooks with .moon/workspace.yml's `vcs.hooks` before
 	// the activation phase — a brownfield sync is the most likely entry
 	// point for a tree whose hooks predate the Moon migration.
 	syncMoonHooksSilent()
-	deps, err := newWizardDeps()
+	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var common cliflags.Common
+	common.Bind(fs)
+	if code, exit := cliflags.MapParseErr(fs.Parse(rest)); exit {
+		return code
+	}
+	common.Resolve()
+
+	root, err := workspace.Root()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "sync:", err)
+		return exitcode.Failure
+	}
+	initial, err := resolveInitialState(root, common.Config)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "sync:", err)
+		return exitcode.Misuse
+	}
+	deps, err := newWizardDeps(initial)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "sync:", err)
 		return exitcode.Failure

@@ -147,6 +147,37 @@ func loadInitialState(workspaceRoot string) state.State {
 	return state.Default()
 }
 
+// loadOverrideState reads an explicit state file path supplied via
+// --config. Distinct from loadInitialState in that any failure is fatal:
+// the user named a specific file and silent fallback to defaults would
+// mask typos and stale paths. Missing-file is an error here precisely
+// because it is not an error when the canonical location is absent.
+func loadOverrideState(path string) (state.State, error) {
+	s, found, err := state.Load(path)
+	if err != nil {
+		return state.State{}, fmt.Errorf("--config %s: %w", path, err)
+	}
+	if !found {
+		return state.State{}, fmt.Errorf("--config %s: file not found", path)
+	}
+	if verr := s.Validate(); verr != nil {
+		return state.State{}, fmt.Errorf("--config %s: %w", path, verr)
+	}
+	return s, nil
+}
+
+// resolveInitialState picks the wizard's pre-seed state. The override
+// path (when non-empty) is the explicit seed; missing or invalid
+// override is a misuse-class error the caller maps to exitcode.Misuse.
+// Without an override we fall back to the canonical workspace file or
+// state.Default(), which never fails.
+func resolveInitialState(workspaceRoot, configOverride string) (state.State, error) {
+	if configOverride == "" {
+		return loadInitialState(workspaceRoot), nil
+	}
+	return loadOverrideState(configOverride)
+}
+
 // newWizardDeps wires the adapters that the install/sync wizard needs.
 // All three persist against the workspace root, so missing it is a hard
 // stop — but we surface it as an error rather than exiting from a
@@ -154,7 +185,13 @@ func loadInitialState(workspaceRoot string) state.State {
 // message it uses for deploy/doctor/sync/scan/backup. This keeps a
 // single user-facing failure mode for "ran outside the workspace,"
 // regardless of which subcommand they invoked.
-func newWizardDeps() (ui.Deps, error) {
+//
+// initial is the pre-seeded persona for the wizard form; the verb is
+// responsible for resolving it (canonical read or --config override)
+// and for mapping resolution errors to the right exit code. The
+// constructor itself only reports infrastructure failures (no
+// workspace).
+func newWizardDeps(initial state.State) (ui.Deps, error) {
 	root, err := workspace.Root()
 	if err != nil {
 		return ui.Deps{}, err
@@ -163,6 +200,6 @@ func newWizardDeps() (ui.Deps, error) {
 	return ui.Deps{
 		Snapshotter:    fsSnapshotter{session: session},
 		StatePersister: tomlPersister{workspaceRoot: root, session: session},
-		Initial:        loadInitialState(root),
+		Initial:        initial,
 	}, nil
 }
