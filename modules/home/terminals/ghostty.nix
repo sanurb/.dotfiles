@@ -8,14 +8,17 @@
   # outside Nix on macOS.
   #
   # Live-editable seam — same pattern as modules/home/editor.nix and
-  # modules/home/multiplexers/tmux.nix. Editing config/ghostty/config
-  # in the repo is picked up the next time ghostty reloads its config;
-  # no `dots apply` round-trip required. When workspaceRoot is empty
-  # (HM run outside `dots apply`) we skip the link rather than emit a
-  # dangling pointer.
-  xdg.configFile."ghostty/config" = lib.mkIf (workspaceRoot != "") {
+  # modules/home/multiplexers/tmux.nix. Editing anything under
+  # config/ghostty/ in the repo is picked up the next time ghostty
+  # reloads its config; no `dots apply` round-trip required.
+  #
+  # We symlink the whole directory (not just `config`) so siblings —
+  # shaders/, themes/ — resolve via Ghostty's config-relative lookup.
+  # When workspaceRoot is empty (HM run outside `dots apply`) we skip
+  # the link rather than emit a dangling pointer.
+  xdg.configFile."ghostty" = lib.mkIf (workspaceRoot != "") {
     source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/ghostty/config";
+      "${workspaceRoot}/config/ghostty";
   };
 
   # Activation hook: ensure Ghostty.app exists on macOS. Idempotent —

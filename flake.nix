@@ -287,8 +287,8 @@
             ghostty-config-wired = mkConfigWiredCheck {
               name = "ghostty-config-wired";
               evaluated = profileEvaluated;
-              expectedKeys = [ "ghostty/config" ];
-              fixHint = "modules/home/terminals/ghostty.nix must declare xdg.configFile.\"ghostty/config\" via mkOutOfStoreSymlink";
+              expectedKeys = [ "ghostty" ];
+              fixHint = "modules/home/terminals/ghostty.nix must declare xdg.configFile.\"ghostty\" via mkOutOfStoreSymlink";
             };
 
             zellij-config-wired = mkConfigWiredCheck {

@@ -3,7 +3,7 @@
     enable = true;
     settings = {
       font = {
-        normal.family = "JetBrainsMono Nerd Font";
+        normal.family = "Iosevka Nerd Font Mono";
         size = 14;
       };
       window = {

@@ -3,7 +3,7 @@
     enable = true;
     themeFile = "tokyo_night_night";
     font = {
-      name = "JetBrainsMono Nerd Font";
+      name = "Iosevka Nerd Font Mono";
       size = 14;
     };
     settings = {
