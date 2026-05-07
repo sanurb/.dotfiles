@@ -8,56 +8,53 @@
 gui:
   theme:
     activeBorderColor:
-      - '#b4befe'                # Lavender — calm focus signal
+      - '#b4befe' # Lavender — calm focus signal
       - bold
     inactiveBorderColor:
-      - '#a6adc8'                # Subtext0 — fades into bg
+      - '#a6adc8' # Subtext0 — fades into bg
     searchingActiveBorderColor:
-      - '#f9e2af'                # Yellow — found / matched
+      - '#f9e2af' # Yellow — found / matched
     optionsTextColor:
-      - '#89b4fa'                # Blue — ambient hint
+      - '#89b4fa' # Blue — ambient hint
     selectedLineBgColor:
-      - '#313244'                # Surface0
+      - '#313244' # Surface0
     inactiveViewSelectedLineBgColor:
-      - '#6c7086'                # Overlay0 — selected but unfocused
+      - '#6c7086' # Overlay0 — selected but unfocused
     cherryPickedCommitFgColor:
-      - '#b4befe'                # Lavender on Surface1 — the picked state
+      - '#b4befe' # Lavender on Surface1 — the picked state
     cherryPickedCommitBgColor:
-      - '#45475a'                # Surface1
+      - '#45475a' # Surface1
     markedBaseCommitFgColor:
-      - '#89b4fa'                # Blue
+      - '#89b4fa' # Blue
     markedBaseCommitBgColor:
-      - '#f9e2af'                # Yellow
+      - '#f9e2af' # Yellow
     unstagedChangesColor:
-      - '#f38ba8'                # Red — pastel, signals without alarm
+      - '#f38ba8' # Red — pastel, signals without alarm
     defaultFgColor:
-      - '#cdd6f4'                # Text — off-white, never pure white
-
+      - '#cdd6f4' # Text — off-white, never pure white
   authorColors:
-    '*': '#b4befe'                # all authors → Lavender
-
+    '*': '#b4befe' # all authors → Lavender
   # Branch colors carry semantics. Pastel hues from the Mocha palette
   # keep the arousal level low while preserving information density.
   branchColors:
-    main: '#94e2d5'                # Teal — calm authority, the standard
+    main: '#94e2d5' # Teal — calm authority, the standard
     master: '#94e2d5'
     develop: '#94e2d5'
-    docs: '#74c7ec'                # Sapphire — informational
-    feature: '#f9e2af'             # Yellow — work in progress
+    docs: '#74c7ec' # Sapphire — informational
+    feature: '#f9e2af' # Yellow — work in progress
     feat: '#f9e2af'
-    staging: '#cba6f7'             # Mauve — pre-prod, special
-    release: '#a6e3a1'             # Green — ready to ship
-    hotfix: '#f38ba8'              # Red — urgency, but pastel
+    staging: '#cba6f7' # Mauve — pre-prod, special
+    release: '#a6e3a1' # Green — ready to ship
+    hotfix: '#f38ba8' # Red — urgency, but pastel
     bugfix: '#f38ba8'
     fix: '#f38ba8'
-
   # Layout & info density.
   sidePanelWidth: 0.25
   expandFocusedSidePanel: true
   mainPanelSplitMode: flexible
-  showFileTree: true              # cognitive scaffolding > flat list
-  showListFooter: true            # "5 of 20" — orientation cue
-  showCommandLog: true            # transparency: see what lazygit ran
+  showFileTree: true # cognitive scaffolding > flat list
+  showListFooter: true # "5 of 20" — orientation cue
+  showCommandLog: true # transparency: see what lazygit ran
   commandLogSize: 8
   showBottomLine: true
   showRandomTip: true
@@ -65,39 +62,33 @@ gui:
   scrollHeight: 2
   scrollPastBottom: true
   commitLength:
-    show: true                    # nudge toward the 50-char convention
-  nerdFontsVersion: '3'           # Iosevka Nerd Font Mono is installed
+    show: true # nudge toward the 50-char convention
+  nerdFontsVersion: '3' # Iosevka Nerd Font Mono is installed
   mouseEvents: true
   timeFormat: '02 Jan 06 15:04 MST'
   language: auto
-
 confirmOnQuit: false
 quitOnTopLevelReturn: true
 disableStartupPopups: false
 notARepository: prompt
 promptToReturnFromSubprocess: true
-
 git:
   # delta is configured in modules/home/delta.nix. useConfig: false
   # tells lazygit to invoke our pager directly while delta still reads
   # the [delta] git-config section for its options (side-by-side, etc.).
-  paging:
-    colorArg: always
-    pager: delta --paging=never
-    useConfig: false
-
+  pagers:
+    - colorArg: always
+      pager: delta --paging=never
+      useConfig: false
   commit:
     signOff: false
-
   merging:
     manualCommit: false
     args: ''
-
   log:
-    order: topo-order             # easier visual graph reading
+    order: topo-order # easier visual graph reading
     showGraph: when-maximised
     showWholeGraph: false
-
   skipHookPrefix: WIP
   autoFetch: true
   autoForwardBranches: none
@@ -105,17 +96,14 @@ git:
   branchLogCmd: 'git log --graph --color=always --abbrev-commit --decorate --date=relative --pretty=medium {{branchName}} --'
   allBranchesLogCmds:
     - 'git log --graph --all --color=always --abbrev-commit --decorate --date=relative --pretty=medium'
-  overrideGpg: false              # let GPG agent handle prompts
+  overrideGpg: false # let GPG agent handle prompts
   disableForcePushing: false
-  parseEmoji: true                # render :sparkles: etc. in messages
-
+  parseEmoji: true # render :sparkles: etc. in messages
 refresher:
-  refreshInterval: 10             # file watcher, seconds
-  fetchInterval: 600              # background fetch, seconds
-
+  refreshInterval: 10 # file watcher, seconds
+  fetchInterval: 600 # background fetch, seconds
 update:
   method: prompt
   days: 14
-
 os:
-  editPreset: nvim                # opens diffs / commit msgs in nvim
+  editPreset: nvim # opens diffs / commit msgs in nvim

@@ -189,7 +189,16 @@
     '';
   };
 
-  programs.zsh.enable = true;
+  programs.zsh = {
+    enable = true;
+    # Bare directory path → cd. Covers `..`, `../..`, `~/src/foo`,
+    # etc. without per-pattern aliases. Idiomatic zsh; the same role
+    # puffer-fish plays in fish via interactive expansion. Lives here
+    # rather than in shells/zsh.nix because that module only loads
+    # when zsh is the active pillar — but manual zsh launches are
+    # always possible and should still get sane interactive defaults.
+    initContent = "setopt AUTO_CD";
+  };
 
   # Route `nix` through nom (nix-output-monitor). Declared once in
   # home.shellAliases — HM propagates it to bash, zsh, fish, and

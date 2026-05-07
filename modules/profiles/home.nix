@@ -39,7 +39,7 @@ let
     schema_version = schemaVersion;
     pillars = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
     capabilities = { editor = true; font = true; };
-    modules = { bat = true; delta = true; gh = true; lazygit = true; opencode = true; };
+    modules = { amoxide = true; ast-grep = true; bat = true; delta = true; gh = true; jaq = true; lazygit = true; opencode = true; osquery = true; procs = true; };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
   state =
@@ -73,7 +73,7 @@ in
     # Foundation + git are mandatory infrastructure (identity is sourced
     # externally per modules/home/git.nix); the wizard never asks about
     # them. Editor and font remain user-toggleable capabilities.
-    # Satellite tools (bat, delta, gh, lazygit, opencode) default-true
+    # Satellite tools (amoxide, ast-grep, bat, delta, gh, jaq, lazygit, opencode, osquery, procs) default-true
     # via `modules.<name> or true`, preserving v1 behavior on hosts
     # whose state file predates the [modules] section.
     [
@@ -85,11 +85,16 @@ in
     ++ lib.optional (multiplexerModule != null) multiplexerModule
     ++ lib.optional (caps.editor   or true) homeModules.editor
     ++ lib.optional (caps.font     or true) homeModules.font
-    ++ lib.optional (modules.bat      or true) homeModules.bat
-    ++ lib.optional (modules.delta    or true) homeModules.delta
-    ++ lib.optional (modules.gh       or true) homeModules.gh
-    ++ lib.optional (modules.lazygit  or true) homeModules.lazygit
-    ++ lib.optional (modules.opencode or true) homeModules.opencode;
+    ++ lib.optional (modules.amoxide      or true) homeModules.amoxide
+    ++ lib.optional (modules."ast-grep"   or true) homeModules."ast-grep"
+    ++ lib.optional (modules.bat          or true) homeModules.bat
+    ++ lib.optional (modules.delta        or true) homeModules.delta
+    ++ lib.optional (modules.gh           or true) homeModules.gh
+    ++ lib.optional (modules.jaq          or true) homeModules.jaq
+    ++ lib.optional (modules.lazygit      or true) homeModules.lazygit
+    ++ lib.optional (modules.opencode     or true) homeModules.opencode
+    ++ lib.optional (modules.osquery      or true) homeModules.osquery
+    ++ lib.optional (modules.procs        or true) homeModules.procs;
 
   home.username = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;
