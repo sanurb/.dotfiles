@@ -11,6 +11,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/dym"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
@@ -188,6 +190,12 @@ func runInstall(rest []string) int {
 			// satisfy those prereqs out-of-band — exit 2 matches
 			// the cliflags contract: "refuse to prompt; exit 2 if
 			// a prompt is needed."
+			if common.JSON {
+				_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+					envelope.New(envelope.CodeBootstrapRequired,
+						"workspace not found and bootstrap requires interactive consent"))
+				return exitcode.Misuse
+			}
 			fmt.Fprintln(os.Stderr, "init: bootstrap requires interactive consent (workspace not found).")
 			fmt.Fprintln(os.Stderr, "      Clone the repo and re-run, or drop --non-interactive.")
 			return exitcode.Misuse
@@ -199,16 +207,35 @@ func runInstall(rest []string) int {
 
 	root, err := workspace.Root()
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+				envelope.Wrap(envelope.CodeWorkspaceNotFound, err))
+			return exitcode.Failure
+		}
 		fmt.Fprintln(os.Stderr, "init:", err)
 		return exitcode.Failure
 	}
 	initial, err := resolveInitialState(root, common.Config)
 	if err != nil {
+		if common.JSON {
+			code := envelope.CodeConfigInvalid
+			if errors.Is(err, errConfigNotFound) {
+				code = envelope.CodeConfigNotFound
+			}
+			_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+				envelope.Wrap(code, err))
+			return exitcode.Misuse
+		}
 		fmt.Fprintln(os.Stderr, "init:", err)
 		return exitcode.Misuse
 	}
 	deps, err := newWizardDeps(initial)
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, initCommandLine(rest, common),
+				envelope.Wrap(envelope.CodeInternalError, err))
+			return exitcode.Failure
+		}
 		fmt.Fprintln(os.Stderr, "init:", err)
 		return exitcode.Failure
 	}

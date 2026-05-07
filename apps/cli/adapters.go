@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -147,6 +148,13 @@ func loadInitialState(workspaceRoot string) state.State {
 	return state.Default()
 }
 
+// errConfigNotFound is the sentinel returned by loadOverrideState
+// when --config PATH points at a non-existent file. Distinct from a
+// validation error so the JSON envelope wiring can map "missing
+// path" to CONFIG_NOT_FOUND and "exists but invalid" to
+// CONFIG_INVALID — two codes the catalog distinguishes intentionally.
+var errConfigNotFound = errors.New("config file not found")
+
 // loadOverrideState reads an explicit state file path supplied via
 // --config. Distinct from loadInitialState in that any failure is fatal:
 // the user named a specific file and silent fallback to defaults would
@@ -158,7 +166,7 @@ func loadOverrideState(path string) (state.State, error) {
 		return state.State{}, fmt.Errorf("--config %s: %w", path, err)
 	}
 	if !found {
-		return state.State{}, fmt.Errorf("--config %s: file not found", path)
+		return state.State{}, fmt.Errorf("--config %s: %w", path, errConfigNotFound)
 	}
 	if verr := s.Validate(); verr != nil {
 		return state.State{}, fmt.Errorf("--config %s: %w", path, verr)

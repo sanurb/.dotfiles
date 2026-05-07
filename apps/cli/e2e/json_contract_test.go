@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -227,6 +228,7 @@ func TestEveryEnvelopeIsValidJSON(t *testing.T) {
 		{"apply", "--dry-run", "--json"},
 		{"why", "--json", "/tmp/nope"},
 		{"capture", "--json"},
+		{"init", "--non-interactive", "--json"},
 	}
 	for _, argv := range verbs {
 		t.Run(strings.Join(argv, " "), func(t *testing.T) {
@@ -244,6 +246,80 @@ func TestEveryEnvelopeIsValidJSON(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestInitJSONHeadless pins the init headless --json contract: a
+// success envelope with the persisted persona in result and a clear
+// `dots apply` next-action. The realize-no path is the common case
+// (a CI step that wants to seed state without committing to a full
+// apply); the realize-yes path delegates to apply, which emits its
+// own envelope.
+func TestInitJSONHeadless(t *testing.T) {
+	h := newHarness(t).
+		withStub("nix", nixStubBody).
+		withStateFile(buildStateTOML(stateOverrides{Shell: "zsh"}))
+
+	got := h.run("init", "--non-interactive", "--json")
+	assertEqual(t, got.ExitCode, 0)
+
+	env := decodeSuccess(t, got.Stdout)
+	assertEqual(t, env["ok"], true)
+	body := mustObject(t, env, "result")
+	assertEqual(t, body["persisted"], true)
+	assertEqual(t, body["shell"], "zsh")
+	actions := mustArray(t, env, "next_actions")
+	if !actionsContainCommand(actions, "dots apply") {
+		t.Fatalf("init --json next_actions must include `dots apply`, got %v", actions)
+	}
+}
+
+// TestInitJSONMissingConfigYieldsNotFoundEnvelope pins the missing-
+// path branch of init --json: a non-existent --config emits the
+// distinct CONFIG_NOT_FOUND code, separate from CONFIG_INVALID. This
+// distinction matters because the agent's recovery path differs:
+// a missing file means "create or fix the path"; an invalid file
+// means "fix the contents."
+func TestInitJSONMissingConfigYieldsNotFoundEnvelope(t *testing.T) {
+	h := newHarness(t).
+		withStub("nix", nixStubBody).
+		withStateFile(buildStateTOML(stateOverrides{}))
+
+	got := h.run("init", "--non-interactive", "--json", "--config", "/this/path/does/not/exist.toml")
+	assertEqual(t, got.ExitCode, 2)
+
+	env := decodeError(t, got.Stdout)
+	errBody := mustObject(t, env, "error")
+	assertEqual(t, errBody["code"], "CONFIG_NOT_FOUND")
+	assertEqual(t, env["user_action_required"], true)
+}
+
+// TestInitJSONInvalidConfigYieldsInvalidEnvelope pins the
+// exists-but-bad branch of --config: a present file with a pillar
+// value outside the closed set is CONFIG_INVALID. Together with the
+// not-found test above, this proves the two-axis classification the
+// catalog promises.
+func TestInitJSONInvalidConfigYieldsInvalidEnvelope(t *testing.T) {
+	h := newHarness(t).
+		withStub("nix", nixStubBody).
+		withStateFile(buildStateTOML(stateOverrides{}))
+
+	bad := filepath.Join(t.TempDir(), "bad.toml")
+	if err := os.WriteFile(bad, []byte(`schema_version = 2
+
+[pillars]
+shell       = "bogus"
+terminal    = "ghostty"
+multiplexer = "none"
+`), 0o644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	got := h.run("init", "--non-interactive", "--json", "--config", bad)
+	assertEqual(t, got.ExitCode, 2)
+
+	env := decodeError(t, got.Stdout)
+	errBody := mustObject(t, env, "error")
+	assertEqual(t, errBody["code"], "CONFIG_INVALID")
+	assertEqual(t, env["user_action_required"], true)
 }
 
 // decodeSuccess unmarshals stdout as a single-line success envelope,

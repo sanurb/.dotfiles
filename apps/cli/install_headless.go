@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/ui"
 )
@@ -27,28 +28,84 @@ import (
 // realization" and is the exact tech-debt shape this refactor exists
 // to avoid.
 func runHeadlessInstall(deps ui.Deps, common cliflags.Common) int {
+	command := "dots init --non-interactive"
+	if common.Yes {
+		command += " --yes"
+	}
+
 	plan, err := planHeadlessInstall(deps.Initial, common)
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, command,
+				envelope.Wrap(envelope.CodeStateInvalid, err))
+			return exitcode.Misuse
+		}
 		fmt.Fprintln(os.Stderr, "init:", err)
 		return exitcode.Misuse
 	}
 
 	if err := deps.StatePersister.SaveState(deps.Initial); err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, command,
+				envelope.Wrap(envelope.CodeInternalError, fmt.Errorf("persist state: %w", err)))
+			return exitcode.Failure
+		}
 		fmt.Fprintln(os.Stderr, "init: persist state:", err)
 		return exitcode.Failure
 	}
 
 	if !plan.realize {
+		if common.JSON {
+			_ = envelope.OK(os.Stdout, command, headlessInstallResultBodyFromState(deps),
+				headlessNextActionsWithoutRealize())
+			return exitcode.Success
+		}
 		printInstallNextSteps()
 		return exitcode.Success
 	}
 
 	self, rerr := resolveSelf()
 	if rerr != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, command,
+				envelope.Wrap(envelope.CodeInternalError, rerr))
+			return exitcode.Failure
+		}
 		fmt.Fprintln(os.Stderr, "apply:", rerr)
 		return exitcode.Failure
 	}
+	// Hand-off to apply: the child emits its own envelope (snapshot
+	// for --dry-run, NDJSON stream + terminal for the real apply).
+	// init's exit code mirrors the child's; init itself emits nothing
+	// further so stdout carries exactly one envelope per invocation.
 	return run(self, plan.applyArgs...)
+}
+
+// headlessInstallResultBody is the result body for the
+// no-realize-yet success envelope. It echoes back the persisted
+// persona so an agent doesn't have to follow up with `dots profile
+// show` to confirm what landed on disk.
+type headlessInstallResultBody struct {
+	Persisted bool   `json:"persisted"`
+	Shell     string `json:"shell"`
+	Terminal  string `json:"terminal"`
+}
+
+func headlessInstallResultBodyFromState(deps ui.Deps) headlessInstallResultBody {
+	return headlessInstallResultBody{
+		Persisted: true,
+		Shell:     deps.Initial.Pillars.Shell,
+		Terminal:  deps.Initial.Pillars.Terminal,
+	}
+}
+
+// headlessNextActionsWithoutRealize is the next_actions for the
+// "profile saved, didn't realize" path: the natural follow-up is
+// `dots apply`, so we put it first with no params (literal command).
+func headlessNextActionsWithoutRealize() []envelope.Action {
+	return []envelope.Action{
+		{Command: "dots apply", Description: "Realize the just-persisted profile."},
+	}
 }
 
 // headlessPlan is the testable decision the headless install boils

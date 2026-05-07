@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+)
 
 // joinArgs reconstructs an as-invoked argument list for the envelope's
 // `command` field. Quoting is intentionally minimal: the field is a
@@ -12,4 +16,14 @@ func joinArgs(rest []string) string {
 		return ""
 	}
 	return strings.Join(rest, " ")
+}
+
+// initCommandLine renders the as-invoked `dots init ...` for the
+// envelope's command field. Args parse before the workspace probe
+// so we have the full rest slice at every error site.
+func initCommandLine(rest []string, _ cliflags.Common) string {
+	if len(rest) == 0 {
+		return "dots init"
+	}
+	return "dots init " + strings.Join(rest, " ")
 }
