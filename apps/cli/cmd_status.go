@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/applied"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
@@ -35,15 +35,15 @@ type statusLastApplyJSON struct {
 	AppliedAt string `json:"appliedAt"`
 }
 
-// statusDocJSON is the full envelope. The pointer fields signal "this
-// host has nothing here yet" with a JSON null, which is unambiguous and
+// statusDocJSON is the verb-specific result body nested under
+// envelope.Envelope.Result. The pointer fields signal "this host has
+// nothing here yet" with a JSON null, which is unambiguous and
 // trivial for jq consumers to branch on.
 type statusDocJSON struct {
-	SchemaVersion int                  `json:"schemaVersion"`
-	Workspace     string               `json:"workspace"`
-	Profile       *statusProfileJSON   `json:"profile"`
-	LastApply     *statusLastApplyJSON `json:"lastApply"`
-	Drift         *statusDriftJSON     `json:"drift"`
+	Workspace string               `json:"workspace"`
+	Profile   *statusProfileJSON   `json:"profile"`
+	LastApply *statusLastApplyJSON `json:"lastApply"`
+	Drift     *statusDriftJSON     `json:"drift"`
 }
 
 // statusDriftJSON reports whether the live receipt matches a fresh
@@ -124,8 +124,7 @@ func runStatus(rest []string) int {
 		// answer "is dots installed on this host?" — the answer is
 		// "yes, but nothing to report" rather than a usage error.
 		if common.JSON {
-			doc := statusDocJSON{SchemaVersion: 1}
-			emitStatusJSON(doc)
+			_ = envelope.OK(os.Stdout, statusCommandLine(rest), statusDocJSON{}, statusNoWorkspaceActions())
 		} else {
 			fmt.Fprintln(os.Stderr, "status: no workspace; nothing to report")
 		}
@@ -191,13 +190,13 @@ func runStatus(rest []string) int {
 	}
 
 	if common.JSON {
-		emitStatusJSON(statusDocJSON{
-			SchemaVersion: 1,
-			Workspace:     root,
-			Profile:       profilePtr,
-			LastApply:     lastPtr,
-			Drift:         driftPtr,
-		})
+		body := statusDocJSON{
+			Workspace: root,
+			Profile:   profilePtr,
+			LastApply: lastPtr,
+			Drift:     driftPtr,
+		}
+		_ = envelope.OK(os.Stdout, statusCommandLine(rest), body, statusActions(drift, root))
 		return exitcode.Success
 	}
 
@@ -205,12 +204,50 @@ func runStatus(rest []string) int {
 	return exitcode.Success
 }
 
-// emitStatusJSON writes the JSON envelope to stdout with two-space
-// indent — the same shape every other --json surface uses.
-func emitStatusJSON(doc statusDocJSON) {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(doc)
+// statusCommandLine reconstructs the as-invoked command for the
+// envelope's `command` field. Snapshot verbs render this verbatim so
+// agents can correlate the response with the request without keeping
+// their own bookkeeping.
+func statusCommandLine(rest []string) string {
+	if len(rest) == 0 {
+		return "dots status"
+	}
+	return "dots status " + joinArgs(rest)
+}
+
+// statusNoWorkspaceActions are the next-step affordances when status
+// runs outside a workspace. The single load-bearing action is
+// `dots init` — the agent's recovery path is to clone or run-via-nix.
+func statusNoWorkspaceActions() []envelope.Action {
+	return []envelope.Action{
+		{
+			Command:     "dots init",
+			Description: "Clone the dotfiles workspace and run the install wizard.",
+		},
+	}
+}
+
+// statusActions returns the contextual next_actions for a status
+// success envelope. Drift drives the urgency: stale or no-receipt
+// makes `dots apply` the primary affordance; converged makes
+// `dots doctor` the audit.
+func statusActions(drift driftKind, _ string) []envelope.Action {
+	switch drift {
+	case driftStale, driftNoReceipt:
+		return []envelope.Action{
+			{Command: "dots apply", Description: "Realize the current plan."},
+			{Command: "dots plan", Description: "Preview what apply would do."},
+		}
+	case driftRollback:
+		return []envelope.Action{
+			{Command: "dots apply", Description: "Re-converge against the current workspace."},
+		}
+	default: // converged or unknown
+		return []envelope.Action{
+			{Command: "dots doctor", Description: "Audit the realized environment against the declared persona."},
+			{Command: "dots plan", Description: "Preview the next apply."},
+		}
+	}
 }
 
 // renderStatusHuman prints the two-column layout for human consumers.

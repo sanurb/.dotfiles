@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
@@ -52,16 +52,37 @@ func runWhy(rest []string) int {
 
 	args := flagSet.Args()
 	if len(args) == 0 {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+				envelope.New(envelope.CodeInvalidArgument, "why: path required").
+					WithFix("Pass exactly one path: `dots why <path>`."))
+			return exitcode.Misuse
+		}
 		fmt.Fprintln(os.Stderr, "why: path required; usage: dots why <path>")
 		return exitcode.Misuse
 	}
 	if len(args) > 1 {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+				envelope.New(envelope.CodeInvalidArgument, "why: too many arguments").
+					WithFix("Pass exactly one path: `dots why <path>`."))
+			return exitcode.Misuse
+		}
 		fmt.Fprintln(os.Stderr, "why: too many arguments; usage: dots why <path>")
 		return exitcode.Misuse
 	}
 
 	root, err := workspace.Root()
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+				envelope.Wrap(envelope.CodeWorkspaceNotFound, err).
+					WithNextActions(envelope.Action{
+						Command:     "dots init",
+						Description: "Clone the dotfiles workspace and run the install wizard.",
+					}))
+			return exitcode.PreFlight
+		}
 		fmt.Fprintln(os.Stderr, "why: workspace required to answer ownership questions")
 		fmt.Fprintln(os.Stderr, "where:", err)
 		fmt.Fprintln(os.Stderr, "next: clone the dotfiles repo and run `dots why` from inside it")
@@ -70,18 +91,32 @@ func runWhy(rest []string) int {
 
 	target, err := resolveQueryPath(args[0])
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+				envelope.Wrap(envelope.CodeInvalidArgument, fmt.Errorf("resolve %q: %w", args[0], err)))
+			return exitcode.Failure
+		}
 		fmt.Fprintf(os.Stderr, "why: resolve %q: %v\n", args[0], err)
 		return exitcode.Failure
 	}
 
 	owner, ferr := findOwner(root, target)
 	if ferr != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, whyCommandLine(rest),
+				envelope.Wrap(envelope.CodeInternalError, ferr))
+			return exitcode.Failure
+		}
 		fmt.Fprintln(os.Stderr, "why: scan modules:", ferr)
 		return exitcode.Failure
 	}
 
 	if common.JSON {
-		emitWhyJSON(target, owner)
+		body := whyResultJSON{Path: target, Owner: owner, Status: "unmanaged"}
+		if owner != "" {
+			body.Status = "managed"
+		}
+		_ = envelope.OK(os.Stdout, whyCommandLine(rest), body, whyActions(owner))
 		return exitcode.Success
 	}
 	if owner == "" {
@@ -92,16 +127,26 @@ func runWhy(rest []string) int {
 	return exitcode.Success
 }
 
-// emitWhyJSON serializes the result with the same indented JSON style
-// every other --json surface uses.
-func emitWhyJSON(path, owner string) {
-	doc := whyResultJSON{Path: path, Owner: owner, Status: "unmanaged"}
-	if owner != "" {
-		doc.Status = "managed"
+// whyCommandLine reconstructs the as-invoked command for the
+// envelope's `command` field.
+func whyCommandLine(rest []string) string {
+	if len(rest) == 0 {
+		return "dots why"
 	}
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(doc)
+	return "dots why " + joinArgs(rest)
+}
+
+// whyActions returns the contextual next_actions for a why response.
+// A managed path's owner is in modules/, so `dots apply` is the
+// recovery path after edits; an unmanaged path has no follow-up
+// inside dots.
+func whyActions(owner string) []envelope.Action {
+	if owner == "" {
+		return nil
+	}
+	return []envelope.Action{
+		{Command: "dots apply", Description: "Realize the workspace after editing the owning module."},
+	}
 }
 
 // resolveQueryPath turns the user-supplied path into an absolute one.

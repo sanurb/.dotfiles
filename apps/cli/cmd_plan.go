@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"os"
+	"time"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
 )
 
 const cmdPlanSummary = "Compute the plan that `dots apply` would execute"
@@ -41,6 +43,12 @@ func runPlan(rest []string) int {
 
 	p, err := computePlan(profile)
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, planCommandLine(rest),
+				envelope.Wrap(envelope.CodeInternalError, err).
+					WithFix("Re-run with -v to see more, or check $HOME readability."))
+			return exitcode.Failure
+		}
 		fmt.Fprintln(os.Stderr, "plan: compute failed:")
 		fmt.Fprintln(os.Stderr, "  what: cannot inspect host")
 		fmt.Fprintf(os.Stderr, "  why:  %s\n", err)
@@ -48,43 +56,109 @@ func runPlan(rest []string) int {
 		return exitcode.Failure
 	}
 
-	w, closer, err := openPlanOutput(outPath)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "plan:", err)
-		return exitcode.Failure
-	}
-	defer closer()
-
-	if common.JSON {
-		if err := p.Encode(w); err != nil {
-			fmt.Fprintln(os.Stderr, "plan: encode:", err)
+	// --out FILE always writes the raw Plan as a replay artifact —
+	// `dots apply --plan FILE` consumes that exact format. The
+	// envelope on stdout (under --json) is a separate consumer; we
+	// don't duplicate the full plan into both, only the summary.
+	if outPath != "" {
+		f, err := os.Create(outPath)
+		if err != nil {
+			if common.JSON {
+				_ = envelope.Fail(os.Stdout, planCommandLine(rest),
+					envelope.Wrap(envelope.CodeInvalidArgument, fmt.Errorf("open %s: %w", outPath, err)))
+				return exitcode.Failure
+			}
+			fmt.Fprintln(os.Stderr, "plan: open:", err)
 			return exitcode.Failure
 		}
-		return exitcode.Success
-	}
-
-	renderPlan(w, p, !common.NoColor)
-	if outPath == "" {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Run `dots apply` to execute, or `dots plan --out FILE` to save.")
-	}
-	return exitcode.Success
-}
-
-// openPlanOutput resolves --out: empty means stdout (no-op closer);
-// otherwise create the file and return a closer that propagates close
-// errors via stderr at defer time.
-func openPlanOutput(path string) (io.Writer, func(), error) {
-	if path == "" {
-		return os.Stdout, func() {}, nil
-	}
-	f, err := os.Create(path)
-	if err != nil {
-		return nil, nil, fmt.Errorf("open %s: %w", path, err)
-	}
-	return f, func() {
+		if encErr := p.Encode(f); encErr != nil {
+			_ = f.Close()
+			if common.JSON {
+				_ = envelope.Fail(os.Stdout, planCommandLine(rest),
+					envelope.Wrap(envelope.CodeInternalError, encErr))
+				return exitcode.Failure
+			}
+			fmt.Fprintln(os.Stderr, "plan: encode:", encErr)
+			return exitcode.Failure
+		}
 		if cerr := f.Close(); cerr != nil {
 			fmt.Fprintln(os.Stderr, "plan: close:", cerr)
 		}
-	}, nil
+		if common.JSON {
+			_ = envelope.OK(os.Stdout, planCommandLine(rest),
+				planSummaryJSON(p, outPath),
+				planActionsWithFile(outPath))
+			return exitcode.Success
+		}
+		// Non-JSON --out path stays as today: file holds the plan,
+		// stdout stays empty (no human render to a file).
+		return exitcode.Success
+	}
+
+	if common.JSON {
+		_ = envelope.OK(os.Stdout, planCommandLine(rest), p, planActions())
+		return exitcode.Success
+	}
+
+	renderPlan(os.Stdout, p, !common.NoColor)
+	fmt.Println()
+	fmt.Println("Run `dots apply` to execute, or `dots plan --out FILE` to save.")
+	return exitcode.Success
+}
+
+// planCommandLine reconstructs the as-invoked command for the
+// envelope's `command` field.
+func planCommandLine(rest []string) string {
+	if len(rest) == 0 {
+		return "dots plan"
+	}
+	return "dots plan " + joinArgs(rest)
+}
+
+// planSummaryJSON is the result body when --out wrote the plan to a
+// file: a small summary that points to the full artifact rather than
+// duplicating it on stdout. The summary fields are stable; the full
+// plan is read from out_path by `dots apply --plan FILE`.
+type planSummaryBody struct {
+	OutPath     string `json:"out_path"`
+	Hash        string `json:"hash"`
+	Profile     string `json:"profile"`
+	GeneratedAt string `json:"generated_at"`
+	StepCount   int    `json:"step_count"`
+}
+
+func planSummaryJSON(p plan.Plan, outPath string) planSummaryBody {
+	return planSummaryBody{
+		OutPath:     outPath,
+		Hash:        p.Hash,
+		Profile:     p.Profile,
+		GeneratedAt: p.GeneratedAt.UTC().Format(time.RFC3339),
+		StepCount:   len(p.Steps),
+	}
+}
+
+func planActions() []envelope.Action {
+	return []envelope.Action{
+		{Command: "dots apply", Description: "Execute this plan."},
+		{
+			Command:     "dots plan --out <path>",
+			Description: "Save the plan to a file for replay or review.",
+			Params: map[string]envelope.ActionParam{
+				"path": {Description: "Path to write the plan JSON.", Required: true},
+			},
+		},
+	}
+}
+
+func planActionsWithFile(outPath string) []envelope.Action {
+	return []envelope.Action{
+		{
+			Command:     "dots apply --plan <path>",
+			Description: "Replay the saved plan, refusing to run if a fresh compute would diverge.",
+			Params: map[string]envelope.ActionParam{
+				"path": {Description: "Plan file written by `dots plan --out`.", Value: outPath, Required: true},
+			},
+		},
+		{Command: "dots apply", Description: "Recompute and execute the plan in one step."},
+	}
 }

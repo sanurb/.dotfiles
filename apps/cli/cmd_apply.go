@@ -16,6 +16,7 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/applied"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/loginshell"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/nix"
@@ -87,9 +88,11 @@ func runApply(rest []string) int {
 	}
 
 	// --dry-run: render and exit. NoOp if there's literally nothing to
-	// do, Success otherwise.
+	// do, Success otherwise. Even though apply itself is a
+	// long-running verb, dry-run is point-in-time: no run_id, no
+	// log_path — this branch emits a snapshot envelope.
 	if common.DryRun {
-		emitPlan(p, common)
+		emitPlan(p, common, rest)
 		if len(p.Steps) == 0 {
 			return exitcode.NoOp
 		}
@@ -322,15 +325,44 @@ func needsInteractiveConsent(p plan.Plan) bool {
 	return p.HasKind(plan.KindBootstrapNix, plan.KindCloneWorkspace)
 }
 
-// emitPlan respects --json: machine output to stdout, human output to
-// stdout (since dry-run IS the result and there's no later side effect
-// to keep stdout pristine for).
-func emitPlan(p plan.Plan, common cliflags.Common) {
+// emitPlan respects --json: envelope-wrapped plan to stdout, human
+// rendering otherwise. dry-run is point-in-time so the envelope is a
+// snapshot variant — no run_id, no log_path. The verb-specific
+// next_actions reflect the dry-run-as-preview semantic: the natural
+// follow-up is `dots apply` (commit) or `dots plan --out` (replay).
+func emitPlan(p plan.Plan, common cliflags.Common, rest []string) {
 	if common.JSON {
-		_ = p.Encode(os.Stdout)
+		_ = envelope.OK(os.Stdout, applyDryRunCommandLine(rest), p, applyDryRunActions())
 		return
 	}
 	renderPlan(os.Stdout, p, !common.NoColor)
+}
+
+// applyDryRunCommandLine reconstructs the as-invoked command for the
+// envelope's `command` field. dry-run is the only --json path
+// reachable through `runApply`; the streaming path (commit 3) builds
+// its own command line.
+func applyDryRunCommandLine(rest []string) string {
+	if len(rest) == 0 {
+		return "dots apply --dry-run"
+	}
+	return "dots apply " + joinArgs(rest)
+}
+
+// applyDryRunActions returns the contextual next_actions for a
+// dry-run preview. The two affordances cover the two natural
+// follow-ups: commit (drop --dry-run) or persist for replay.
+func applyDryRunActions() []envelope.Action {
+	return []envelope.Action{
+		{Command: "dots apply", Description: "Execute this plan."},
+		{
+			Command:     "dots plan --out <path>",
+			Description: "Save the plan as a replay artifact.",
+			Params: map[string]envelope.ActionParam{
+				"path": {Description: "Path to write the plan JSON.", Required: true},
+			},
+		},
+	}
 }
 
 // isAlreadyApplied returns true only when the plan is pure

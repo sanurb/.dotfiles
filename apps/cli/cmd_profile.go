@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
@@ -18,17 +18,16 @@ import (
 // extend list/use.
 const cmdProfileSummary = "Inspect the active profile (use <name> reserved for a future release)"
 
-// profileShowJSON is the JSON projection of state.State for `profile
-// show --json`. Mirrors the field set the human renderer prints; the
-// JSON consumer wants the same data plus stable types (booleans, not
-// "true"/"false" strings).
+// profileShowJSON is the result body nested under envelope.OK for
+// `profile show --json`. Mirrors the field set the human renderer
+// prints; the JSON consumer wants the same data plus stable types
+// (booleans, not "true"/"false" strings).
 type profileShowJSON struct {
-	SchemaVersion int    `json:"schemaVersion"`
-	Shell         string `json:"shell"`
-	Terminal      string `json:"terminal"`
-	Multiplexer   string `json:"multiplexer"`
-	Editor        bool   `json:"editor"`
-	Font          bool   `json:"font"`
+	Shell       string `json:"shell"`
+	Terminal    string `json:"terminal"`
+	Multiplexer string `json:"multiplexer"`
+	Editor      bool   `json:"editor"`
+	Font        bool   `json:"font"`
 }
 
 // runProfile dispatches over the subcommand. We hand-roll the dispatch
@@ -128,6 +127,15 @@ func runProfileShow(rest []string) int {
 
 	root, err := workspace.Root()
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, profileShowCommandLine(rest),
+				envelope.Wrap(envelope.CodeWorkspaceNotFound, err).
+					WithNextActions(envelope.Action{
+						Command:     "dots init",
+						Description: "Clone the dotfiles workspace and run the install wizard.",
+					}))
+			return exitcode.PreFlight
+		}
 		fmt.Fprintln(os.Stderr, "profile show: workspace required")
 		fmt.Fprintln(os.Stderr, "where:", err)
 		fmt.Fprintln(os.Stderr, "next: clone the dotfiles repo and run from inside it")
@@ -136,14 +144,22 @@ func runProfileShow(rest []string) int {
 
 	s, found, err := state.Load(state.Path(root))
 	if err != nil {
+		if common.JSON {
+			_ = envelope.Fail(os.Stdout, profileShowCommandLine(rest),
+				envelope.Wrap(envelope.CodeStateParseFailed, err))
+			return exitcode.Failure
+		}
 		fmt.Fprintln(os.Stderr, "profile show: read state:", err)
 		return exitcode.Failure
 	}
 	if !found {
 		if common.JSON {
-			// Emit a typed null so jq consumers can distinguish
-			// "no profile" from a parse failure cleanly.
-			fmt.Println("null")
+			// "No profile" is informational, not an error: the file
+			// simply hasn't been written yet. Emit a success envelope
+			// with result=null and a clear next-action.
+			_ = envelope.OK(os.Stdout, profileShowCommandLine(rest), nil, []envelope.Action{
+				{Command: "dots init", Description: "Run the install wizard to capture a persona."},
+			})
 			return exitcode.Success
 		}
 		fmt.Println("(no profile selected — run `dots install` to capture one)")
@@ -151,17 +167,17 @@ func runProfileShow(rest []string) int {
 	}
 
 	if common.JSON {
-		doc := profileShowJSON{
-			SchemaVersion: s.SchemaVersion,
-			Shell:         s.Pillars.Shell,
-			Terminal:      s.Pillars.Terminal,
-			Multiplexer:   s.Pillars.Multiplexer,
-			Editor:        s.Capabilities.Editor,
-			Font:          s.Capabilities.Font,
+		body := profileShowJSON{
+			Shell:       s.Pillars.Shell,
+			Terminal:    s.Pillars.Terminal,
+			Multiplexer: s.Pillars.Multiplexer,
+			Editor:      s.Capabilities.Editor,
+			Font:        s.Capabilities.Font,
 		}
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		_ = enc.Encode(doc)
+		_ = envelope.OK(os.Stdout, profileShowCommandLine(rest), body, []envelope.Action{
+			{Command: "dots apply", Description: "Realize this profile."},
+			{Command: "dots init", Description: "Re-run the wizard to change the profile."},
+		})
 		return exitcode.Success
 	}
 
@@ -172,6 +188,15 @@ func runProfileShow(rest []string) int {
 	fmt.Printf("editor          %v\n", s.Capabilities.Editor)
 	fmt.Printf("font            %v\n", s.Capabilities.Font)
 	return exitcode.Success
+}
+
+// profileShowCommandLine reconstructs the as-invoked command for the
+// envelope's `command` field; mirrors statusCommandLine's contract.
+func profileShowCommandLine(rest []string) string {
+	if len(rest) == 0 {
+		return "dots profile show"
+	}
+	return "dots profile show " + joinArgs(rest)
 }
 
 // runProfileUse is the documented stub. Exit 2 (misuse): the verb is

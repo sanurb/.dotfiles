@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/sanurb/.dotfiles/apps/cli/internal/cliflags"
+	"github.com/sanurb/.dotfiles/apps/cli/internal/envelope"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/exitcode"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
@@ -53,23 +54,104 @@ func runCapture(rest []string) int {
 
 	doc := buildCaptureDoc()
 
-	body, err := renderCapture(doc, common.JSON)
+	// File path: the on-disk artifact is always the same shape
+	// (TOML or raw-doc JSON) regardless of --json on stdout — peer
+	// hosts and `dots install` consume it directly. The envelope is
+	// only emitted on stdout, never written to --output.
+	if *output != "" {
+		body, err := renderCapture(doc, common.JSON)
+		if err != nil {
+			if common.JSON {
+				_ = envelope.Fail(os.Stdout, captureCommandLine(rest),
+					envelope.Wrap(envelope.CodeInternalError, err))
+				return exitcode.Failure
+			}
+			fmt.Fprintln(os.Stderr, "capture:", err)
+			return exitcode.Failure
+		}
+		if err := writeCaptureFile(*output, body); err != nil {
+			if common.JSON {
+				_ = envelope.Fail(os.Stdout, captureCommandLine(rest),
+					envelope.Wrap(envelope.CodeInvalidArgument, fmt.Errorf("write %s: %w", *output, err)).
+						WithFix("Confirm the parent directory exists and is writable, or pick a different --output path."))
+				return exitcode.Failure
+			}
+			fmt.Fprintf(os.Stderr, "capture: write %s: %v\n", *output, err)
+			fmt.Fprintln(os.Stderr, "next: confirm the parent directory exists and is writable, or pick a different --output path")
+			return exitcode.Failure
+		}
+		if common.JSON {
+			_ = envelope.OK(os.Stdout, captureCommandLine(rest),
+				captureSummary(doc, *output),
+				captureActionsWithFile(*output))
+			return exitcode.Success
+		}
+		return exitcode.Success
+	}
+
+	// stdout sink:
+	if common.JSON {
+		_ = envelope.OK(os.Stdout, captureCommandLine(rest), doc, captureActions())
+		return exitcode.Success
+	}
+	body, err := renderCapture(doc, false)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "capture:", err)
 		return exitcode.Failure
 	}
-
-	if *output == "" {
-		_, _ = os.Stdout.Write(body)
-		return exitcode.Success
-	}
-
-	if err := writeCaptureFile(*output, body); err != nil {
-		fmt.Fprintf(os.Stderr, "capture: write %s: %v\n", *output, err)
-		fmt.Fprintln(os.Stderr, "next: confirm the parent directory exists and is writable, or pick a different --output path")
-		return exitcode.Failure
-	}
+	_, _ = os.Stdout.Write(body)
 	return exitcode.Success
+}
+
+// captureCommandLine reconstructs the as-invoked command for the
+// envelope's `command` field.
+func captureCommandLine(rest []string) string {
+	if len(rest) == 0 {
+		return "dots capture"
+	}
+	return "dots capture " + joinArgs(rest)
+}
+
+// captureSummaryBody is the result body when --output wrote the doc
+// to a file. Pointing at the artifact rather than duplicating it on
+// stdout keeps the envelope small and matches the plan-with-out
+// pattern.
+type captureSummaryBody struct {
+	OutPath  string `json:"out_path"`
+	Hostname string `json:"hostname"`
+	Profile  string `json:"profile,omitempty"` // pillar one-liner when present
+}
+
+func captureSummary(doc captureDoc, outPath string) captureSummaryBody {
+	body := captureSummaryBody{OutPath: outPath, Hostname: doc.Host.Hostname}
+	if doc.Profile != nil {
+		body.Profile = doc.Profile.Shell + " · " + doc.Profile.Terminal + " · " + doc.Profile.Multiplexer
+	}
+	return body
+}
+
+func captureActions() []envelope.Action {
+	return []envelope.Action{
+		{
+			Command:     "dots capture --output <path>",
+			Description: "Save the captured doc as an artifact for `dots init --config <path>`.",
+			Params: map[string]envelope.ActionParam{
+				"path": {Description: "File path to write the captured TOML or JSON.", Required: true},
+			},
+		},
+	}
+}
+
+func captureActionsWithFile(outPath string) []envelope.Action {
+	return []envelope.Action{
+		{
+			Command:     "dots init --non-interactive --config <path>",
+			Description: "Seed the install wizard from this captured doc on a peer host.",
+			Params: map[string]envelope.ActionParam{
+				"path": {Description: "Path to the file just written.", Value: outPath, Required: true},
+			},
+		},
+	}
 }
 
 // buildCaptureDoc collects the host fingerprint and (optionally) the
