@@ -21,16 +21,28 @@
   # Activation hook: ensure Ghostty.app exists on macOS. Idempotent —
   # checks both /Applications and ~/Applications before invoking brew.
   # The lib.mkIf gate keeps the script out of Linux closures.
+  #
+  # `nh home switch` doesn't source `brew shellenv`, so PATH at hook
+  # time may lack `/opt/homebrew/bin`. We probe the canonical install
+  # paths so the hook still works when apply is launched from a shell
+  # (or devenv subshell) where shellenv hasn't run.
   home.activation = lib.mkIf pkgs.stdenv.isDarwin {
     installGhostty = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if [ -d "/Applications/Ghostty.app" ] || [ -d "$HOME/Applications/Ghostty.app" ]; then
         $VERBOSE_ECHO "ghostty: already installed; skipping brew cask"
-      elif command -v brew >/dev/null 2>&1; then
-        $VERBOSE_ECHO "ghostty: installing via brew cask"
-        run brew install --cask ghostty
       else
-        echo "ghostty: brew not found on PATH — install Homebrew or Ghostty.app manually." >&2
-        echo "         /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"" >&2
+        BREW=
+        for c in $(command -v brew 2>/dev/null) /opt/homebrew/bin/brew /usr/local/bin/brew; do
+          [ -x "$c" ] && { BREW=$c; break; }
+        done
+        if [ -n "$BREW" ]; then
+          $VERBOSE_ECHO "ghostty: installing via brew cask ($BREW)"
+          run "$BREW" install --cask ghostty
+        else
+          echo "ghostty: brew not found — Ghostty.app was NOT installed." >&2
+          echo "  fix: install Homebrew, then rerun \`dots apply\`:" >&2
+          echo "       /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"" >&2
+        fi
       fi
     '';
   };
