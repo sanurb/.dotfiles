@@ -39,6 +39,7 @@ let
     schema_version = schemaVersion;
     pillars = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
     capabilities = { editor = true; font = true; };
+    modules = { bat = true; delta = true; gh = true; opencode = true; };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
   state =
@@ -48,6 +49,11 @@ let
 
   pillars = state.pillars or defaultState.pillars;
   caps = state.capabilities or defaultState.capabilities;
+  # Satellite modules — schema v2. v1 state files have no [modules]
+  # section; `state.modules or {}` returns an empty attrset and each
+  # satellite then resolves to its `or true` default below, so a v1
+  # file boots with all satellites enabled (behavior-preserving).
+  modules = state.modules or { };
 
   # Module discovery — the directory tree under ../home/ is the registry.
   # `homeModules.shells.fish` resolves to ../home/shells/fish.nix, and a
@@ -64,22 +70,25 @@ let
 in
 {
   imports =
-    # Git is mandatory infrastructure (identity is sourced externally per
-    # modules/home/git.nix); the wizard never asks about it. Editor and
-    # font remain user-toggleable capabilities.
+    # Foundation + git are mandatory infrastructure (identity is sourced
+    # externally per modules/home/git.nix); the wizard never asks about
+    # them. Editor and font remain user-toggleable capabilities.
+    # Satellite tools (bat, delta, gh, opencode) default-true via
+    # `modules.<name> or true`, preserving v1 behavior on hosts whose
+    # state file predates the [modules] section.
     [
       homeModules.foundation
       homeModules.git
-      homeModules.delta
-      homeModules.gh
-      homeModules.bat
-      homeModules.opencode
       shellModule
       terminalModule
     ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
-    ++ lib.optional (caps.editor or true) homeModules.editor
-    ++ lib.optional (caps.font   or true) homeModules.font;
+    ++ lib.optional (caps.editor   or true) homeModules.editor
+    ++ lib.optional (caps.font     or true) homeModules.font
+    ++ lib.optional (modules.bat      or true) homeModules.bat
+    ++ lib.optional (modules.delta    or true) homeModules.delta
+    ++ lib.optional (modules.gh       or true) homeModules.gh
+    ++ lib.optional (modules.opencode or true) homeModules.opencode;
 
   home.username = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;

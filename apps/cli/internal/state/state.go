@@ -4,10 +4,10 @@
 // home.nix module (reader, via builtins.fromTOML), and the doctor command
 // (auditor).
 //
-// We hand-roll TOML for our flat schema (3 strings + 2 bools) rather than
-// pulling in a dependency. The schema is closed and small; a 60-line
-// parser is preferable to a third-party module that the doctor would then
-// also have to verify.
+// We hand-roll TOML for our flat schema (3 strings + a small set of
+// bools) rather than pulling in a dependency. The schema is closed and
+// small; a ~80-line parser is preferable to a third-party module that
+// the doctor would then also have to verify.
 package state
 
 import (
@@ -46,6 +46,7 @@ type State struct {
 	SchemaVersion int
 	Pillars       Pillars
 	Capabilities  Capabilities
+	Modules       Modules
 }
 
 type Pillars struct {
@@ -61,9 +62,50 @@ func (p Pillars) Format() string {
 	return p.Shell + " · " + p.Terminal + " · " + p.Multiplexer
 }
 
+// Capabilities are user-facing feature categories that toggle on or
+// off. They map to feature-class modules (editor.nix, font.nix), each
+// of which encapsulates a curated set of packages and configuration.
+// Distinct from Modules below, which toggles concrete packages.
 type Capabilities struct {
 	Editor bool
 	Font   bool
+}
+
+// Modules toggles concrete satellite packages individually. Foundation
+// (atuin/zoxide/starship/git/nix-index) and pillars (shell/terminal/
+// multiplexer) are out of scope here — those are mandatory or
+// mutually exclusive choices; Modules is the opt-out surface for
+// always-default-true convenience tools.
+//
+// Default is true for every field. The parser explicitly defaults
+// absent fields to true so a v1 state file (no [modules] section)
+// upgrades to v2 with zero behavior change.
+type Modules struct {
+	Bat      bool
+	Delta    bool
+	Gh       bool
+	Opencode bool
+}
+
+// Skipped returns the lower-case names of satellite modules whose
+// install is suppressed in this state. Used by status/profile/doctor
+// surfaces that need to render an opt-out summary; centralized here
+// so the four call-sites never drift on naming or order.
+func (m Modules) Skipped() []string {
+	var out []string
+	if !m.Bat {
+		out = append(out, "bat")
+	}
+	if !m.Delta {
+		out = append(out, "delta")
+	}
+	if !m.Gh {
+		out = append(out, "gh")
+	}
+	if !m.Opencode {
+		out = append(out, "opencode")
+	}
+	return out
 }
 
 // Allowed values per pillar — the TUI offers exactly these and the doctor
@@ -77,11 +119,15 @@ var (
 
 // Default returns the opinionated 2026 starting point: behavior-preserving
 // for the modules that previously hard-coded fish + ghostty + zellij.
+// Every Modules field defaults to true so a fresh host gets the full
+// satellite set; opt-out is explicit (TUI write, --config seed, or
+// hand-edit).
 func Default() State {
 	return State{
 		SchemaVersion: SchemaVersion,
 		Pillars:       Pillars{Shell: "fish", Terminal: "ghostty", Multiplexer: "zellij"},
 		Capabilities:  Capabilities{Editor: true, Font: true},
+		Modules:       Modules{Bat: true, Delta: true, Gh: true, Opencode: true},
 	}
 }
 
@@ -111,7 +157,15 @@ func Load(path string) (s State, found bool, err error) {
 // Save writes atomically: stage to a sibling .tmp file, then rename. The
 // .dots-state.toml file is the input to home.nix, so a partial write
 // during a power loss would leave Nix evaluation in a half-state.
+//
+// SchemaVersion is normalized to the current package version on every
+// write. Reads preserve whatever the file claimed (so callers can audit
+// staleness), but a write is the migration boundary: by the time we
+// emit, the on-disk shape *is* the current schema. Skipping this would
+// produce a "v1 file with v2 sections" — a structural lie about
+// version metadata.
 func Save(path string, s State) error {
+	s.SchemaVersion = SchemaVersion
 	if err := s.Validate(); err != nil {
 		return err
 	}
@@ -153,7 +207,7 @@ func (s State) Validate() error {
 
 // parse handles our closed schema:
 //
-//	schema_version = 1
+//	schema_version = 2
 //	[pillars]
 //	shell       = "fish"
 //	terminal    = "ghostty"
@@ -161,10 +215,20 @@ func (s State) Validate() error {
 //	[capabilities]
 //	editor = true
 //	font   = true
+//	[modules]
+//	bat      = true
+//	delta    = true
+//	gh       = true
+//	opencode = true
 //
 // Anything outside this shape is ignored — we never want a typo'd key to
 // surface as a parser error and block a deploy. Validate() catches the
 // values that actually matter.
+//
+// v1 → v2 backcompat: out is seeded from Default() so an absent
+// [modules] section (the v1 shape) yields all-satellites-enabled, which
+// is behavior-preserving. The schema_version field is updated by the
+// next Save(); reads never rewrite the file.
 func parse(r io.Reader) (State, error) {
 	out := Default()
 	sc := bufio.NewScanner(r)
@@ -219,6 +283,21 @@ func parse(r io.Reader) (State, error) {
 			case "font":
 				out.Capabilities.Font = b
 			}
+		case "modules":
+			b, ok := parseBool(val)
+			if !ok {
+				return State{}, fmt.Errorf("modules.%s: expected bool, got %q", key, val)
+			}
+			switch key {
+			case "bat":
+				out.Modules.Bat = b
+			case "delta":
+				out.Modules.Delta = b
+			case "gh":
+				out.Modules.Gh = b
+			case "opencode":
+				out.Modules.Opencode = b
+			}
 		}
 	}
 	return out, sc.Err()
@@ -228,8 +307,9 @@ func emit(w io.Writer, s State) error {
 	const tmpl = `# .dots-state.toml — managed by the dots CLI. Edit via 'dots install'.
 # This file is the single source of truth for the environment's persona:
 # shell, terminal, multiplexer. home.nix reads it via builtins.fromTOML.
-# Mandatory infrastructure (atuin, zoxide, starship) is not represented
-# here — those are non-negotiable and live in modules/home/foundation.nix.
+# Mandatory infrastructure (atuin, zoxide, starship, git, nix-index) is
+# not represented here — those are non-negotiable and live in
+# modules/home/foundation.nix and modules/home/git.nix.
 
 schema_version = %d
 
@@ -241,11 +321,22 @@ multiplexer = %q
 [capabilities]
 editor = %v
 font   = %v
+
+# Satellite tools — opt out by setting any to false. Defaults are true.
+# The home-manager profile imports each module via lib.optional, so a
+# false here removes the package from the realized closure on the next
+# 'dots apply'.
+[modules]
+bat      = %v
+delta    = %v
+gh       = %v
+opencode = %v
 `
 	_, err := fmt.Fprintf(w, tmpl,
 		s.SchemaVersion,
 		s.Pillars.Shell, s.Pillars.Terminal, s.Pillars.Multiplexer,
-		s.Capabilities.Editor, s.Capabilities.Font)
+		s.Capabilities.Editor, s.Capabilities.Font,
+		s.Modules.Bat, s.Modules.Delta, s.Modules.Gh, s.Modules.Opencode)
 	return err
 }
 
