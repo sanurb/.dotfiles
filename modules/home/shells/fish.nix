@@ -8,24 +8,31 @@
     interactiveShellInit = ''
       set -g fish_greeting ""
 
-      # fzf.fish binding override.
-      # Lives here, NOT in config/fish/conf.d/, because fish loads conf.d
-      # USER→SYS→VENDOR (share/fish/config.fish:216) — so the plugin's
-      # vendor_conf.d/fzf.fish (which ends with `fzf_configure_bindings`
-      # and no args, resetting every binding to defaults) always runs
-      # AFTER any user conf.d. interactiveShellInit gets injected into
-      # ~/.config/fish/config.fish, which fish sources after all conf.d
-      # processing — so this is the only place a user override survives.
-      #
-      # Bindings:
+      # Both blocks below run from interactiveShellInit (rendered into
+      # ~/.config/fish/config.fish), NOT from a conf.d file, because
+      # fish loads conf.d USER→SYS→VENDOR (share/fish/config.fish:216)
+      # — vendor conf.d always runs LAST and would clobber any user
+      # binding override placed in conf.d. config.fish runs after all
+      # conf.d, so this is the only place plugin overrides survive.
+
+      # fzf.fish binding override. Vendor conf.d ends with
+      # `fzf_configure_bindings` (no args) which resets to defaults.
       #   alt+c       → directory picker      (mnemonic: change-dir)
       #   ctrl+alt+s  → git status picker
-      # Untouched on purpose:
-      #   ctrl+f      → fish accept-autosuggestion
-      #   ctrl+r      → Atuin (programs.atuin.enableFishIntegration)
+      # Untouched: ctrl+f (accept-autosuggestion), ctrl+r (Atuin).
       if functions -q fzf_configure_bindings
           fzf_configure_bindings --directory=\ec --git_status=\e\cs
       end
+
+      # Puffer mode fix. Puffer's vendor conf.d binds `.`, `!`, `$`,
+      # `*` to insert-mode if `fish_key_bindings` isn't exactly
+      # `fish_default_key_bindings` — assuming vi mode otherwise.
+      # config/fish/conf.d/fish_frozen_key_bindings.fish erases the
+      # variable on startup, leaving it empty, so puffer binds to the
+      # wrong mode and expansions silently never fire. Setting it here
+      # re-triggers puffer's `--on-variable` handler with the right
+      # value and rebinds to default mode.
+      set fish_key_bindings fish_default_key_bindings
     '';
     shellAbbrs = {
       g = "git";
@@ -34,24 +41,27 @@
     };
   };
 
-  # fzf.fish — installed as a package so fish auto-loads it via the
-  # `$__fish_vendor_*_dir` paths (~/.nix-profile/share/fish/vendor_*.d).
-  # We can't use programs.fish.plugins here: HM resolves it by writing
+  # Fish plugins — installed as packages so fish auto-loads them via
+  # the `$__fish_vendor_*_dir` paths (~/.nix-profile/share/fish/vendor_*.d).
+  # programs.fish.plugins isn't usable here: HM resolves it by writing
   # `conf.d/plugin-<name>.fish`, which collides with our directory-level
   # mkOutOfStoreSymlink for fish/conf.d (HM refuses to install files
   # "outside $HOME" when the target is a workspace symlink).
   #
-  # The nixpkgs derivation pins `meta.broken = stdenv.hostPlatform.isDarwin`
-  # (pkgs/shells/fish/plugins/fzf-fish.nix:69) — but the runtime plugin
-  # is fine on darwin. The mark is there because the upstream test runner
-  # (fishtape via BSD `script(1)`) misbehaves on macOS, not because the
-  # plugin itself fails. We override broken=false AND skip checks rather
-  # than vendor the source — narrower blast radius, easy to revert when
-  # nixpkgs flips it.
-  #
-  # Tuning (FZF_DEFAULT_OPTS, bindings, previews) lives in
-  # config/fish/conf.d/fzf_config.fish so it stays live-editable.
+  # - puffer: predictive expansions on plain character keys —
+  #     `..` → `../`, `...` → `../../`, `!!` → last command,
+  #     `!$` → last arg, `**` → recursive glob. Replaces the manual
+  #     `alias up='cd ..'` style of nav. No conflicts with our other
+  #     bindings (puffer binds `.`, `!`, `$`, `*`; we use modifier keys).
+  #     No tuning required.
+  # - fzf.fish: nixpkgs pins `meta.broken = stdenv.hostPlatform.isDarwin`
+  #     (pkgs/shells/fish/plugins/fzf-fish.nix:69), but the runtime is
+  #     fine — the mark is there because BSD script(1) breaks the
+  #     fishtape test runner on macOS, not because the plugin fails.
+  #     We override broken=false + doCheck=false; revert when nixpkgs
+  #     flips it. Tuning lives in config/fish/conf.d/fzf_config.fish.
   home.packages = [
+    pkgs.fishPlugins.puffer
     (pkgs.fishPlugins.fzf-fish.overrideAttrs (old: {
       doCheck = false;
       meta = (old.meta or { }) // { broken = false; };
