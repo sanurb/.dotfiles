@@ -109,7 +109,11 @@
   # for the single-pass-replace case), hyperfine (statistical command
   # benchmarks), eza (ls replacement). Persona-agnostic, so they sit
   # alongside direnv/fzf/proto rather than in any per-shell module.
-  home.packages = with pkgs; [ direnv fzf proto fd sd hyperfine eza just watchexec xh d2 ];
+  # uv (Astral) replaces pip/poetry/conda and doubles as a Python
+  # interpreter manager — lives here rather than .prototools because
+  # python itself isn't on the proto ladder, and uv's bootstrap is
+  # what every persona reaches for first when a Python project shows up.
+  home.packages = with pkgs; [ direnv fzf proto fd sd hyperfine eza just watchexec xh d2 uv ];
 
   # Source of truth for $PATH additions. home.sessionPath writes
   # into ~/.config/hm-session-vars.{sh,fish}, sourced by every HM-
