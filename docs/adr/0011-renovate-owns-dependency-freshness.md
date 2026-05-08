@@ -46,5 +46,10 @@ laptop.
   future reader can see they were considered, not forgotten.
 - Two superseded artifacts deleted on adoption:
   `.github/dependabot.yml` and `.github/workflows/flake-lock-update.yml`.
+  The behavioral equivalent of the deleted flake-lock workflow is
+  Renovate's `lockFileMaintenance` (enabled top-level, scoped to the
+  `nix` manager via packageRules). Branch-tracking flake inputs like
+  `nixos-unstable` aren't versioned in Renovate's eyes, so without
+  `lockFileMaintenance` `flake.lock` would never refresh.
 - New manager additions to `enabledManagers` are a deliberate scope
   decision and warrant either an ADR amendment or a successor ADR.

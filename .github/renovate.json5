@@ -36,6 +36,16 @@
   // Keep go.work.sum coherent with go.mod bumps.
   postUpdateOptions: ["gomodTidy"],
 
+  // Branch-tracking flake inputs (nixos-unstable, devenv main, etc.)
+  // only refresh via lockFileMaintenance — Renovate treats them as
+  // "always at HEAD" rather than versioned. This is the behavioral
+  // replacement for the deleted flake-lock-update.yml workflow.
+  // Disabled per-manager below for ecosystems that don't benefit.
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ["before 7am on monday"],
+  },
+
   packageRules: [
     // ── Nix flake.lock ─────────────────────────────────────────────
     // nixpkgs unstable ships freely; every bump gets human eyes.
@@ -91,6 +101,17 @@
       matchManagers: ["npm"],
       addLabels: ["npm"],
       automerge: false,
+    },
+
+    // ── lockFileMaintenance scope ──────────────────────────────────
+    // Only nix benefits from periodic lockfile refresh in this repo:
+    //   - gomod: postUpdateOptions:[gomodTidy] keeps go.sum coherent
+    //     on every direct bump; periodic maintenance is redundant.
+    //   - github-actions: no lockfile concept; SHA pins are direct.
+    //   - npm: single direct dep, no transitive churn worth managing.
+    {
+      matchManagers: ["gomod", "github-actions", "npm"],
+      lockFileMaintenance: { enabled: false },
     },
   ],
 
