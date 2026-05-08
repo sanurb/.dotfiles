@@ -1,0 +1,107 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // Repo-side dependency freshness. The architectural rationale lives
+  // in docs/adr/0011-renovate-owns-dependency-freshness.md; this file
+  // is the operational policy.
+  extends: [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    "helpers:pinGitHubActionDigests",
+  ],
+
+  timezone: "UTC",
+  schedule: ["before 7am on monday"],
+
+  // Conventional Commits — gated by .github/workflows/ci.yml::commit-lint.
+  // The github-actions rule overrides semanticCommitType to "ci".
+  semanticCommitType: "chore",
+  semanticCommitScope: "deps",
+
+  // Keep noise low; let humans absorb a small batch on Monday morning.
+  prConcurrentLimit: 5,
+  prHourlyLimit: 2,
+  rebaseWhen: "behind-base-branch",
+  labels: ["dependencies"],
+
+  // GitHub-native auto-merge — requires Settings → General → Pull
+  // Requests → "Allow auto-merge" enabled at the repo level.
+  platformAutomerge: true,
+
+  // Only ecosystems we have CI gates and explicit policy for. Adding
+  // a manager here is a deliberate scope decision; every entry is
+  // mirrored in the ADR.
+  enabledManagers: ["nix", "gomod", "github-actions", "npm"],
+
+  // Keep go.work.sum coherent with go.mod bumps.
+  postUpdateOptions: ["gomodTidy"],
+
+  packageRules: [
+    // ── Nix flake.lock ─────────────────────────────────────────────
+    // nixpkgs unstable ships freely; every bump gets human eyes.
+    // CI's flake-check job is the safety net, not auto-merge.
+    {
+      matchManagers: ["nix"],
+      groupName: "nix flake inputs",
+      commitMessageTopic: "flake.lock",
+      addLabels: ["nix"],
+      automerge: false,
+    },
+
+    // ── GitHub Actions ─────────────────────────────────────────────
+    // Repo convention is SHA pinning (see release.yml). Combined with
+    // CI, auto-merge for minor/patch/digest is safe.
+    {
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["minor", "patch", "digest"],
+      groupName: "github-actions (non-major)",
+      semanticCommitType: "ci",
+      addLabels: ["github-actions"],
+      automerge: true,
+    },
+    {
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["major"],
+      semanticCommitType: "ci",
+      addLabels: ["github-actions"],
+      automerge: false,
+    },
+
+    // ── Go modules ────────────────────────────────────────────────
+    // CI's cli-quality job runs go vet + go test + treefmt on PRs.
+    {
+      matchManagers: ["gomod"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "go modules (non-major)",
+      addLabels: ["go"],
+      automerge: true,
+    },
+    {
+      matchManagers: ["gomod"],
+      matchUpdateTypes: ["major"],
+      addLabels: ["go"],
+      automerge: false,
+    },
+
+    // ── npm ───────────────────────────────────────────────────────
+    // Currently only config/opencode/package.json. No behavioral test
+    // exists for @opencode-ai/plugin, so every bump is reviewed.
+    // Revisit if a CI gate for opencode plugin behavior lands.
+    {
+      matchManagers: ["npm"],
+      addLabels: ["npm"],
+      automerge: false,
+    },
+  ],
+
+  // ── Out of scope, by design ──────────────────────────────────────
+  // - .prototools — runtime versions are deliberately manual; the
+  //   file header is explicit ("Pinned versions are authoritative;
+  //   never auto-bump on shell entry").
+  // - config/nvim/lazy-lock.json — nvim plugins update via :Lazy sync
+  //   inside nvim; the resulting lock file is committed by the human.
+  // - devenv.yaml — the nixpkgs URL tracks a branch (nixos-unstable),
+  //   not a version; pinning lives in flake.lock and is handled by
+  //   the nix manager above.
+  // - .goreleaser.yaml — release configuration, not a manifest.
+}

@@ -68,6 +68,24 @@ jobs:
               treefmt --fail-on-change
             '
 
+  renovate-config:
+    name: renovate config
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate Renovate config
+        # Tag-pinned on first introduction; Renovate's
+        # helpers:pinGitHubActionDigests preset will SHA-pin this
+        # automatically on its first run against the repo.
+        uses: suzuki-shunsuke/github-action-renovate-config-validator@v1.1.1
+
   commit-lint:
     name: commit lint
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
