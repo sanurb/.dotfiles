@@ -1,4 +1,5 @@
-{ pkgs, lib, ... }: {
+{ pkgs, lib, ... }:
+{
   # osquery — SQL-as-introspection over OS state (processes, sockets,
   # users, launchd/systemd jobs, package managers, etc.). Ships
   # `osqueryi` (interactive shell) and `osqueryd` (daemon); we install

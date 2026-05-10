@@ -1,4 +1,10 @@
-{ pkgs, lib, inputs, system, ... }:
+{
+  pkgs,
+  lib,
+  inputs,
+  system,
+  ...
+}:
 let
   envUser = builtins.getEnv "USER";
   envHome = builtins.getEnv "HOME";
@@ -16,9 +22,13 @@ let
   # which is the correct failure mode for a public-safe repo.
   identityPath = "${envHome}/.config/dots/identity.nix";
   identity =
-    if envHome != "" && builtins.pathExists identityPath
-    then import identityPath
-    else { name = ""; email = ""; };
+    if envHome != "" && builtins.pathExists identityPath then
+      import identityPath
+    else
+      {
+        name = "";
+        email = "";
+      };
 
   # Persona — the dots install TUI writes .dots-state.toml at the
   # workspace root; that file is the single source of truth for which
@@ -32,20 +42,40 @@ let
   # and read from there by both Go (go:embed) and Nix (this readFile). Drift
   # between the two consumers is impossible by construction — there is no
   # "Nix-side constant" to forget to bump.
-  schemaVersion = lib.toInt (lib.removeSuffix "\n"
-    (builtins.readFile ../../apps/cli/internal/state/SCHEMA_VERSION));
+  schemaVersion = lib.toInt (
+    lib.removeSuffix "\n" (builtins.readFile ../../apps/cli/internal/state/SCHEMA_VERSION)
+  );
 
   defaultState = {
     schema_version = schemaVersion;
-    pillars = { shell = "fish"; terminal = "ghostty"; multiplexer = "zellij"; };
-    capabilities = { editor = true; font = true; };
-    modules = { amoxide = true; ast-grep = true; bat = true; delta = true; gh = true; jaq = true; lazygit = true; opencode = true; osquery = true; procs = true; };
+    pillars = {
+      shell = "fish";
+      terminal = "ghostty";
+      multiplexer = "zellij";
+    };
+    capabilities = {
+      editor = true;
+      font = true;
+    };
+    modules = {
+      amoxide = true;
+      ast-grep = true;
+      bat = true;
+      delta = true;
+      gh = true;
+      jaq = true;
+      lazygit = true;
+      opencode = true;
+      osquery = true;
+      procs = true;
+    };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
   state =
-    if stateFile != "" && builtins.pathExists stateFile
-    then builtins.fromTOML (builtins.readFile stateFile)
-    else defaultState;
+    if stateFile != "" && builtins.pathExists stateFile then
+      builtins.fromTOML (builtins.readFile stateFile)
+    else
+      defaultState;
 
   pillars = state.pillars or defaultState.pillars;
   caps = state.capabilities or defaultState.capabilities;
@@ -64,8 +94,8 @@ let
   # Pillar resolution — defensive `or` falls through to a sane default
   # rather than throwing on an unrecognized state value. Validation
   # lives in the CLI (state.Validate); this is the second line of defense.
-  shellModule = homeModules.shells.${pillars.shell}        or homeModules.shells.fish;
-  terminalModule = homeModules.terminals.${pillars.terminal}  or homeModules.terminals.ghostty;
+  shellModule = homeModules.shells.${pillars.shell} or homeModules.shells.fish;
+  terminalModule = homeModules.terminals.${pillars.terminal} or homeModules.terminals.ghostty;
   multiplexerModule = homeModules.multiplexers.${pillars.multiplexer} or null;
 in
 {
@@ -83,18 +113,18 @@ in
       terminalModule
     ]
     ++ lib.optional (multiplexerModule != null) multiplexerModule
-    ++ lib.optional (caps.editor   or true) homeModules.editor
-    ++ lib.optional (caps.font     or true) homeModules.font
-    ++ lib.optional (modules.amoxide      or true) homeModules.amoxide
-    ++ lib.optional (modules."ast-grep"   or true) homeModules."ast-grep"
-    ++ lib.optional (modules.bat          or true) homeModules.bat
-    ++ lib.optional (modules.delta        or true) homeModules.delta
-    ++ lib.optional (modules.gh           or true) homeModules.gh
-    ++ lib.optional (modules.jaq          or true) homeModules.jaq
-    ++ lib.optional (modules.lazygit      or true) homeModules.lazygit
-    ++ lib.optional (modules.opencode     or true) homeModules.opencode
-    ++ lib.optional (modules.osquery      or true) homeModules.osquery
-    ++ lib.optional (modules.procs        or true) homeModules.procs;
+    ++ lib.optional (caps.editor or true) homeModules.editor
+    ++ lib.optional (caps.font or true) homeModules.font
+    ++ lib.optional (modules.amoxide or true) homeModules.amoxide
+    ++ lib.optional (modules."ast-grep" or true) homeModules."ast-grep"
+    ++ lib.optional (modules.bat or true) homeModules.bat
+    ++ lib.optional (modules.delta or true) homeModules.delta
+    ++ lib.optional (modules.gh or true) homeModules.gh
+    ++ lib.optional (modules.jaq or true) homeModules.jaq
+    ++ lib.optional (modules.lazygit or true) homeModules.lazygit
+    ++ lib.optional (modules.opencode or true) homeModules.opencode
+    ++ lib.optional (modules.osquery or true) homeModules.osquery
+    ++ lib.optional (modules.procs or true) homeModules.procs;
 
   home.username = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;

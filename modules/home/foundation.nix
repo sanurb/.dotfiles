@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   # Foundation — the "air" the environment breathes. These three tools
   # (Atuin, Zoxide, Starship) are mandatory infrastructure for every
   # persona, regardless of which shell / terminal / multiplexer the user
@@ -65,8 +72,7 @@
   # the prompt — starship still ships its config but doesn't bind.
   programs.starship.enable = true;
   xdg.configFile."starship.toml" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/starship/starship.toml";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/starship/starship.toml";
   };
 
   # Jujutsu — Git-compatible VCS, persona-agnostic infrastructure like
@@ -113,7 +119,20 @@
   # interpreter manager — lives here rather than .prototools because
   # python itself isn't on the proto ladder, and uv's bootstrap is
   # what every persona reaches for first when a Python project shows up.
-  home.packages = with pkgs; [ direnv fzf proto fd sd hyperfine eza just watchexec xh d2 uv ];
+  home.packages = with pkgs; [
+    direnv
+    fzf
+    proto
+    fd
+    sd
+    hyperfine
+    eza
+    just
+    watchexec
+    xh
+    d2
+    uv
+  ];
 
   # Source of truth for $PATH additions. home.sessionPath writes
   # into ~/.config/hm-session-vars.{sh,fish}, sourced by every HM-

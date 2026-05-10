@@ -1,4 +1,5 @@
-{ pkgs, ... }: {
+{ pkgs, ... }:
+{
   # jaq — jq-compatible JSON processor in Rust. Faster startup and a
   # stricter type system than jq, but accepts the same filter syntax for
   # the 90% case (see github.com/01mf02/jaq#differences-to-jq for the

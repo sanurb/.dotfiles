@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   programs.fish = {
     enable = true;
     # EDITOR / MANPAGER live in modules/home/editor.nix via
@@ -64,7 +71,9 @@
     pkgs.fishPlugins.puffer
     (pkgs.fishPlugins.fzf-fish.overrideAttrs (old: {
       doCheck = false;
-      meta = (old.meta or { }) // { broken = false; };
+      meta = (old.meta or { }) // {
+        broken = false;
+      };
     }))
   ];
 
@@ -89,13 +98,12 @@
   # When workspaceRoot is empty (HM run outside `dots apply`) we skip
   # the link rather than create dangling pointers.
   xdg.configFile = lib.mkIf (workspaceRoot != "") {
-    "fish/conf.d".source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/fish/conf.d";
-    "fish/functions".source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/fish/functions";
-    "fish/completions".source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/fish/completions";
-    "fish/fish_plugins".source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/fish/fish_plugins";
+    "fish/conf.d".source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/fish/conf.d";
+    "fish/functions".source =
+      config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/fish/functions";
+    "fish/completions".source =
+      config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/fish/completions";
+    "fish/fish_plugins".source =
+      config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/fish/fish_plugins";
   };
 }

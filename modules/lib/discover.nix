@@ -16,25 +16,25 @@ let
   #
   # so `homeModules.shells.${pillars.shell}` is the canonical lookup form
   # in modules/profiles/home.nix.
-  discoverDir = path:
+  discoverDir =
+    path:
     let
       entries = builtins.readDir path;
 
-      isNixFile = name: type:
-        type == "regular" && lib.hasSuffix ".nix" name;
+      isNixFile = name: type: type == "regular" && lib.hasSuffix ".nix" name;
 
-      moduleEntries = lib.mapAttrs'
-        (name: _: lib.nameValuePair (lib.removeSuffix ".nix" name) (path + "/${name}"))
-        (lib.filterAttrs isNixFile entries);
+      moduleEntries = lib.mapAttrs' (
+        name: _: lib.nameValuePair (lib.removeSuffix ".nix" name) (path + "/${name}")
+      ) (lib.filterAttrs isNixFile entries);
 
       subDirs = lib.filterAttrs (_: type: type == "directory") entries;
 
-      subDirEntries = lib.mapAttrs
-        (name: _: discoverDir (path + "/${name}"))
-        subDirs;
+      subDirEntries = lib.mapAttrs (name: _: discoverDir (path + "/${name}")) subDirs;
 
       nonEmptySubDirs = lib.filterAttrs (_: v: v != { }) subDirEntries;
     in
     moduleEntries // nonEmptySubDirs;
 in
-{ inherit discoverDir; }
+{
+  inherit discoverDir;
+}

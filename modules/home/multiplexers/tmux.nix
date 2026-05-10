@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   # Install tmux directly via home.packages rather than programs.tmux,
   # because programs.tmux.enable = true authors ~/.config/tmux/tmux.conf
   # itself and would collide with the live-edit symlink below. The
@@ -15,7 +22,6 @@
   # repo and pressing prefix+r in any tmux session reloads the new
   # config; no `dots apply` round-trip required.
   xdg.configFile."tmux/tmux.conf" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/tmux/tmux.conf";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/tmux/tmux.conf";
   };
 }

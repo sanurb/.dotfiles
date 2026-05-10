@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   # Install wezterm directly via home.packages rather than programs.wezterm,
   # because programs.wezterm.enable = true authors ~/.config/wezterm/wezterm.lua
   # itself (rendered from extraConfig) and would collide with the live-edit
@@ -11,7 +18,6 @@
   # wezterm writes alongside the config (state, cache) stays outside
   # the symlink chain.
   xdg.configFile."wezterm/wezterm.lua" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/wezterm/wezterm.lua";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/wezterm/wezterm.lua";
   };
 }

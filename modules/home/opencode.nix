@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   # opencode — terminal-native AI coding agent. Installed straight from
   # nixpkgs; no `programs.opencode` HM module exists upstream, so this
   # module just lands the binary plus the live-edit config tree.
@@ -22,7 +29,6 @@
   # the symlink rather than emit a dangling pointer to "/" — opencode
   # falls back to its built-in defaults instead.
   xdg.configFile."opencode" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/opencode";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/opencode";
   };
 }

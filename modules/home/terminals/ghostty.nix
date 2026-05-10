@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   # Ghostty — config managed as a plain text file so it remains portable
   # to a non-Nix host (just copy the file). The upstream `pkgs.ghostty`
   # is Linux-only as of nixpkgs 26.05 (Zig + macOS toolchain mismatch),
@@ -17,8 +24,7 @@
   # When workspaceRoot is empty (HM run outside `dots apply`) we skip
   # the link rather than emit a dangling pointer.
   xdg.configFile."ghostty" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/ghostty";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/ghostty";
   };
 
   # Activation hook: ensure Ghostty.app exists on macOS. Idempotent —

@@ -71,9 +71,23 @@
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-edge, flake-parts, devenv, home-manager, nix-index-database, ... }:
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      nixpkgs-edge,
+      flake-parts,
+      devenv,
+      home-manager,
+      nix-index-database,
+      ...
+    }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
 
       # Single source of truth for the per-system Home Manager configuration.
       # Used by `homeConfigurations` (for `home-manager switch --flake`),
@@ -81,9 +95,12 @@
       # invokes via nh), and `checks.home-activation` (the `nix flake check`
       # gate that fails a PR when the activation derivation can't build).
       # Factor here so extraSpecialArgs is declared once.
-      mkHome = system:
-        let pkgs = nixpkgs.legacyPackages.${system};
-        in home-manager.lib.homeManagerConfiguration {
+      mkHome =
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           modules = [
             ./modules/profiles/home.nix
@@ -105,7 +122,8 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       inherit systems;
 
-      perSystem = { system, ... }:
+      perSystem =
+        { system, ... }:
         let
           pkgs = nixpkgs.legacyPackages.${system};
 
@@ -137,32 +155,41 @@
           # evaluation — `homeManagerConfiguration` is one of the most
           # expensive nix-eval operations in the repo, and previously
           # each profile-level check was paying the cost independently.
-          mkSyntheticConfig = modules: (home-manager.lib.homeManagerConfiguration {
-            inherit pkgs;
-            modules = modules ++ [
-              { _module.args.workspaceRoot = nixpkgs.lib.mkForce "/synthetic/dots"; }
-            ];
-            extraSpecialArgs = {
-              inherit inputs system;
-              pkgsPins.edge = nixpkgs-edge.legacyPackages.${system};
-            };
-          }).config;
+          mkSyntheticConfig =
+            modules:
+            (home-manager.lib.homeManagerConfiguration {
+              inherit pkgs;
+              modules = modules ++ [
+                { _module.args.workspaceRoot = nixpkgs.lib.mkForce "/synthetic/dots"; }
+              ];
+              extraSpecialArgs = {
+                inherit inputs system;
+                pkgsPins.edge = nixpkgs-edge.legacyPackages.${system};
+              };
+            }).config;
 
-          mkConfigWiredCheck = { name, evaluated, expectedKeys, fixHint }:
+          mkConfigWiredCheck =
+            {
+              name,
+              evaluated,
+              expectedKeys,
+              fixHint,
+            }:
             let
-              missing = builtins.filter
-                (k: !(evaluated.xdg.configFile ? "${k}"))
-                expectedKeys;
+              missing = builtins.filter (k: !(evaluated.xdg.configFile ? "${k}")) expectedKeys;
             in
             pkgs.runCommand name { } (
-              if missing == [ ] then ''
-                echo "ok: ${name} wires ${nixpkgs.lib.concatStringsSep " " expectedKeys}" > $out
-              '' else ''
-                echo "${name}: missing xdg.configFile keys: ${nixpkgs.lib.concatStringsSep " " missing}" >&2
-                echo "  why: without them, edits to the corresponding config/ dir never reach ~/.config/" >&2
-                echo "  fix: ${fixHint}" >&2
-                exit 1
-              ''
+              if missing == [ ] then
+                ''
+                  echo "ok: ${name} wires ${nixpkgs.lib.concatStringsSep " " expectedKeys}" > $out
+                ''
+              else
+                ''
+                  echo "${name}: missing xdg.configFile keys: ${nixpkgs.lib.concatStringsSep " " missing}" >&2
+                  echo "  why: without them, edits to the corresponding config/ dir never reach ~/.config/" >&2
+                  echo "  fix: ${fixHint}" >&2
+                  exit 1
+                ''
             );
 
           # The pillar-default profile imports fish/ghostty/zellij plus
@@ -193,19 +220,18 @@
         {
           devShells.default =
             if haveDevenvRoot then
-              devenv.lib.mkShell
-                {
-                  inherit inputs pkgs;
-                  modules = [
-                    { devenv.root = devenvRoot; }
-                    ./devenv.nix
-                  ];
-                }
+              devenv.lib.mkShell {
+                inherit inputs pkgs;
+                modules = [
+                  { devenv.root = devenvRoot; }
+                  ./devenv.nix
+                ];
+              }
             else
-            # Fallback so `nix flake check` from a non-direnv shell
-            # still passes. `nix develop` against this output prints
-            # actionable guidance and exits non-zero rather than
-            # silently dropping the user into a barebones shell.
+              # Fallback so `nix flake check` from a non-direnv shell
+              # still passes. `nix develop` against this output prints
+              # actionable guidance and exits non-zero rather than
+              # silently dropping the user into a barebones shell.
               pkgs.mkShellNoCC {
                 name = "dots-shell-no-devenv-root";
                 shellHook = ''
@@ -280,7 +306,10 @@
             fish-config-wired = mkConfigWiredCheck {
               name = "fish-config-wired";
               evaluated = profileEvaluated;
-              expectedKeys = [ "fish/conf.d" "fish/functions" ];
+              expectedKeys = [
+                "fish/conf.d"
+                "fish/functions"
+              ];
               fixHint = "modules/home/shells/fish.nix must declare xdg.configFile.\"fish/conf.d\" and \"fish/functions\" via mkOutOfStoreSymlink";
             };
 

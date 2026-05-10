@@ -1,4 +1,5 @@
-{ pkgs, lib, ... }: {
+{ pkgs, lib, ... }:
+{
   # Iosevka Nerd Font, sourced from nixpkgs' modular nerd-fonts split
   # (post-2024 reorg — `nerd-fonts.iosevka` adds ~30MB to the closure
   # rather than the ~3GB of the old umbrella `nerdfonts` derivation, so

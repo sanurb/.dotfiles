@@ -1,4 +1,5 @@
-{ pkgs, lib, ... }: {
+{ pkgs, lib, ... }:
+{
   # Zsh + Powerlevel10k. P10k owns the prompt; starship integration for
   # zsh is suppressed because two prompt initializers fight and the user
   # picked zsh-with-p10k specifically for that prompt. Starship is still

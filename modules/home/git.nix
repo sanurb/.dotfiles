@@ -1,4 +1,9 @@
-{ pkgs, lib, identity, ... }:
+{
+  pkgs,
+  lib,
+  identity,
+  ...
+}:
 let
   # Optional identity fields. The base contract is { name; email; } —
   # everything below activates only when the host's identity.nix

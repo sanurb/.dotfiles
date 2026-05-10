@@ -1,4 +1,12 @@
-{ config, pkgs, lib, pkgsPins, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  pkgsPins,
+  workspaceRoot,
+  ...
+}:
+{
   # Editor — wrapper-free path. We install neovim plus its runtime
   # toolchain via home.packages and point ~/.config/nvim at the live
   # workspace tree via a single out-of-store symlink. No
@@ -88,7 +96,6 @@
   # Nvim falls back to its default empty-config behavior — visibly
   # broken instead of silently wrong.
   xdg.configFile."nvim" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/nvim";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/nvim";
   };
 }

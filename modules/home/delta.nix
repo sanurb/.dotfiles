@@ -1,4 +1,5 @@
-{ ... }: {
+{ ... }:
+{
   # delta — git pager. enableGitIntegration owns core.pager and the
   # [delta] section in the rendered git config, so there's no parallel
   # block in modules/home/git.nix. syntax-theme matches bat

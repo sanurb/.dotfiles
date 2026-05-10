@@ -1,4 +1,5 @@
-{ pkgs, ... }: {
+{ pkgs, ... }:
+{
   # procs — modern `ps` replacement with colorized columns, tree view,
   # search/sort, and pager integration. Sibling to bat/delta in the
   # "richer terminal output" satellite tier; never replaces ps because

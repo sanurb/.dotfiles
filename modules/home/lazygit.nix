@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   # Direct package install — NOT programs.lazygit.enable. HM's lazygit
   # module writes a fish helper into ~/.config/fish/functions/lg.fish,
   # which collides with our directory-level mkOutOfStoreSymlink for
@@ -9,7 +16,6 @@
   home.packages = [ pkgs.lazygit ];
 
   xdg.configFile."lazygit/config.yml" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/lazygit/config.yml";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/lazygit/config.yml";
   };
 }

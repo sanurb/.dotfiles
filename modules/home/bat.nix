@@ -1,4 +1,5 @@
-{ pkgs, ... }: {
+{ pkgs, ... }:
+{
   # bat — persona-agnostic pager. Theme stays in sync with delta
   # (modules/home/delta.nix) so diff output matches `bat` output.
   # bat-extras (batdiff/batman/batgrep/batwatch) ride the same binary;
@@ -7,6 +8,11 @@
   programs.bat = {
     enable = true;
     config.theme = "TwoDark";
-    extraPackages = with pkgs.bat-extras; [ batdiff batman batgrep batwatch ];
+    extraPackages = with pkgs.bat-extras; [
+      batdiff
+      batman
+      batgrep
+      batwatch
+    ];
   };
 }

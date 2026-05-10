@@ -1,4 +1,11 @@
-{ config, pkgs, lib, workspaceRoot, ... }: {
+{
+  config,
+  pkgs,
+  lib,
+  workspaceRoot,
+  ...
+}:
+{
   programs.nushell = {
     enable = true;
 
@@ -24,8 +31,7 @@
   # link rather than emit a dangling pointer — nushell falls back to
   # its built-in defaults.
   xdg.configFile."nushell/config.nu" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink
-      "${workspaceRoot}/config/nushell/config.nu";
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/nushell/config.nu";
   };
 
   programs.atuin.enableNushellIntegration = true;

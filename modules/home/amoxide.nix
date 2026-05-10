@@ -1,4 +1,9 @@
-{ config, pkgs, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 let
   # amoxide isn't in nixpkgs (only `moxide` and `zoxide` exist as
   # near-misses), so we vendor a custom buildRustPackage. Workspace

@@ -1,4 +1,5 @@
-{ pkgs, ... }: {
+{ pkgs, ... }:
+{
   # ast-grep — structural code search via tree-sitter ASTs. Sibling to
   # ripgrep (already in modules/home/editor.nix) for cases where regex
   # over text is too coarse — meta-variables and AST patterns instead.

@@ -1,4 +1,5 @@
-{ pkgs, lib, ... }: {
+{ pkgs, lib, ... }:
+{
   programs.alacritty = {
     enable = true;
     settings = {
@@ -8,7 +9,10 @@
       };
       window = {
         decorations = "None";
-        padding = { x = 8; y = 8; };
+        padding = {
+          x = 8;
+          y = 8;
+        };
       };
       cursor.style.shape = "Block";
       bell.duration = 0;
