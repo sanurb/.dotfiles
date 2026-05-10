@@ -20,6 +20,7 @@ export const onRequest = [errorHandling, authentication, logging];
 ```
 
 **Best practices:**
+
 - First middleware = error handler (wraps others)
 - Use `context.next()` to pass control
 - Share state via `context.data`
@@ -173,11 +174,13 @@ export default {
 ```
 
 **When to use:**
+
 - Existing Worker too complex for file-based routing
 - Need full routing control
 - Framework-generated Workers (Next.js, SvelteKit)
 
 **Important:**
+
 - Module Worker syntax required
 - `/functions` ignored
 - Manually call `env.ASSETS.fetch()` for static files

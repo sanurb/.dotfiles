@@ -15,5 +15,5 @@ activate) is shown verbatim before consent — a user cannot approve
   consent covers.
 - **Terraform-style stateful plan** (a stored authoritative state
   file) — rejected; the plan is recomputed each run from observed
-  state. Receipts (`applied.toml`) record what *did* run, not what
-  *should*.
+  state. Receipts (`applied.toml`) record what _did_ run, not what
+  _should_.

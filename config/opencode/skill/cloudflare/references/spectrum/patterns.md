@@ -16,6 +16,7 @@ curl "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/spectrum/apps" \
 ```
 
 **Benefits:**
+
 - Hide origin IP from attackers
 - DDoS protection at L3/L4
 - Argo reduces latency
@@ -37,4 +38,5 @@ curl "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/spectrum/apps" \
 ```
 
 **Benefits:**
+
 - Protection

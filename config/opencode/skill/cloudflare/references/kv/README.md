@@ -5,6 +5,7 @@ Globally-distributed, eventually-consistent key-value store optimized for high r
 ## Overview
 
 KV provides:
+
 - Eventual consistency (60s global propagation)
 - Read-optimized performance
 - 25 MiB value limit per key
@@ -31,14 +32,14 @@ const json = await env.MY_KV.get<Config>("config", "json");
 
 ## Core Operations
 
-| Method | Purpose | Returns |
-|--------|---------|---------|
-| `get(key, type?)` | Single read | `string \| null` |
-| `get(keys, type?)` | Bulk read (≤100) | `Map<string, T \| null>` |
-| `put(key, value, options?)` | Write | `Promise<void>` |
-| `delete(key)` | Delete | `Promise<void>` |
-| `list(options?)` | List keys | `{ keys, list_complete, cursor? }` |
-| `getWithMetadata(key)` | Get + metadata | `{ value, metadata }` |
+| Method                      | Purpose          | Returns                            |
+| --------------------------- | ---------------- | ---------------------------------- |
+| `get(key, type?)`           | Single read      | `string \| null`                   |
+| `get(keys, type?)`          | Bulk read (≤100) | `Map<string, T \| null>`           |
+| `put(key, value, options?)` | Write            | `Promise<void>`                    |
+| `delete(key)`               | Delete           | `Promise<void>`                    |
+| `list(options?)`            | List keys        | `{ keys, list_complete, cursor? }` |
+| `getWithMetadata(key)`      | Get + metadata   | `{ value, metadata }`              |
 
 ## Consistency Model
 

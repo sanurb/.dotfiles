@@ -5,6 +5,7 @@ Enterprise-grade bot detection, protection, and mitigation using ML/heuristics, 
 ## Overview
 
 Bot Management provides multi-tier protection:
+
 - **Free (Bot Fight Mode)**: Auto-blocks definite bots, no config
 - **Pro/Business (Super Bot Fight Mode)**: Configurable actions, static resource protection, analytics groupings
 - **Enterprise (Bot Management)**: Granular 1-99 scores, WAF integration, JA3/JA4 fingerprinting, Workers API, Advanced Analytics
@@ -28,11 +29,11 @@ Bot Management provides multi-tier protection:
 
 ## Platform Limits
 
-| Plan | Bot Scores | JA3/JA4 | Custom Rules | Analytics Retention |
-|------|------------|---------|--------------|---------------------|
-| Free | No (auto-block only) | No | 5 | N/A (no analytics) |
-| Pro/Business | Groupings only | No | 20/100 | 30 days (72h at a time) |
-| Enterprise | 1-99 granular | Yes | 1,000+ | 30 days (1 week at a time) |
+| Plan         | Bot Scores           | JA3/JA4 | Custom Rules | Analytics Retention        |
+| ------------ | -------------------- | ------- | ------------ | -------------------------- |
+| Free         | No (auto-block only) | No      | 5            | N/A (no analytics)         |
+| Pro/Business | Groupings only       | No      | 20/100       | 30 days (72h at a time)    |
+| Enterprise   | 1-99 granular        | Yes     | 1,000+       | 30 days (1 week at a time) |
 
 ## Basic Patterns
 

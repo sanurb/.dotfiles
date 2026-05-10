@@ -5,6 +5,7 @@ See [README.md](./README.md) for overview.
 ## Limitations
 
 **General:**
+
 - No formal SLA (free service)
 - No dashboard config visibility
 - Recovery may take days
@@ -12,11 +13,13 @@ See [README.md](./README.md) for overview.
 - Backup Internet required
 
 **v1:**
+
 - Asymmetric MTU (1500↓/1476↑)
 - GRE overhead for Magic Transit/WAN
 - 1 Gbps/GRE tunnel limit
 
 **v2:**
+
 - No VLAN (yet)
 - No BFD (yet)
 - No LACP (use ECMP)
@@ -24,6 +27,7 @@ See [README.md](./README.md) for overview.
 - Beta status
 
 **Cloud:**
+
 - AWS Hosted Direct Connect unsupported
 - Magic WAN only
 - GCP BGP routes ignored
@@ -36,12 +40,14 @@ See [README.md](./README.md) for overview.
 **Symptoms:** Stuck in pending.
 
 **Causes:**
+
 - Cross-connect not installed
 - RX/TX fibers reversed
 - Wrong fiber type
 - Low light levels
 
 **Fix:**
+
 1. Verify cross-connect installed
 2. Check fiber at patch panel
 3. Swap RX/TX
@@ -53,12 +59,14 @@ See [README.md](./README.md) for overview.
 **Symptoms:** Shows unhealthy.
 
 **Causes:**
+
 - Physical issue
 - Light <-20 dBm
 - Optic mismatch
 - Dirty connectors
 
 **Fix:**
+
 1. Check physical connections
 2. Clean fiber connectors
 3. Verify optic types (10GBASE-LR/100GBASE-LR4)
@@ -71,12 +79,14 @@ See [README.md](./README.md) for overview.
 **Symptoms:** Link up, BGP down.
 
 **Causes:**
+
 - Wrong IP addressing
 - Wrong ASN
 - Password mismatch
 - Firewall blocking TCP/179
 
 **Fix:**
+
 1. Verify IPs match CNI object
 2. Confirm ASN correct
 3. Check BGP password
@@ -89,12 +99,14 @@ See [README.md](./README.md) for overview.
 **Symptoms:** Traffic flows, below expected.
 
 **Causes:**
+
 - MTU mismatch
 - Fragmentation
 - Single GRE tunnel (v1)
 - Routing inefficiency
 
 **Fix:**
+
 1. Check MTU (1500↓/1476↑ for v1, 1500 both for v2)
 2. Test various packet sizes
 3. Add more GRE tunnels (v1)
@@ -105,18 +117,21 @@ See [README.md](./README.md) for overview.
 ## Common Mistakes
 
 **Ordering:**
+
 - ❌ Wrong facility code on LOA
 - ❌ Multi-mode fiber (need single-mode)
 - ❌ Wrong optic type
 - ❌ Forgetting to track cross-connect order
 
 **Configuration:**
+
 - ❌ Not using /31 subnets
 - ❌ Skipping BGP passwords
 - ❌ Wrong ASN
 - ❌ Firewall blocking BGP (TCP/179)
 
 **Production:**
+
 - ❌ No maintenance notifications
 - ❌ Not testing backup connectivity
 - ❌ Missing runbooks
@@ -126,11 +141,13 @@ See [README.md](./README.md) for overview.
 ## Quick Reference
 
 **Status Guide:**
+
 - **Active**: Working normally → Monitor
 - **Unhealthy**: Down → Check physical
 - **Pending**: In progress → Complete cross-connect
 
 **Contact Account Team For:**
+
 - CNI eligibility
 - Config assistance
 - LOA generation
@@ -139,6 +156,7 @@ See [README.md](./README.md) for overview.
 - Device diversity options
 
 **Key Commands:**
+
 ```bash
 # List interconnects
 curl "https://api.cloudflare.com/client/v4/accounts/${ID}/cni/interconnects" \

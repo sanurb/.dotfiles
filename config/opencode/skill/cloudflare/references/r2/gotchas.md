@@ -78,17 +78,17 @@ if (!key || key.includes('..') || key.startsWith('/')) {
 
 ## Limits
 
-| Limit | Value |
-|-------|-------|
-| Object size | 5 TB |
-| Multipart part count | 10,000 |
-| Batch delete | 1,000 keys |
-| List limit | 1,000 per request |
-| Key size | 1024 bytes |
-| Custom metadata | 2 KB per object |
+| Limit                | Value             |
+| -------------------- | ----------------- |
+| Object size          | 5 TB              |
+| Multipart part count | 10,000            |
+| Batch delete         | 1,000 keys        |
+| List limit           | 1,000 per request |
+| Key size             | 1024 bytes        |
+| Custom metadata      | 2 KB per object   |
 
 ## Common Errors
 
-**"oldString not found"**: Object key doesn't exist  
-**List compatibility_date**: Set `compatibility_date >= 2022-08-04` or enable `r2_list_honor_include` flag  
+**"oldString not found"**: Object key doesn't exist\
+**List compatibility_date**: Set `compatibility_date >= 2022-08-04` or enable `r2_list_honor_include` flag\
 **Multipart part size**: Ensure uniform size except final part

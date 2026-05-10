@@ -53,7 +53,7 @@ Maintainability gains at the cost of reviewability are a net loss.
 
 Components do not import each other across the split. The TUI knows
 nothing about Nix; the realization layer knows nothing about Go source
-beyond the schema-contract surface. 
+beyond the schema-contract surface.
 
 This repository is a VERY EARLY WIP. Proposing sweeping changes that improve long-term maintainability is encouraged.
 
@@ -62,15 +62,15 @@ This repository is a VERY EARLY WIP. Proposing sweeping changes that improve lon
 Lanes prevent overlap from becoming ambiguity. Each tool owns one
 concern.
 
-| Lane | Tool | Owns |
-|---|---|---|
-| Dotfiles environment | Nix flake | Shell, terminal, editor, multiplexer, system utilities |
-| Per-project runtimes | Proto | Go, Bun, Node, language versions; `.prototools`-pinned. Proto's shims are first in `$PATH`. |
-| Build/test/lint DAG | Moon | Go DAG under `apps/` plus repo-root tasks (formatting, repo-wide gates) declared in top-level `moon.yml`. Does not orchestrate Nix. |
-| Dev shell entry | Devenv (via `nix develop`) | Shell package set, treefmt integration, hooks. `languages.*` left empty by design. Direnv activates it. |
-| Formatting | treefmt | Multi-language formatter dispatch via `nix fmt`. |
-| Realization driver | `nh` (+ `nom` renderer) | `dots apply` (alias `deploy`) shells out to `nh home switch` directly; `nom` composed via `$PATH`. |
-| User-facing UX | `dots` binary | Reading and writing `.dots-state.toml`. Bootstraps Nix and the workspace clone behind explicit consent. Never installs packages, never calls `brew` or `pip install`. |
+| Lane                 | Tool                       | Owns                                                                                                                                                                  |
+| -------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dotfiles environment | Nix flake                  | Shell, terminal, editor, multiplexer, system utilities                                                                                                                |
+| Per-project runtimes | Proto                      | Go, Bun, Node, language versions; `.prototools`-pinned. Proto's shims are first in `$PATH`.                                                                           |
+| Build/test/lint DAG  | Moon                       | Go DAG under `apps/` plus repo-root tasks (formatting, repo-wide gates) declared in top-level `moon.yml`. Does not orchestrate Nix.                                   |
+| Dev shell entry      | Devenv (via `nix develop`) | Shell package set, treefmt integration, hooks. `languages.*` left empty by design. Direnv activates it.                                                               |
+| Formatting           | treefmt                    | Multi-language formatter dispatch via `nix fmt`.                                                                                                                      |
+| Realization driver   | `nh` (+ `nom` renderer)    | `dots apply` (alias `deploy`) shells out to `nh home switch` directly; `nom` composed via `$PATH`.                                                                    |
+| User-facing UX       | `dots` binary              | Reading and writing `.dots-state.toml`. Bootstraps Nix and the workspace clone behind explicit consent. Never installs packages, never calls `brew` or `pip install`. |
 
 `$PATH` priority, top to bottom: Proto shims → nix-darwin / NixOS system
 → Home Manager profile → OS defaults. `dots doctor` verifies this order.
@@ -81,8 +81,8 @@ Long term maintainability is a core priority. If you add new functionality, firs
 
 ## Distribution Model
 
-The two components in §4 produce three peer entry points. *Entry point*
-(how the binary reaches the user) is orthogonal to *depth* (whether the
+The two components in §4 produce three peer entry points. _Entry point_
+(how the binary reaches the user) is orthogonal to _depth_ (whether the
 user only writes a profile or also realizes it). All three entry points
 are equally supported; the user picks based on which package
 manager they already use, not on a primary/fallback hierarchy.
@@ -93,11 +93,11 @@ Windows artifact. Windows users use WSL2.
 
 ### Entry points
 
-| Entry point | Command | Delivers |
-|---|---|---|
-| Homebrew | `brew install sanurb/tap/dots` | Persistent binary |
+| Entry point  | Command                                                                                       | Delivers                                                     |
+| ------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Homebrew     | `brew install sanurb/tap/dots`                                                                | Persistent binary                                            |
 | Curl install | `curl -fsSL https://raw.githubusercontent.com/sanurb/.dotfiles/main/scripts/install.sh \| sh` | Persistent binary in `$INSTALL_DIR` (default `~/.local/bin`) |
-| `nix run` | `nix run github:sanurb/.dotfiles -- <args>` | Ephemeral execution |
+| `nix run`    | `nix run github:sanurb/.dotfiles -- <args>`                                                   | Ephemeral execution                                          |
 
 The Homebrew tap (`sanurb/homebrew-tap`) ships only `dots`. The curl
 fetcher downloads the stable raw-binary asset
@@ -117,16 +117,16 @@ as a subprocess, and apply walks the plan: install Nix → clone
 workspace → snapshot conflicts → realize. No "capture a profile and
 then do these three things by hand" intermediate.
 
-| Verb (canonical) | Aliases | Side-effect class |
-|---|---|---|
-| `dots init` | `install`, bare `dots` | converge — bootstrap, wizard, apply |
-| `dots apply` | `deploy` | converge — realize the plan |
-| `dots update` | — | converge — `git pull --ff-only && dots apply` |
-| `dots rollback` | — | converge — switch Home Manager generation |
-| `dots sync` | — | converge — brownfield-safe wizard |
-| `dots status`, `plan`, `diff`, `doctor`, `why`, `explain`, `scan` | — | measure (read-only) |
-| `dots capture`, `profile`, `completion`, `backup` | — | power-user / composable |
-| `dots version`, `help` | — | meta |
+| Verb (canonical)                                                  | Aliases                | Side-effect class                             |
+| ----------------------------------------------------------------- | ---------------------- | --------------------------------------------- |
+| `dots init`                                                       | `install`, bare `dots` | converge — bootstrap, wizard, apply           |
+| `dots apply`                                                      | `deploy`               | converge — realize the plan                   |
+| `dots update`                                                     | —                      | converge — `git pull --ff-only && dots apply` |
+| `dots rollback`                                                   | —                      | converge — switch Home Manager generation     |
+| `dots sync`                                                       | —                      | converge — brownfield-safe wizard             |
+| `dots status`, `plan`, `diff`, `doctor`, `why`, `explain`, `scan` | —                      | measure (read-only)                           |
+| `dots capture`, `profile`, `completion`, `backup`                 | —                      | power-user / composable                       |
+| `dots version`, `help`                                            | —                      | meta                                          |
 
 `dots help <verb>` prints the per-verb summary; `dots explain <topic>`
 is the built-in topic browser shipped inside the binary. The verb
@@ -137,15 +137,15 @@ are reachable via `dots explain plan` and `dots explain exit-codes`.
 
 Properties that must never break. Each has a verification command.
 
-| # | Invariant | Verification |
-|---|---|---|
-| I1 | The TUI binary does not import any Nix-related Go modules. Subprocess invocation of sibling subcommands (e.g. `dots install` exec-ing `dots deploy`) and external binaries (`nh`, `moon`, the Determinate Systems installer) is permitted — that is not an import, and the TUI does not encode Nix concepts beyond the existence of the sibling subcommand. | runnable — see block below |
-| I2 | The realization layer references the TUI tree only at the schema-contract surface | runnable — see block below |
-| I3 | `.dots-state.toml` schema agrees between Go and Nix consumers | manual: PR review (automated parity check deferred — §12) |
-| I4 | `nix develop -c` is the only sanctioned execution surface for dev tooling | manual: PR review |
-| I5 | `flake.lock` is never hand-edited | runnable — see block below |
-| I6 | Every subcommand declares workspace-required vs workspace-optional | manual: review every new command in `apps/cli/` |
-| I7 | Modules under `modules/home/<category>/` are orthogonal — a shell module references no terminal symbols | manual: PR review (automated ortho-check deferred — §12) |
+| #  | Invariant                                                                                                                                                                                                                                                                                                                                                   | Verification                                              |
+| -- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| I1 | The TUI binary does not import any Nix-related Go modules. Subprocess invocation of sibling subcommands (e.g. `dots install` exec-ing `dots deploy`) and external binaries (`nh`, `moon`, the Determinate Systems installer) is permitted — that is not an import, and the TUI does not encode Nix concepts beyond the existence of the sibling subcommand. | runnable — see block below                                |
+| I2 | The realization layer references the TUI tree only at the schema-contract surface                                                                                                                                                                                                                                                                           | runnable — see block below                                |
+| I3 | `.dots-state.toml` schema agrees between Go and Nix consumers                                                                                                                                                                                                                                                                                               | manual: PR review (automated parity check deferred — §12) |
+| I4 | `nix develop -c` is the only sanctioned execution surface for dev tooling                                                                                                                                                                                                                                                                                   | manual: PR review                                         |
+| I5 | `flake.lock` is never hand-edited                                                                                                                                                                                                                                                                                                                           | runnable — see block below                                |
+| I6 | Every subcommand declares workspace-required vs workspace-optional                                                                                                                                                                                                                                                                                          | manual: review every new command in `apps/cli/`           |
+| I7 | Modules under `modules/home/<category>/` are orthogonal — a shell module references no terminal symbols                                                                                                                                                                                                                                                     | manual: PR review (automated ortho-check deferred — §12)  |
 
 Runnable verifications (copy-paste from inside `nix develop`):
 
@@ -164,4 +164,3 @@ grep -rE 'apps/cli' modules/ flake.nix | grep -v SCHEMA_VERSION   # expect: empt
 # I5 — flake.lock diffs look like `nix flake update` output.
 git log -p flake.lock   # manual visual check
 ```
-

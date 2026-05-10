@@ -5,6 +5,7 @@ Expert guidance for Cloudflare D1, a serverless SQLite database designed for hor
 ## Overview
 
 D1 is Cloudflare's managed, serverless database with:
+
 - SQLite SQL semantics and compatibility
 - Built-in disaster recovery via Time Travel (30-day point-in-time recovery)
 - Horizontal scale-out architecture (10 GB per database)
@@ -48,13 +49,13 @@ const results = await env.DB.batch([
 
 ## Platform Limits
 
-| Limit | Value |
-|-------|-------|
-| Database size | 10 GB per database |
-| Row size | 1 MB maximum |
-| Query timeout | 30 seconds |
-| Batch size | 10,000 statements |
-| Time Travel retention | 30 days |
+| Limit                 | Value              |
+| --------------------- | ------------------ |
+| Database size         | 10 GB per database |
+| Row size              | 1 MB maximum       |
+| Query timeout         | 30 seconds         |
+| Batch size            | 10,000 statements  |
+| Time Travel retention | 30 days            |
 
 ## CLI Commands
 

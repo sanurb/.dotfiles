@@ -237,9 +237,9 @@ export default {
 {
   "send_email": [
     {
-      "name": "EMAIL"
-    }
-  ]
+      "name": "EMAIL",
+    },
+  ],
 }
 ```
 
@@ -340,18 +340,19 @@ npx wrangler deploy
 ### Bind to Route
 
 In Cloudflare dashboard:
+
 1. Go to Email Routing → Email Workers
 2. Create route (e.g., `hello@yourdomain.com`)
 3. Bind route to your deployed Worker
 
 ## Limits
 
-| Limit | Value |
-|-------|-------|
-| Max message size | 25 MiB |
-| Max rules | 200 |
-| Max destination addresses | 200 |
-| Workers CPU (free tier) | Limited (upgrade for more) |
+| Limit                     | Value                      |
+| ------------------------- | -------------------------- |
+| Max message size          | 25 MiB                     |
+| Max rules                 | 200                        |
+| Max destination addresses | 200                        |
+| Workers CPU (free tier)   | Limited (upgrade for more) |
 
 ### CPU Limit Errors
 
@@ -362,6 +363,7 @@ npx wrangler tail
 ```
 
 Look for `EXCEEDED_CPU` errors. Consider:
+
 - Upgrading to Workers Paid plan
 - Optimizing email parsing logic
 - Using `ctx.waitUntil()` for non-critical operations
@@ -472,8 +474,8 @@ export default {
 ```json
 {
   "dependencies": {
-    "postal-mime": "^2.3.3",    // Parse incoming emails
-    "mimetext": "^4.0.0"         // Compose outgoing emails
+    "postal-mime": "^2.3.3", // Parse incoming emails
+    "mimetext": "^4.0.0" // Compose outgoing emails
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",

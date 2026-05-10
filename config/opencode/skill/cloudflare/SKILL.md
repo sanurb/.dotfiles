@@ -20,13 +20,14 @@ Consolidated skill for building on the Cloudflare platform. Use decision trees b
 Each product in `./references/<product>/` contains a `README.md` as the entry point, which may be structured in one of two ways:
 
 **Multi-file format (5 files):**
-| File | Purpose | When to Read |
-|------|---------|--------------|
-| `README.md` | Overview, when to use, getting started | **Always read first** |
-| `api.md` | Runtime API, types, method signatures | Writing code |
-| `configuration.md` | wrangler.toml, bindings, setup | Configuring a project |
-| `patterns.md` | Common patterns, best practices | Implementation guidance |
-| `gotchas.md` | Pitfalls, limitations, edge cases | Debugging, avoiding mistakes |
+
+| File               | Purpose                                | When to Read                 |
+| ------------------ | -------------------------------------- | ---------------------------- |
+| `README.md`        | Overview, when to use, getting started | **Always read first**        |
+| `api.md`           | Runtime API, types, method signatures  | Writing code                 |
+| `configuration.md` | wrangler.toml, bindings, setup         | Configuring a project        |
+| `patterns.md`      | Common patterns, best practices        | Implementation guidance      |
+| `gotchas.md`       | Pitfalls, limitations, edge cases      | Debugging, avoiding mistakes |
 
 **Single-file format:** All information consolidated in `README.md`.
 
@@ -133,101 +134,111 @@ Need IaC?
 ## Product Index
 
 ### Compute & Runtime
-| Product | Entry File |
-|---------|------------|
-| Workers | `./references/workers/README.md` |
-| Pages | `./references/pages/README.md` |
-| Pages Functions | `./references/pages-functions/README.md` |
-| Durable Objects | `./references/durable-objects/README.md` |
-| Workflows | `./references/workflows/README.md` |
-| Containers | `./references/containers/README.md` |
+
+| Product               | Entry File                                     |
+| --------------------- | ---------------------------------------------- |
+| Workers               | `./references/workers/README.md`               |
+| Pages                 | `./references/pages/README.md`                 |
+| Pages Functions       | `./references/pages-functions/README.md`       |
+| Durable Objects       | `./references/durable-objects/README.md`       |
+| Workflows             | `./references/workflows/README.md`             |
+| Containers            | `./references/containers/README.md`            |
 | Workers for Platforms | `./references/workers-for-platforms/README.md` |
-| Cron Triggers | `./references/cron-triggers/README.md` |
-| Tail Workers | `./references/tail-workers/README.md` |
-| Snippets | `./references/snippets/README.md` |
-| Smart Placement | `./references/smart-placement/README.md` |
+| Cron Triggers         | `./references/cron-triggers/README.md`         |
+| Tail Workers          | `./references/tail-workers/README.md`          |
+| Snippets              | `./references/snippets/README.md`              |
+| Smart Placement       | `./references/smart-placement/README.md`       |
 
 ### Storage & Data
-| Product | Entry File |
-|---------|------------|
-| KV | `./references/kv/README.md` |
-| D1 | `./references/d1/README.md` |
-| R2 | `./references/r2/README.md` |
-| Queues | `./references/queues/README.md` |
-| Hyperdrive | `./references/hyperdrive/README.md` |
-| DO Storage | `./references/do-storage/README.md` |
-| Secrets Store | `./references/secrets-store/README.md` |
-| Pipelines | `./references/pipelines/README.md` |
+
+| Product         | Entry File                               |
+| --------------- | ---------------------------------------- |
+| KV              | `./references/kv/README.md`              |
+| D1              | `./references/d1/README.md`              |
+| R2              | `./references/r2/README.md`              |
+| Queues          | `./references/queues/README.md`          |
+| Hyperdrive      | `./references/hyperdrive/README.md`      |
+| DO Storage      | `./references/do-storage/README.md`      |
+| Secrets Store   | `./references/secrets-store/README.md`   |
+| Pipelines       | `./references/pipelines/README.md`       |
 | R2 Data Catalog | `./references/r2-data-catalog/README.md` |
-| R2 SQL | `./references/r2-sql/README.md` |
+| R2 SQL          | `./references/r2-sql/README.md`          |
 
 ### AI & Machine Learning
-| Product | Entry File |
-|---------|------------|
+
+| Product    | Entry File                          |
+| ---------- | ----------------------------------- |
 | Workers AI | `./references/workers-ai/README.md` |
-| Vectorize | `./references/vectorize/README.md` |
+| Vectorize  | `./references/vectorize/README.md`  |
 | Agents SDK | `./references/agents-sdk/README.md` |
 | AI Gateway | `./references/ai-gateway/README.md` |
-| AI Search | `./references/ai-search/README.md` |
+| AI Search  | `./references/ai-search/README.md`  |
 
 ### Networking & Connectivity
-| Product | Entry File |
-|---------|------------|
-| Tunnel | `./references/tunnel/README.md` |
-| Spectrum | `./references/spectrum/README.md` |
-| TURN | `./references/turn/README.md` |
+
+| Product              | Entry File                                    |
+| -------------------- | --------------------------------------------- |
+| Tunnel               | `./references/tunnel/README.md`               |
+| Spectrum             | `./references/spectrum/README.md`             |
+| TURN                 | `./references/turn/README.md`                 |
 | Network Interconnect | `./references/network-interconnect/README.md` |
-| Argo Smart Routing | `./references/argo-smart-routing/README.md` |
-| Workers VPC | `./references/workers-vpc/README.md` |
+| Argo Smart Routing   | `./references/argo-smart-routing/README.md`   |
+| Workers VPC          | `./references/workers-vpc/README.md`          |
 
 ### Security
-| Product | Entry File |
-|---------|------------|
-| WAF | `./references/waf/README.md` |
-| DDoS Protection | `./references/ddos/README.md` |
-| Bot Management | `./references/bot-management/README.md` |
-| API Shield | `./references/api-shield/README.md` |
-| Turnstile | `./references/turnstile/README.md` |
+
+| Product         | Entry File                              |
+| --------------- | --------------------------------------- |
+| WAF             | `./references/waf/README.md`            |
+| DDoS Protection | `./references/ddos/README.md`           |
+| Bot Management  | `./references/bot-management/README.md` |
+| API Shield      | `./references/api-shield/README.md`     |
+| Turnstile       | `./references/turnstile/README.md`      |
 
 ### Media & Content
-| Product | Entry File |
-|---------|------------|
-| Images | `./references/images/README.md` |
-| Stream | `./references/stream/README.md` |
+
+| Product           | Entry File                                 |
+| ----------------- | ------------------------------------------ |
+| Images            | `./references/images/README.md`            |
+| Stream            | `./references/stream/README.md`            |
 | Browser Rendering | `./references/browser-rendering/README.md` |
-| Zaraz | `./references/zaraz/README.md` |
+| Zaraz             | `./references/zaraz/README.md`             |
 
 ### Real-Time Communication
-| Product | Entry File |
-|---------|------------|
-| RealtimeKit | `./references/realtimekit/README.md` |
+
+| Product      | Entry File                            |
+| ------------ | ------------------------------------- |
+| RealtimeKit  | `./references/realtimekit/README.md`  |
 | Realtime SFU | `./references/realtime-sfu/README.md` |
 
 ### Developer Tools
-| Product | Entry File |
-|---------|------------|
-| Wrangler | `./references/wrangler/README.md` |
-| Miniflare | `./references/miniflare/README.md` |
-| C3 | `./references/c3/README.md` |
-| Observability | `./references/observability/README.md` |
-| Analytics Engine | `./references/analytics-engine/README.md` |
-| Web Analytics | `./references/web-analytics/README.md` |
-| Sandbox | `./references/sandbox/README.md` |
-| Workerd | `./references/workerd/README.md` |
+
+| Product            | Entry File                                  |
+| ------------------ | ------------------------------------------- |
+| Wrangler           | `./references/wrangler/README.md`           |
+| Miniflare          | `./references/miniflare/README.md`          |
+| C3                 | `./references/c3/README.md`                 |
+| Observability      | `./references/observability/README.md`      |
+| Analytics Engine   | `./references/analytics-engine/README.md`   |
+| Web Analytics      | `./references/web-analytics/README.md`      |
+| Sandbox            | `./references/sandbox/README.md`            |
+| Workerd            | `./references/workerd/README.md`            |
 | Workers Playground | `./references/workers-playground/README.md` |
 
 ### Infrastructure as Code
-| Product | Entry File |
-|---------|------------|
-| Pulumi | `./references/pulumi/README.md` |
+
+| Product   | Entry File                         |
+| --------- | ---------------------------------- |
+| Pulumi    | `./references/pulumi/README.md`    |
 | Terraform | `./references/terraform/README.md` |
-| API | `./references/api/README.md` |
+| API       | `./references/api/README.md`       |
 
 ### Other Services
-| Product | Entry File |
-|---------|------------|
+
+| Product       | Entry File                             |
+| ------------- | -------------------------------------- |
 | Email Routing | `./references/email-routing/README.md` |
 | Email Workers | `./references/email-workers/README.md` |
 | Static Assets | `./references/static-assets/README.md` |
-| Bindings | `./references/bindings/README.md` |
+| Bindings      | `./references/bindings/README.md`      |
 | Cache Reserve | `./references/cache-reserve/README.md` |

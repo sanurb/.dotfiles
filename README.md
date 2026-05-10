@@ -76,7 +76,7 @@ table or `dots help <verb>` for per-verb summary. `dots explain plan`
 documents the plan/apply contract; `dots explain exit-codes` documents
 the stable exit-code table.
 
-For the canonical day-to-day UX, install [direnv][] so that entering
+For the canonical day-to-day UX, install [direnv][direnv] so that entering
 the cloned workspace activates the dev shell automatically; `dots
 apply` then runs without a `nix develop -c` prefix.
 

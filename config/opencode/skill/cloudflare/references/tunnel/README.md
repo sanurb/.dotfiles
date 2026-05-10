@@ -5,6 +5,7 @@ Secure outbound-only connections between infrastructure and Cloudflare's global 
 ## Overview
 
 Cloudflare Tunnel (formerly Argo Tunnel) enables:
+
 - **Outbound-only connections** - No inbound ports or firewall changes
 - **Public hostname routing** - Expose local services to internet
 - **Private network access** - Connect internal networks via WARP

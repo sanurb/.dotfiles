@@ -25,3 +25,4 @@ export default {
         1                                  // double2: request count (for summing)
       ],
       indexes: [customerId || "anonymous"
+```

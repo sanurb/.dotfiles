@@ -122,6 +122,7 @@ GET /accounts/{account_id}/secrets_store/quota
 ### Responses
 
 Success:
+
 ```json
 {
   "success": true,
@@ -135,10 +136,11 @@ Success:
 ```
 
 Error:
+
 ```json
 {
   "success": false,
-  "errors": [{"code": 10000, "message": "Name exists"}]
+  "errors": [{ "code": 10000, "message": "Name exists" }]
 }
 ```
 

@@ -5,6 +5,7 @@
 **Endpoint**: `https://api.cloudflare.com/client/v4/graphql`
 
 **Query Workers Metrics**:
+
 ```graphql
 query {
   viewer {
@@ -49,3 +50,4 @@ SHOW TABLES;
 -- Time-series aggregation (5-minute buckets)
 SELECT
   intDi
+```

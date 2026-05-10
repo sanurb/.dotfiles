@@ -29,3 +29,4 @@ For non-proxied sites (limit: 10 sites):
 
 ```html
 <!-- Cloudflar
+```

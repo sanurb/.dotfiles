@@ -10,7 +10,7 @@ oneOf: Zero matches (missing discriminator), Multiple (ambiguous)
 
 ## JWT Failing
 
-1) JWKS match IdP? 2) `exp` valid? 3) Header/cookie name? 4) Test jwt.io 5) Clock skew?
+1. JWKS match IdP? 2) `exp` valid? 3) Header/cookie name? 4) Test jwt.io 5) Clock skew?
 
 ## Discovery Missing
 

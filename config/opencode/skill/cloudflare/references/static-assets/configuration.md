@@ -9,8 +9,8 @@ Minimal configuration requires only `assets.directory`:
   "name": "my-worker",
   "compatibility_date": "2025-01-01",
   "assets": {
-    "directory": "./dist"
-  }
+    "directory": "./dist",
+  },
 }
 ```
 
@@ -34,8 +34,8 @@ directory = "./dist"
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "html_handling": "auto-trailing-slash",
-    "run_worker_first": ["/api/*", "!/api/docs/*"]
-  }
+    "run_worker_first": ["/api/*", "!/api/docs/*"],
+  },
 }
 ```
 

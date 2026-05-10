@@ -49,6 +49,7 @@ What are you building?
 ## When to Create a Skill
 
 Create a skill when:
+
 - Same instructions repeated across conversations
 - Domain knowledge model lacks (schemas, internal APIs, company policies)
 - Workflow requires 3+ steps with specific order
@@ -57,42 +58,42 @@ Create a skill when:
 
 ## When NOT to Create a Skill
 
-| Scenario | Do Instead |
-|----------|------------|
-| Single-use instructions | AGENTS.md or inline in conversation |
-| Model already knows domain | Don't add redundant context |
-| < 3 steps, no reuse | Inline instructions |
-| Highly variable workflow | Higher-freedom guidelines |
-| Just want to store files | Use regular directories |
+| Scenario                   | Do Instead                          |
+| -------------------------- | ----------------------------------- |
+| Single-use instructions    | AGENTS.md or inline in conversation |
+| Model already knows domain | Don't add redundant context         |
+| < 3 steps, no reuse        | Inline instructions                 |
+| Highly variable workflow   | Higher-freedom guidelines           |
+| Just want to store files   | Use regular directories             |
 
 ## Reading Order
 
-| Task | Files to Read |
-|------|---------------|
-| New skill from scratch | anatomy.md → frontmatter.md |
-| Optimize existing skill | progressive-disclosure.md |
-| Add scripts/resources | bundled-resources.md |
-| Find skill pattern | patterns.md |
-| Debug/fix skill | gotchas.md |
+| Task                    | Files to Read               |
+| ----------------------- | --------------------------- |
+| New skill from scratch  | anatomy.md → frontmatter.md |
+| Optimize existing skill | progressive-disclosure.md   |
+| Add scripts/resources   | bundled-resources.md        |
+| Find skill pattern      | patterns.md                 |
+| Debug/fix skill         | gotchas.md                  |
 
 ## In This Reference
 
-| File | Purpose |
-|------|---------|
-| [anatomy.md](./references/anatomy.md) | Skill directory structures |
-| [frontmatter.md](./references/frontmatter.md) | YAML spec, naming, validation |
-| [progressive-disclosure.md](./references/progressive-disclosure.md) | Token-efficient design |
-| [bundled-resources.md](./references/bundled-resources.md) | scripts/, references/, assets/ |
-| [patterns.md](./references/patterns.md) | Real-world skill patterns |
-| [gotchas.md](./references/gotchas.md) | Common mistakes + fixes |
+| File                                                                | Purpose                        |
+| ------------------------------------------------------------------- | ------------------------------ |
+| [anatomy.md](./references/anatomy.md)                               | Skill directory structures     |
+| [frontmatter.md](./references/frontmatter.md)                       | YAML spec, naming, validation  |
+| [progressive-disclosure.md](./references/progressive-disclosure.md) | Token-efficient design         |
+| [bundled-resources.md](./references/bundled-resources.md)           | scripts/, references/, assets/ |
+| [patterns.md](./references/patterns.md)                             | Real-world skill patterns      |
+| [gotchas.md](./references/gotchas.md)                               | Common mistakes + fixes        |
 
 ## Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `scripts/init_skill.sh` | Scaffold new skill |
+| Script                      | Purpose                  |
+| --------------------------- | ------------------------ |
+| `scripts/init_skill.sh`     | Scaffold new skill       |
 | `scripts/validate_skill.sh` | Validate skill structure |
-| `scripts/package_skill.sh` | Create distributable zip |
+| `scripts/package_skill.sh`  | Create distributable zip |
 
 ## Pre-Flight Checklist
 
@@ -109,11 +110,11 @@ Run: `./scripts/validate_skill.sh ./my-skill`
 
 ## Skill Locations
 
-| Priority | Location |
-|----------|----------|
-| 1 | `.opencode/skills/<name>/` (project) |
-| 2 | `~/.config/opencode/skills/<name>/` (global) |
-| 3 | `.claude/skills/<name>/` (Claude-compat) |
+| Priority | Location                                     |
+| -------- | -------------------------------------------- |
+| 1        | `.opencode/skills/<name>/` (project)         |
+| 2        | `~/.config/opencode/skills/<name>/` (global) |
+| 3        | `.claude/skills/<name>/` (Claude-compat)     |
 
 Discovery walks up from CWD to git root. First-wins for duplicate names.
 

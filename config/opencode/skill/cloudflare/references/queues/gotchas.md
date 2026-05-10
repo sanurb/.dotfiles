@@ -55,8 +55,8 @@ Default: 30s per consumer invocation. Increase if needed:
 
 ## Cost Optimization
 
-Operations: write + read + delete = 3 ops per message  
-Retries add read ops  
+Operations: write + read + delete = 3 ops per message\
+Retries add read ops\
 Formula: `((messages × 3) - 1M) / 1M × $0.40` per month
 
 ```typescript
@@ -88,17 +88,17 @@ wrangler tail my-worker
 
 ## Limits
 
-| Limit | Value |
-|-------|-------|
-| Max queues | 10,000 |
-| Message size | 128 KB |
-| Batch size (consumer) | 100 messages |
-| Batch size (sendBatch) | 100 msgs/256 KB |
-| Throughput | 5,000 msgs/sec/queue |
-| Retention | 4-14 days |
-| Max backlog | 25 GB |
-| Max delay | 12 hours (43,200s) |
-| Max retries | 100 |
+| Limit                  | Value                |
+| ---------------------- | -------------------- |
+| Max queues             | 10,000               |
+| Message size           | 128 KB               |
+| Batch size (consumer)  | 100 messages         |
+| Batch size (sendBatch) | 100 msgs/256 KB      |
+| Throughput             | 5,000 msgs/sec/queue |
+| Retention              | 4-14 days            |
+| Max backlog            | 25 GB                |
+| Max delay              | 12 hours (43,200s)   |
+| Max retries            | 100                  |
 
 ## Best Practices
 

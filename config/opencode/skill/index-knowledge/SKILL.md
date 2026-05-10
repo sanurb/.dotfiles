@@ -29,7 +29,7 @@ Default: Update mode (modify existing + create new where warranted)
 
 <critical>
 **TodoWrite ALL phases. Mark in_progress → completed in real-time.**
-  
+
 ```
 TodoWrite([
   { id: "discovery", content: "Fire explore agents + LSP codemap + read existing", status: "pending", priority: "high" },
@@ -38,6 +38,7 @@ TodoWrite([
   { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
 ])
 ```
+
 </critical>
 
 ---
@@ -93,14 +94,14 @@ Task(
 <dynamic-agents>
 **DYNAMIC AGENT SPAWNING**: After bash analysis, spawn ADDITIONAL explore agents based on project scale:
 
-| Factor | Threshold | Additional Agents |
-|--------|-----------|-------------------|
-| **Total files** | >100 | +1 per 100 files |
-| **Total lines** | >10k | +1 per 10k lines |
-| **Directory depth** | ≥4 | +2 for deep exploration |
+| Factor                       | Threshold | Additional Agents          |
+| ---------------------------- | --------- | -------------------------- |
+| **Total files**              | >100      | +1 per 100 files           |
+| **Total lines**              | >10k      | +1 per 10k lines           |
+| **Directory depth**          | ≥4        | +2 for deep exploration    |
 | **Large files (>500 lines)** | >10 files | +1 for complexity hotspots |
-| **Monorepo** | detected | +1 per package/workspace |
-| **Multiple languages** | >1 | +1 per language |
+| **Monorepo**                 | detected  | +1 per package/workspace   |
+| **Multiple languages**       | >1        | +1 per language            |
 
 ```bash
 # Measure project scale first
@@ -111,6 +112,7 @@ max_depth=$(find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' |
 ```
 
 Example spawning (all in ONE message for parallel execution):
+
 ```
 // 500 files, 50k lines, depth 6, 15 large files → spawn additional agents
 Task(
@@ -132,6 +134,7 @@ Task(
 )
 // ... more based on calculation
 ```
+
 </dynamic-agents>
 
 ### Main Session: Concurrent Analysis
@@ -139,6 +142,7 @@ Task(
 **While Task agents execute**, main session does:
 
 #### 1. Bash Structural Analysis
+
 ```bash
 # Directory depth + file counts
 find . -type d -not -path '*/\.*' -not -path '*/node_modules/*' -not -path '*/venv/*' -not -path '*/dist/*' -not -path '*/build/*' | awk -F/ '{print NF-1}' | sort -n | uniq -c
@@ -154,6 +158,7 @@ find . -type f \( -name "AGENTS.md" -o -name "CLAUDE.md" \) -not -path '*/node_m
 ```
 
 #### 2. Read Existing AGENTS.md
+
 ```
 For each existing file found:
   Read(filePath=file)
@@ -164,6 +169,7 @@ For each existing file found:
 If `--create-new`: Read all existing first (preserve context) → then delete all → regenerate.
 
 #### 3. LSP Codemap (if available)
+
 ```
 lsp_servers()  # Check availability
 
@@ -192,27 +198,28 @@ lsp_find_references(filePath="...", line=X, character=Y)
 
 ### Scoring Matrix
 
-| Factor | Weight | High Threshold | Source |
-|--------|--------|----------------|--------|
-| File count | 3x | >20 | bash |
-| Subdir count | 2x | >5 | bash |
-| Code ratio | 2x | >70% | bash |
-| Unique patterns | 1x | Has own config | explore |
-| Module boundary | 2x | Has index.ts/__init__.py | bash |
-| Symbol density | 2x | >30 symbols | LSP |
-| Export count | 2x | >10 exports | LSP |
-| Reference centrality | 3x | >20 refs | LSP |
+| Factor               | Weight | High Threshold           | Source  |
+| -------------------- | ------ | ------------------------ | ------- |
+| File count           | 3x     | >20                      | bash    |
+| Subdir count         | 2x     | >5                       | bash    |
+| Code ratio           | 2x     | >70%                     | bash    |
+| Unique patterns      | 1x     | Has own config           | explore |
+| Module boundary      | 2x     | Has index.ts/**init**.py | bash    |
+| Symbol density       | 2x     | >30 symbols              | LSP     |
+| Export count         | 2x     | >10 exports              | LSP     |
+| Reference centrality | 3x     | >20 refs                 | LSP     |
 
 ### Decision Rules
 
-| Score | Action |
-|-------|--------|
-| **Root (.)** | ALWAYS create |
-| **>15** | Create AGENTS.md |
-| **8-15** | Create if distinct domain |
-| **<8** | Skip (parent covers) |
+| Score        | Action                    |
+| ------------ | ------------------------- |
+| **Root (.)** | ALWAYS create             |
+| **>15**      | Create AGENTS.md          |
+| **8-15**     | Create if distinct domain |
+| **<8**       | Skip (parent covers)      |
 
 ### Output
+
 ```
 AGENTS_LOCATIONS = [
   { path: ".", type: "root" },
@@ -239,39 +246,48 @@ AGENTS_LOCATIONS = [
 **Branch:** {BRANCH}
 
 ## OVERVIEW
+
 {1-2 sentences: what + core stack}
 
 ## STRUCTURE
+
 \`\`\`
 {root}/
-├── {dir}/    # {non-obvious purpose only}
+├── {dir}/ # {non-obvious purpose only}
 └── {entry}
 \`\`\`
 
 ## WHERE TO LOOK
+
 | Task | Location | Notes |
-|------|----------|-------|
+| ---- | -------- | ----- |
 
 ## CODE MAP
+
 {From LSP - skip if unavailable or project <10 files}
 
 | Symbol | Type | Location | Refs | Role |
 
 ## CONVENTIONS
+
 {ONLY deviations from standard}
 
 ## ANTI-PATTERNS (THIS PROJECT)
+
 {Explicitly forbidden here}
 
 ## UNIQUE STYLES
+
 {Project-specific}
 
 ## COMMANDS
+
 \`\`\`bash
 {dev/test/build}
 \`\`\`
 
 ## NOTES
+
 {Gotchas}
 ```
 
@@ -316,6 +332,7 @@ Task(
 **Mark "review" as in_progress.**
 
 For each generated file:
+
 - Remove generic advice
 - Remove parent duplicates
 - Trim to size limits

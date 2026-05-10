@@ -5,6 +5,7 @@ Comprehensive guide for implementing Cloudflare Web Analytics - a privacy-first 
 ## Overview
 
 Cloudflare Web Analytics is a free, privacy-focused analytics service that:
+
 - Measures Core W...
 
 ## In This Reference

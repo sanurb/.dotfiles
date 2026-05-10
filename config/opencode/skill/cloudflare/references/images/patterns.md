@@ -29,3 +29,4 @@ export default {
     let format: 'avif' | 'webp' | undefined;
     if (/image\/avif/.test(accept)) {
       format = 'a
+```

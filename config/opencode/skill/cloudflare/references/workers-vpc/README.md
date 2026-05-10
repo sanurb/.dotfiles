@@ -276,7 +276,7 @@ compatibility_date = "2024-01-01"
 
 [env.production]
 routes = [
-  { pattern = "api.example.com/*", zone_name = "example.com" }
+  { pattern = "api.example.com/*", zone_name = "example.com" },
 ]
 ```
 

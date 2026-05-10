@@ -119,6 +119,7 @@ const migration = new D1Migration("migration", {
 ## Data Sources
 
 **Get Zone:**
+
 ```typescript
 const zone = cloudflare.getZone({name: "example.com"});
 const zoneId = zone.then(z => z.id);
@@ -163,6 +164,7 @@ const worker = new cloudflare.WorkerScript("worker", {
 ```
 
 Store secrets:
+
 ```bash
 pulumi config set --secret apiKey "secret-value"
 ```
@@ -191,4 +193,5 @@ function createBucket(name: string, args: BucketArgs) {
 ```
 
 ---
+
 See: [README.md](./README.md), [configuration.md](./configuration.md), [patterns.md](./patterns.md), [gotchas.md](./gotchas.md)

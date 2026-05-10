@@ -9,21 +9,22 @@ CLI for Jira operations via Cloudflare Access authentication.
 
 ## Quick Reference
 
-| Task | Command |
-|------|---------|
+| Task          | Command                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------- |
 | Create ticket | `scripts/jira-tool.sh create -p PROJECT -s "Summary" [-t Type] [-d "Desc"] [-l labels]` |
-| Get ticket | `scripts/jira-tool.sh get ISSUE-KEY` |
-| Update ticket | `scripts/jira-tool.sh update ISSUE-KEY [-s "Summary"] [-d "Desc"] [-a user]` |
-| Add comment | `scripts/jira-tool.sh comment ISSUE-KEY "Comment body"` |
-| Transition | `scripts/jira-tool.sh transition ISSUE-KEY [STATUS]` |
-| Close ticket | `scripts/jira-tool.sh close ISSUE-KEY` |
-| Assign | `scripts/jira-tool.sh assign ISSUE-KEY [username]` |
-| Search | `scripts/jira-tool.sh search "JQL query" [max]` |
-| Auth status | `scripts/jira-tool.sh status` |
+| Get ticket    | `scripts/jira-tool.sh get ISSUE-KEY`                                                    |
+| Update ticket | `scripts/jira-tool.sh update ISSUE-KEY [-s "Summary"] [-d "Desc"] [-a user]`            |
+| Add comment   | `scripts/jira-tool.sh comment ISSUE-KEY "Comment body"`                                 |
+| Transition    | `scripts/jira-tool.sh transition ISSUE-KEY [STATUS]`                                    |
+| Close ticket  | `scripts/jira-tool.sh close ISSUE-KEY`                                                  |
+| Assign        | `scripts/jira-tool.sh assign ISSUE-KEY [username]`                                      |
+| Search        | `scripts/jira-tool.sh search "JQL query" [max]`                                         |
+| Auth status   | `scripts/jira-tool.sh status`                                                           |
 
 ## Authentication
 
 Auth is automatic via `cloudflared`. On first use or token expiry:
+
 - Browser opens for Cloudflare Access login
 - Token valid 24h
 
@@ -86,11 +87,13 @@ scripts/jira-tool.sh comment PROJ-123 "Fixed in commit abc123"
 ### Transition
 
 List available transitions:
+
 ```bash
 scripts/jira-tool.sh transition PROJ-123
 ```
 
 Transition to status:
+
 ```bash
 scripts/jira-tool.sh transition PROJ-123 "In Progress"
 ```
@@ -98,6 +101,7 @@ scripts/jira-tool.sh transition PROJ-123 "In Progress"
 ### Close
 
 Tries common close statuses (Done, Closed, Resolved, Complete):
+
 ```bash
 scripts/jira-tool.sh close PROJ-123
 ```
@@ -123,12 +127,12 @@ scripts/jira-tool.sh delete PROJ-123
 
 ## Common JQL Queries
 
-| Query | JQL |
-|-------|-----|
-| My open tickets | `assignee = currentUser() AND status != Done` |
-| Project backlog | `project = PROJ AND status = "To Do"` |
-| Recently updated | `project = PROJ AND updated >= -7d` |
-| High priority | `priority in (High, Highest) AND status != Done` |
+| Query            | JQL                                              |
+| ---------------- | ------------------------------------------------ |
+| My open tickets  | `assignee = currentUser() AND status != Done`    |
+| Project backlog  | `project = PROJ AND status = "To Do"`            |
+| Recently updated | `project = PROJ AND updated >= -7d`              |
+| High priority    | `priority in (High, Highest) AND status != Done` |
 
 ## Output
 

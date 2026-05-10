@@ -9,48 +9,48 @@
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2024-01-15",
   "compatibility_flags": ["nodejs_compat"],
-  
+
   "vars": { "API_URL": "https://api.example.com" },
-  
+
   "kv_namespaces": [
-    { "binding": "KV", "id": "abc123" }
+    { "binding": "KV", "id": "abc123" },
   ],
-  
+
   "d1_databases": [{
     "binding": "DB",
     "database_name": "production-db",
-    "database_id": "xyz789"
+    "database_id": "xyz789",
   }],
-  
+
   "r2_buckets": [
-    { "binding": "BUCKET", "bucket_name": "my-bucket" }
+    { "binding": "BUCKET", "bucket_name": "my-bucket" },
   ],
-  
+
   "durable_objects": {
     "bindings": [{
       "name": "COUNTER",
       "class_name": "Counter",
-      "script_name": "counter-worker"
-    }]
+      "script_name": "counter-worker",
+    }],
   },
-  
+
   "services": [
-    { "binding": "AUTH", "service": "auth-worker" }
+    { "binding": "AUTH", "service": "auth-worker" },
   ],
-  
+
   "ai": { "binding": "AI" },
-  
+
   "vectorize": [{
     "binding": "VECTORIZE",
-    "index_name": "my-index"
+    "index_name": "my-index",
   }],
-  
+
   "hyperdrive": [{
     "binding": "HYPERDRIVE",
-    "id": "hyperdrive-id"
+    "id": "hyperdrive-id",
   }],
-  
-  "analytics_engine_datasets": [{ "binding": "ANALYTICS" }]
+
+  "analytics_engine_datasets": [{ "binding": "ANALYTICS" }],
 }
 ```
 
@@ -60,19 +60,20 @@
 {
   "name": "my-app",
   "vars": { "API_URL": "http://localhost:8787" },
-  
+
   "env": {
     "preview": {
-      "vars": { "API_URL": "https://preview.example.com" }
+      "vars": { "API_URL": "https://preview.example.com" },
     },
     "production": {
-      "vars": { "API_URL": "https://api.example.com" }
-    }
-  }
+      "vars": { "API_URL": "https://api.example.com" },
+    },
+  },
 }
 ```
 
 **Rules:**
+
 - Top-level → local dev
 - `env.preview` → preview deployments
 - `env.production` → production

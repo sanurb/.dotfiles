@@ -9,19 +9,21 @@ curl -X POST 'https://rtc.live/v1/apps/${CALLS_APP_ID}/sessions/new' \
 
 ## Core Concepts
 
-**Sessions:** PeerConnection to Cloudflare edge  
-**Tracks:** Media/data channels (audio/video/datachannel)  
+**Sessions:** PeerConnection to Cloudflare edge\
+**Tracks:** Media/data channels (audio/video/datachannel)\
 **No rooms:** Build presence via track sharing
 
 ## Endpoints
 
 ### Create Session
+
 ```http
 POST /v1/apps/{appId}/sessions/new
 → {sessionId, sessionDescription}
 ```
 
 ### Add Track (Publish)
+
 ```http
 POST /v1/apps/{appId}/sessions/{sessionId}/tracks/new
 Body: {
@@ -32,6 +34,7 @@ Body: {
 ```
 
 ### Add Track (Subscribe)
+
 ```http
 POST /v1/apps/{appId}/sessions/{sessionId}/tracks/new
 Body: {
@@ -45,18 +48,21 @@ Body: {
 ```
 
 ### Renegotiate
+
 ```http
 PUT /v1/apps/{appId}/sessions/{sessionId}/renegotiate
 Body: {sessionDescription: {sdp, type: "answer"}}
 ```
 
 ### Close Tracks
+
 ```http
 PUT /v1/apps/{appId}/sessions/{sessionId}/tracks/close
 Body: {tracks: [{trackName}]}
 ```
 
 ### Get Session
+
 ```http
 GET /v1/apps/{appId}/sessions/{sessionId}
 ```

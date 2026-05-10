@@ -29,6 +29,7 @@ This skill focuses **exclusively on Cloudflare Workers AI** - the serverless AI 
 ### When to Load This Skill
 
 Load this skill when:
+
 - Implementing AI inference in Cloudflare Workers
 - Building RAG systems with Workers AI + Vectorize
 - Optimizing Workers AI costs or performance
@@ -82,6 +83,7 @@ The skill is organized into these sections:
 ## What's NOT Covered
 
 This skill does NOT cover:
+
 - General Cloudflare Workers programming (use Workers skill)
 - Cloudflare Pages (unless specifically Workers AI integration)
 - Cloudflare CDN, DNS, security features
@@ -91,6 +93,7 @@ This skill does NOT cover:
 ## Maintenance
 
 To keep this skill up to date:
+
 - Check official docs: https://developers.cloudflare.com/workers-ai/
 - Monitor model catalog: https://developers.cloudflare.com/workers-ai/models/
 - Track pricing changes: https://developers.cloudflare.com/workers-ai/platform/pricing/
@@ -98,6 +101,7 @@ To keep this skill up to date:
 ## Contributing
 
 Found an issue or want to improve this skill?
+
 1. Test changes against official Cloudflare Workers AI docs
 2. Verify code examples work with latest Wrangler
 3. Update pricing/limits if changed

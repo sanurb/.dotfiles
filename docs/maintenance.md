@@ -24,8 +24,8 @@ the pin can be removed and the module collapsed back to the default
 
 ### Active pins
 
-| Pin | Module | Started | Reason | Last upstream check |
-|---|---|---|---|---|
+| Pin    | Module                             | Started    | Reason                                                                                                                                                             | Last upstream check  |
+| ------ | ---------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
 | `edge` | `modules/home/editor.nix` (neovim) | 2026-05-03 | Demonstrate the per-tool-pin pattern; neovim cycles faster than `nixos-unstable`'s hydra gating and the lag has bitten plugin/treesitter parser compat in the past | 2026-05-03 (initial) |
 
 ### Retired pins

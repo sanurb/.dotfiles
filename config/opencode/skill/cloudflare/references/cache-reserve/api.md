@@ -142,6 +142,7 @@ const getClearStatus = async (zoneId: string, apiToken: string) => {
 ```
 
 **Clear process:**
+
 1. Disable Cache Reserve (`value: 'off'`)
 2. Call cache_reserve_clear endpoint
 3. Deletion takes up to 24 hours

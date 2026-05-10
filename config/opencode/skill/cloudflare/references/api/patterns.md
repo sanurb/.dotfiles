@@ -45,3 +45,4 @@ const records = await client.dns.records.list({
   zone_id: 'zone-id',
   type: 'A',
   name: 'exa
+```

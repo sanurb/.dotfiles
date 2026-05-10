@@ -51,3 +51,4 @@ const configs: Record<string, ArgoEnvironmentConfig> = {
     monitoring: {
       usageAlerts: false,
       th
+```

@@ -25,6 +25,7 @@ Your App → AI Gateway → AI Provider (OpenAI, Anthropic, etc.)
 ```
 
 **Key URL patterns:**
+
 - Unified API (OpenAI-compatible): `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/compat/chat/completions`
 - Provider-specific: `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/{provider}/{endpoint}`
 - Dynamic routes: Use route name instead of model: `dynamic/{route-name}`
@@ -66,6 +67,7 @@ const response = await client.chat.completions.create({
 ```
 
 **Benefits:**
+
 - Works with existing OpenAI SDK tooling
 - Switch providers without code changes (just change model param)
 - Compatible with most OpenAI-compatible tools
@@ -163,6 +165,7 @@ curl https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai/chat/
 ```
 
 **Cache headers:**
+
 - `cf-aig-skip-cache: true` - Bypass cache
 - `cf-aig-cache-ttl: <seconds>` - Custom TTL (min: 60s, max: 1 month)
 - `cf-aig-cache-key: <key>` - Custom cache key
@@ -173,6 +176,7 @@ curl https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai/chat/
 Store provider keys in dashboard, remove from code.
 
 **Setup:**
+
 1. Enable authentication on gateway
 2. Dashboard → AI Gateway → Select gateway → Provider Keys → Add API Key
 3. Remove provider API keys from code:
@@ -210,12 +214,14 @@ const response = await client.chat.completions.create({
 ```
 
 **Dynamic routing use cases:**
+
 - A/B testing between models
 - Rate/budget limits per user/team
 - Model fallbacks on errors
 - Conditional routing (paid vs free users)
 
 **Route configuration (in dashboard):**
+
 1. Create route: Dashboard → Gateway → Dynamic Routes → Add Route
 2. Define flow with nodes:
    - **Conditional**: Branch on metadata (e.g., `user.plan == "paid"`)
@@ -259,6 +265,7 @@ try {
 ### Dashboard Setup
 
 **Create gateway:**
+
 ```bash
 # Via Dashboard: AI > AI Gateway > Create Gateway
 # Or via API:
@@ -279,12 +286,14 @@ curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/gatew
 ### Feature Configuration
 
 **Caching:**
+
 - Dashboard: Settings → Cache Responses → Enable
 - Default TTL: Set in gateway settings
 - Cache behavior: Only for identical requests (text & image responses)
 - Use case: Support bots with limited prompt options
 
 **Rate Limiting:**
+
 - Dashboard: Settings → Rate-limiting → Enable
 - Parameters:
   - Limit: Number of requests
@@ -293,6 +302,7 @@ curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/gatew
 - Response: `429 Too Many Requests` when exceeded
 
 **Logging:**
+
 - Dashboard: Settings → Logs
 - Default: Enabled (up to 10M logs per gateway)
 - Per-request: `cf-aig-collect-log: false` to skip
@@ -353,10 +363,12 @@ wrangler secret put OPENAI_API_KEY
 ### API Token Permissions
 
 **For gateway management:**
+
 - AI Gateway - Read
 - AI Gateway - Edit
 
 **For authenticated gateway access:**
+
 - Create API token with appropriate permissions
 - Pass in `cf-aig-authorization: Bearer {token}` header
 
@@ -364,23 +376,23 @@ wrangler secret put OPENAI_API_KEY
 
 AI Gateway works with 15+ providers via unified API or provider-specific endpoints:
 
-| Provider | Unified API | Provider Endpoint | Notes |
-|----------|-------------|-------------------|-------|
-| OpenAI | ✅ `openai/gpt-4o` | `/openai/*` | Full support |
-| Anthropic | ✅ `anthropic/claude-3-5-sonnet` | `/anthropic/*` | Full support |
-| Google AI Studio | ✅ `google-ai-studio/gemini-2.0-flash` | `/google-ai-studio/*` | Full support |
-| Workers AI | ✅ `workersai/@cf/meta/llama-3` | `/workers-ai/*` | Native integration |
-| Azure OpenAI | ✅ `azure-openai/*` | `/azure-openai/*` | Deployment names |
-| AWS Bedrock | ❌ | `/bedrock/*` | Provider endpoint only |
-| Groq | ✅ `groq/*` | `/groq/*` | Fast inference |
-| Mistral | ✅ `mistral/*` | `/mistral/*` | Full support |
-| Cohere | ✅ `cohere/*` | `/cohere/*` | Full support |
-| Perplexity | ✅ `perplexity/*` | `/perplexity/*` | Full support |
-| xAI (Grok) | ✅ `grok/*` | `/grok/*` | Full support |
-| DeepSeek | ✅ `deepseek/*` | `/deepseek/*` | Full support |
-| Cerebras | ✅ `cerebras/*` | `/cerebras/*` | Fast inference |
-| Replicate | ❌ | `/replicate/*` | Provider endpoint only |
-| HuggingFace | ❌ | `/huggingface/*` | Provider endpoint only |
+| Provider         | Unified API                            | Provider Endpoint     | Notes                  |
+| ---------------- | -------------------------------------- | --------------------- | ---------------------- |
+| OpenAI           | ✅ `openai/gpt-4o`                     | `/openai/*`           | Full support           |
+| Anthropic        | ✅ `anthropic/claude-3-5-sonnet`       | `/anthropic/*`        | Full support           |
+| Google AI Studio | ✅ `google-ai-studio/gemini-2.0-flash` | `/google-ai-studio/*` | Full support           |
+| Workers AI       | ✅ `workersai/@cf/meta/llama-3`        | `/workers-ai/*`       | Native integration     |
+| Azure OpenAI     | ✅ `azure-openai/*`                    | `/azure-openai/*`     | Deployment names       |
+| AWS Bedrock      | ❌                                     | `/bedrock/*`          | Provider endpoint only |
+| Groq             | ✅ `groq/*`                            | `/groq/*`             | Fast inference         |
+| Mistral          | ✅ `mistral/*`                         | `/mistral/*`          | Full support           |
+| Cohere           | ✅ `cohere/*`                          | `/cohere/*`           | Full support           |
+| Perplexity       | ✅ `perplexity/*`                      | `/perplexity/*`       | Full support           |
+| xAI (Grok)       | ✅ `grok/*`                            | `/grok/*`             | Full support           |
+| DeepSeek         | ✅ `deepseek/*`                        | `/deepseek/*`         | Full support           |
+| Cerebras         | ✅ `cerebras/*`                        | `/cerebras/*`         | Fast inference         |
+| Replicate        | ❌                                     | `/replicate/*`        | Provider endpoint only |
+| HuggingFace      | ❌                                     | `/huggingface/*`      | Provider endpoint only |
 
 See [full provider list](https://developers.cloudflare.com/ai-gateway/usage/providers/)
 
@@ -389,6 +401,7 @@ See [full provider list](https://developers.cloudflare.com/ai-gateway/usage/prov
 ### Analytics Dashboard
 
 View in Dashboard → AI Gateway → Select gateway:
+
 - Request count over time
 - Token usage (input/output)
 - Cost tracking (estimated or custom)
@@ -399,6 +412,7 @@ View in Dashboard → AI Gateway → Select gateway:
 ### Log Structure
 
 Each log entry contains:
+
 - User prompt & model response
 - Provider & model
 - Timestamp
@@ -487,6 +501,7 @@ const response = await client.chat.completions.create(
 Currently, caching requires identical requests. Semantic caching (similar but not identical requests) is planned.
 
 **Current workaround:**
+
 ```typescript
 // Use cf-aig-cache-key for grouped responses
 const normalizedPrompt = normalizePrompt(userInput); // Your logic
@@ -520,6 +535,7 @@ curl https://api.cloudflare.com/client/v4/accounts/{account_id}/ai-gateway/gatew
 Dashboard → Gateway → Logs
 
 **Filter examples:**
+
 - `status: error` - All failed requests
 - `provider: openai` - OpenAI requests only
 - `metadata.userId: user123` - Specific user
@@ -529,27 +545,32 @@ Dashboard → Gateway → Logs
 ### Common Issues
 
 **401 Unauthorized:**
+
 - Authenticated gateway without `cf-aig-authorization` header
 - Invalid/expired CF API token
 - Check token permissions (AI Gateway - Read)
 
 **403 Forbidden:**
+
 - Provider API key invalid/missing
 - BYOK key not configured or expired
 - Provider quota exceeded
 
 **429 Rate Limited:**
+
 - Gateway rate limit exceeded
 - Check settings: Dashboard → Gateway → Settings → Rate-limiting
 - Implement backoff or use dynamic routing
 
 **Cache not working:**
+
 - Requests must be identical (body, model, parameters)
 - Caching only supports text/image responses
 - Check `cf-aig-cache-status` header in response
 - Verify caching enabled: Dashboard → Settings → Cache Responses
 
 **Logs not appearing:**
+
 - Check log limit (default: 10M per gateway)
 - Verify logs enabled: Dashboard → Settings → Logs
 - Per-request `cf-aig-collect-log: false` bypasses logging
@@ -589,18 +610,22 @@ DELETE /accounts/{account_id}/ai-gateway/gateways/{gateway_id}/logs
 ### Headers Reference
 
 **Gateway authentication:**
+
 - `cf-aig-authorization: Bearer {token}` - Required for authenticated gateways
 
 **Caching:**
+
 - `cf-aig-cache-ttl: {seconds}` - Cache duration (60s - 1 month)
 - `cf-aig-skip-cache: true` - Bypass cache
 - `cf-aig-cache-key: {key}` - Custom cache key
 - Response: `cf-aig-cache-status: HIT|MISS`
 
 **Logging:**
+
 - `cf-aig-collect-log: false` - Skip logging for this request
 
 **Metadata:**
+
 - `cf-aig-metadata: {json}` - Custom tracking data (max 5 entries, string/number/boolean values)
 
 ## Best Practices
@@ -648,6 +673,7 @@ DELETE /accounts/{account_id}/ai-gateway/gateways/{gateway_id}/logs
 ## Examples Repository
 
 See real-world usage:
+
 - [NextChat](https://github.com/ChatGPTNextWeb/NextChat/blob/main/app/utils/cloudflare.ts) - URL parsing utilities
 - [LibreChat](https://github.com/danny-avila/LibreChat) - Multi-provider chat with AI Gateway
 - [Continue.dev](https://github.com/continuedev/continue/blob/main/core/llm/llms/Cloudflare.ts) - IDE integration
@@ -664,11 +690,13 @@ See real-world usage:
 ## Quick Reference
 
 **Create gateway:**
+
 ```bash
 Dashboard → AI → AI Gateway → Create Gateway
 ```
 
 **Basic request:**
+
 ```typescript
 const client = new OpenAI({
   baseURL: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/compat`
@@ -676,17 +704,20 @@ const client = new OpenAI({
 ```
 
 **Check cache status:**
+
 ```bash
 # Response header: cf-aig-cache-status: HIT|MISS
 ```
 
 **Get account/gateway IDs:**
+
 ```bash
 # Account ID: Dashboard → Overview → Account ID
 # Gateway ID: Dashboard → AI Gateway → Gateway name/ID
 ```
 
 **Required env vars:**
+
 ```bash
 CF_ACCOUNT_ID=xxx
 GATEWAY_ID=xxx

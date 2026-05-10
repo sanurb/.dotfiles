@@ -23,13 +23,13 @@ Tier 3: Bundled Resources (on-demand)
 
 ## Context Window Economics
 
-| Scenario | Files Loaded | ~Tokens |
-|----------|--------------|---------|
-| Agent startup (10 skills) | Metadata only | ~1000 |
-| Skill triggered | + SKILL.md | +1500 |
-| Read 1 reference | + reference file | +800 |
-| Full implementation | SKILL.md + 2-3 refs | ~4000 |
-| **Worst case** | Everything | 10000+ |
+| Scenario                  | Files Loaded        | ~Tokens |
+| ------------------------- | ------------------- | ------- |
+| Agent startup (10 skills) | Metadata only       | ~1000   |
+| Skill triggered           | + SKILL.md          | +1500   |
+| Read 1 reference          | + reference file    | +800    |
+| Full implementation       | SKILL.md + 2-3 refs | ~4000   |
+| **Worst case**            | Everything          | 10000+  |
 
 **Key insight:** Proper navigation keeps budget at 2-5K. Poor navigation explodes to 10K+.
 
@@ -50,7 +50,7 @@ Split into multiple files when:
 └─ Large reference tables/schemas
 ```
 
-### The 5-File Pattern 
+### The 5-File Pattern
 
 For complex products/domains:
 
@@ -65,12 +65,12 @@ product/
 
 **Task-based loading:**
 
-| Task | Files to Read |
-|------|---------------|
-| Quick start | README.md only |
+| Task              | Files to Read           |
+| ----------------- | ----------------------- |
+| Quick start       | README.md only          |
 | Implement feature | README + api + patterns |
-| Configure/setup | README + configuration |
-| Debug issue | gotchas.md |
+| Configure/setup   | README + configuration  |
+| Debug issue       | gotchas.md              |
 
 **Token savings:** 2-3K per task vs 5-6K reading everything.
 
@@ -95,10 +95,12 @@ Agent loads forms.md or batch.md only when needed.
 
 ```markdown
 ## Quick Start
+
 Here's how to process PDFs...
 
 ## Advanced Features
-As mentioned above, to process PDFs...  # BAD: duplicates content
+
+As mentioned above, to process PDFs... # BAD: duplicates content
 ```
 
 ## Navigation Patterns
@@ -110,12 +112,12 @@ Always include in SKILL.md:
 ```markdown
 ## In This Reference
 
-| File | Purpose |
-|------|---------|
-| [api.md](./references/api.md) | Runtime APIs |
-| [config.md](./references/config.md) | Setup |
-| [patterns.md](./references/patterns.md) | Best practices |
-| [gotchas.md](./references/gotchas.md) | Troubleshooting |
+| File                                    | Purpose         |
+| --------------------------------------- | --------------- |
+| [api.md](./references/api.md)           | Runtime APIs    |
+| [config.md](./references/config.md)     | Setup           |
+| [patterns.md](./references/patterns.md) | Best practices  |
+| [gotchas.md](./references/gotchas.md)   | Troubleshooting |
 ```
 
 ### "Reading Order" Section
@@ -125,11 +127,11 @@ Guide task-based navigation:
 ```markdown
 ## Reading Order
 
-| Task | Files |
-|------|-------|
-| New project | README + config |
+| Task        | Files                   |
+| ----------- | ----------------------- |
+| New project | README + config         |
 | Add feature | README + api + patterns |
-| Debug | gotchas |
+| Debug       | gotchas                 |
 ```
 
 ### Decision Trees for Routing
@@ -151,12 +153,12 @@ Agent routes to correct product without reading everything.
 
 ## Anti-Patterns
 
-| Pattern | Problem | Fix |
-|---------|---------|-----|
-| Monolithic SKILL.md | Context rot | Split by task/domain |
-| Duplicated content | Staleness, bloat | Link, don't copy |
-| Missing navigation | Agent guesses | Add decision trees |
-| Everything in Tier 2 | Wasted tokens | Push details to Tier 3 |
+| Pattern              | Problem          | Fix                    |
+| -------------------- | ---------------- | ---------------------- |
+| Monolithic SKILL.md  | Context rot      | Split by task/domain   |
+| Duplicated content   | Staleness, bloat | Link, don't copy       |
+| Missing navigation   | Agent guesses    | Add decision trees     |
+| Everything in Tier 2 | Wasted tokens    | Push details to Tier 3 |
 
 ## See Also
 

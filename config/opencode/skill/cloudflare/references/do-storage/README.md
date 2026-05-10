@@ -5,6 +5,7 @@ Persistent storage API for Durable Objects with SQLite and KV backends, PITR, an
 ## Overview
 
 DO Storage provides:
+
 - SQLite-backed (recommended) or KV-backed
 - SQL API + synchronous/async KV APIs
 - Automatic input/output gates (race-free)
@@ -34,10 +35,10 @@ export class Counter extends DurableObject {
 
 ## Storage Backends
 
-| Backend | Create Method | APIs | PITR |
-|---------|---------------|------|------|
-| SQLite (recommended) | `new_sqlite_classes` | SQL + sync KV + async KV | ✅ |
-| KV (legacy) | `new_classes` | async KV only | ❌ |
+| Backend              | Create Method        | APIs                     | PITR |
+| -------------------- | -------------------- | ------------------------ | ---- |
+| SQLite (recommended) | `new_sqlite_classes` | SQL + sync KV + async KV | ✅   |
+| KV (legacy)          | `new_classes`        | async KV only            | ❌   |
 
 ## Core APIs
 

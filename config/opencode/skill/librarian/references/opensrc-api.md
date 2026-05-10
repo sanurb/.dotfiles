@@ -4,8 +4,8 @@
 
 Use the **opensrc MCP server** via single tool:
 
-| Tool | Purpose |
-|------|---------|
+| Tool              | Purpose                                                 |
+| ----------------- | ------------------------------------------------------- |
 | `opensrc_execute` | All operations (fetch, read, grep, files, remove, etc.) |
 
 Takes a `code` parameter: JavaScript async arrow function executed server-side. Source trees stay on server, only results return.
@@ -131,12 +131,12 @@ interface AstGrepMatch {
 
 #### AST Pattern Syntax
 
-| Pattern | Matches |
-|---------|---------|
-| `$NAME` | Single node, captures to metavars |
+| Pattern   | Matches                                 |
+| --------- | --------------------------------------- |
+| `$NAME`   | Single node, captures to metavars       |
 | `$$$ARGS` | Zero or more nodes (variadic), captures |
-| `$_` | Single node, no capture |
-| `$$$` | Zero or more nodes, no capture |
+| `$_`      | Single node, no capture                 |
+| `$$$`     | Zero or more nodes, no capture          |
 
 ### FileEntry
 
@@ -207,15 +207,15 @@ const successful = Object.entries(files)
 
 ## Package Spec Formats
 
-| Format | Example | Source Name After Fetch |
-|--------|---------|------------------------|
-| `<name>` | `"zod"` | `"zod"` |
-| `<name>@<version>` | `"zod@3.22.0"` | `"zod"` |
-| `pypi:<name>` | `"pypi:requests"` | `"requests"` |
-| `crates:<name>` | `"crates:serde"` | `"serde"` |
-| `owner/repo` | `"vercel/ai"` | `"github.com/vercel/ai"` |
-| `owner/repo@ref` | `"vercel/ai@v1.0.0"` | `"github.com/vercel/ai"` |
-| `gitlab:owner/repo` | `"gitlab:org/repo"` | `"gitlab.com/org/repo"` |
+| Format              | Example              | Source Name After Fetch  |
+| ------------------- | -------------------- | ------------------------ |
+| `<name>`            | `"zod"`              | `"zod"`                  |
+| `<name>@<version>`  | `"zod@3.22.0"`       | `"zod"`                  |
+| `pypi:<name>`       | `"pypi:requests"`    | `"requests"`             |
+| `crates:<name>`     | `"crates:serde"`     | `"serde"`                |
+| `owner/repo`        | `"vercel/ai"`        | `"github.com/vercel/ai"` |
+| `owner/repo@ref`    | `"vercel/ai@v1.0.0"` | `"github.com/vercel/ai"` |
+| `gitlab:owner/repo` | `"gitlab:org/repo"`  | `"gitlab.com/org/repo"`  |
 
 ## Critical Pattern
 

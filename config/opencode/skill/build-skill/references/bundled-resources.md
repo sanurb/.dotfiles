@@ -16,11 +16,13 @@ What kind of content?
 Executable code the agent runs directly.
 
 **When to include:**
+
 - Same code rewritten repeatedly
 - Deterministic operations needed
 - Complex validation logic
 
 **Best practices:**
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -33,6 +35,7 @@ fi
 ```
 
 **Execution vs reading:**
+
 - "Run `scripts/validate.sh`" → execute
 - "See `scripts/validate.sh` for logic" → read
 
@@ -41,22 +44,26 @@ fi
 Documentation loaded into agent context.
 
 **When to include:**
+
 - Domain knowledge model lacks
 - API documentation
 - Database schemas
 - Detailed workflow guides
 
 **Structure each file:**
+
 ```markdown
 # Title
 
 Brief overview.
 
 ## Contents
+
 - Section 1
 - Section 2
 
 ## Section 1
+
 ...
 ```
 
@@ -67,11 +74,13 @@ Brief overview.
 Files used in output, not loaded into context.
 
 **When to include:**
+
 - Templates (`.yaml`, `.json`)
 - Images (logos, diagrams)
 - Boilerplate code
 
 **Organization:**
+
 ```
 assets/
 ├── templates/config.yaml
@@ -83,19 +92,19 @@ Agent copies/uses files without loading into context.
 
 ## Comparison
 
-| Directory | Purpose | Token Cost | Agent Action |
-|-----------|---------|------------|--------------|
-| scripts/ | Automation | Zero | Execute |
-| references/ | Documentation | When read | Read |
-| assets/ | Output files | Zero | Copy/use |
+| Directory   | Purpose       | Token Cost | Agent Action |
+| ----------- | ------------- | ---------- | ------------ |
+| scripts/    | Automation    | Zero       | Execute      |
+| references/ | Documentation | When read  | Read         |
+| assets/     | Output files  | Zero       | Copy/use     |
 
 ## Not Supported in OpenCode
 
-| Feature | Status |
-|---------|--------|
-| `toolbox/` protocol | Not supported |
-| `mcp.json` bundling | Not supported |
-| Per-skill MCP | Use global opencode.json |
+| Feature             | Status                   |
+| ------------------- | ------------------------ |
+| `toolbox/` protocol | Not supported            |
+| `mcp.json` bundling | Not supported            |
+| Per-skill MCP       | Use global opencode.json |
 
 ## See Also
 

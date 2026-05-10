@@ -10,24 +10,24 @@
   "containers": [
     {
       "class_name": "MyContainer",
-      "image": "./Dockerfile",  // or path to directory with Dockerfile
-      "max_instances": 10
-    }
+      "image": "./Dockerfile", // or path to directory with Dockerfile
+      "max_instances": 10,
+    },
   ],
   "durable_objects": {
     "bindings": [
       {
         "name": "MY_CONTAINER",
-        "class_name": "MyContainer"
-      }
-    ]
+        "class_name": "MyContainer",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["MyContainer"]  // Must use new_sqlite_classes
-    }
-  ]
+      "new_sqlite_classes": ["MyContainer"], // Must use new_sqlite_classes
+    },
+  ],
 }
 ```
 
@@ -53,4 +53,5 @@ new_sqlite_classes = ["MyContainer"]
 ```
 
 Key config requirements:
+
 - `image` - Path to Dockerfile or directory conta

@@ -13,12 +13,12 @@ Schedule Workers execution using cron expressions. Runs on Cloudflare's global n
 ## Cron Syntax
 
 ```
- ┌─────────── minute (0-59)
- │ ┌───────── hour (0-23)
- │ │ ┌─────── day of month (1-31)
- │ │ │ ┌───── month (1-12, JAN-DEC)
- │ │ │ │ ┌─── day of week (1-7, SUN-SAT, 1=Sunday)
- * * * * *
+┌─────────── minute (0-59)
+│ ┌───────── hour (0-23)
+│ │ ┌─────── day of month (1-31)
+│ │ │ ┌───── month (1-12, JAN-DEC)
+│ │ │ │ ┌─── day of week (1-7, SUN-SAT, 1=Sunday)
+* * * * *
 ```
 
 **Special chars:** `*` (any), `,` (list), `-` (range), `/` (step), `L` (last), `W` (weekday), `#` (nth)
@@ -39,16 +39,18 @@ Schedule Workers execution using cron expressions. Runs on Cloudflare's global n
 ## Quick Start
 
 **wrangler.jsonc:**
+
 ```jsonc
 {
   "name": "my-cron-worker",
   "triggers": {
-    "crons": ["*/5 * * * *", "0 2 * * *"]
-  }
+    "crons": ["*/5 * * * *", "0 2 * * *"],
+  },
 }
 ```
 
 **Handler:**
+
 ```typescript
 export default {
   async scheduled(
@@ -65,6 +67,7 @@ export default {
 ```
 
 **Test locally:**
+
 ```bash
 npx wrangler dev
 curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"

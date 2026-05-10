@@ -42,11 +42,11 @@ Private, high-performance connectivity to Cloudflare's network. **Enterprise-onl
 
 ## Throughput
 
-| Direction | 10G | 100G |
-|-----------|-----|------|
-| CF → Customer | 10 Gbps | 100 Gbps |
-| Customer → CF (peering) | 10 Gbps | 100 Gbps |
-| Customer → CF (Magic) | 1 Gbps/tunnel or CNI | 1 Gbps/tunnel or CNI |
+| Direction               | 10G                  | 100G                 |
+| ----------------------- | -------------------- | -------------------- |
+| CF → Customer           | 10 Gbps              | 100 Gbps             |
+| Customer → CF (peering) | 10 Gbps              | 100 Gbps             |
+| Customer → CF (Magic)   | 1 Gbps/tunnel or CNI | 1 Gbps/tunnel or CNI |
 
 ## Timeline
 

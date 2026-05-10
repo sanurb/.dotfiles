@@ -33,12 +33,14 @@ API Token permissions: `Account Secrets Store Edit/Read`
 ## When to Use
 
 **Use Secrets Store when:**
+
 - Multiple Workers share same credential
 - Centralized management needed
 - Compliance requires audit trail
 - Team collaboration on secrets
 
 **Use Worker Secrets when:**
+
 - Secret unique to one Worker
 - Simple single-Worker project
 - No cross-Worker sharing needed

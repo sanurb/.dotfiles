@@ -12,6 +12,7 @@ https://dash.cloudflare.com/caching/cache-reserve
 ```
 
 **Prerequisites:**
+
 - Paid Cache Reserve plan required
 - Tiered Cache strongly recommended (Cache Reserve checks for this)
 
@@ -133,11 +134,11 @@ Cache Reserve works automatically with Workers deployed via Wrangler. No special
   "name": "cache-reserve-worker",
   "main": "src/index.ts",
   "compatibility_date": "2025-01-11", // Use current date for new projects
-  
+
   // Cache Reserve works automatically with standard routes
   "routes": [
-    { "pattern": "example.com/*", "zone_name": "example.com" }
-  ]
+    { "pattern": "example.com/*", "zone_name": "example.com" },
+  ],
   // No special Cache Reserve configuration needed
   // Enable via Dashboard or API
 }

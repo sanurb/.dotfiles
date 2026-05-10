@@ -8,15 +8,15 @@
   "name": "my-cron-worker",
   "main": "src/index.ts",
   "compatibility_date": "2024-01-01",
-  
+
   "triggers": {
     "crons": [
-      "*/5 * * * *",     // Every 5 minutes
-      "0 */2 * * *",     // Every 2 hours
+      "*/5 * * * *", // Every 5 minutes
+      "0 */2 * * *", // Every 2 hours
       "0 9 * * MON-FRI", // Weekdays at 9am UTC
-      "0 2 1 * *"        // Monthly on 1st at 2am UTC
-    ]
-  }
+      "0 2 1 * *", // Monthly on 1st at 2am UTC
+    ],
+  },
 }
 ```
 
@@ -29,10 +29,10 @@ compatibility_date = "2024-01-01"
 
 [triggers]
 crons = [
-  "*/5 * * * *",     # Every 5 minutes
-  "0 */2 * * *",     # Every 2 hours
+  "*/5 * * * *", # Every 5 minutes
+  "0 */2 * * *", # Every 2 hours
   "0 9 * * MON-FRI", # Weekdays at 9am UTC
-  "0 2 1 * *"        # Monthly on 1st at 2am UTC
+  "0 2 1 * *", # Monthly on 1st at 2am UTC
 ]
 ```
 
@@ -42,20 +42,20 @@ crons = [
 {
   "name": "my-cron-worker",
   "triggers": {
-    "crons": ["0 */6 * * *"]  // Prod: every 6 hours
+    "crons": ["0 */6 * * *"], // Prod: every 6 hours
   },
   "env": {
     "staging": {
       "triggers": {
-        "crons": ["*/15 * * * *"]  // Staging: every 15min
-      }
+        "crons": ["*/15 * * * *"], // Staging: every 15min
+      },
     },
     "dev": {
       "triggers": {
-        "crons": ["*/5 * * * *"]  // Dev: every 5min
-      }
-    }
-  }
+        "crons": ["*/5 * * * *"], // Dev: every 5min
+      },
+    },
+  },
 }
 ```
 
@@ -63,23 +63,25 @@ crons = [
 name = "my-cron-worker"
 
 [triggers]
-crons = ["0 */6 * * *"]  # Prod: every 6 hours
+crons = ["0 */6 * * *"] # Prod: every 6 hours
 
 [env.staging.triggers]
-crons = ["*/15 * * * *"]  # Staging: every 15min
+crons = ["*/15 * * * *"] # Staging: every 15min
 
 [env.dev.triggers]
-crons = ["*/5 * * * *"]  # Dev: every 5min
+crons = ["*/5 * * * *"] # Dev: every 5min
 ```
 
 ## Schedule Format
 
 **5-field structure:**
+
 ```
 minute hour day-of-month month day-of-week
 ```
 
 **Special characters:**
+
 - `*` - Any value
 - `,` - List: `1,15,30 * * * *` (minutes 1, 15, 30)
 - `-` - Range: `0 9-17 * * *` (9am-5pm)
@@ -91,15 +93,17 @@ minute hour day-of-month month day-of-week
 ## Managing Triggers
 
 **Remove all:**
+
 ```jsonc
 {
   "triggers": {
-    "crons": []  // Empty array removes all
-  }
+    "crons": [], // Empty array removes all
+  },
 }
 ```
 
 **Preserve existing:**
+
 ```jsonc
 {
   // Omit "triggers" entirely to keep existing crons
@@ -124,12 +128,14 @@ npx wrangler deployments list
 ## API Management
 
 **Get triggers:**
+
 ```bash
 curl "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{script_name}/schedules" \
   -H "Authorization: Bearer {api_token}"
 ```
 
 **Update triggers:**
+
 ```bash
 curl -X PUT "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{script_name}/schedules" \
   -H "Authorization: Bearer {api_token}" \
@@ -138,6 +144,7 @@ curl -X PUT "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/
 ```
 
 **Delete all:**
+
 ```bash
 curl -X PUT "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/scripts/{script_name}/schedules" \
   -H "Authorization: Bearer {api_token}" \

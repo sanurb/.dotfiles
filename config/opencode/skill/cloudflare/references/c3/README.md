@@ -96,6 +96,7 @@ npm create cloudflare@latest my-app
 ```
 
 C3 prompts for:
+
 1. Application type (Website/API/scheduled worker/etc.)
 2. Framework choice (if applicable)
 3. TypeScript preference

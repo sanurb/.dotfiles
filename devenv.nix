@@ -108,11 +108,63 @@
     enable = true;
     config = {
       projectRootFile = "flake.nix";
+
+      # Tool-managed and machine-generated files are off-limits to every
+      # formatter — reformatting them either fights another writer
+      # (lazy.nvim, npm, Nix) or adds churn that obscures real diffs.
+      settings.global.excludes = [
+        "config/nvim/lazy-lock.json"
+        "config/opencode/package-lock.json"
+        "flake.lock"
+        "*.lock"
+        ".moon/cache/**"
+        ".devenv/**"
+        ".direnv/**"
+      ];
+
       programs.gofumpt.enable = true;
+
       # nixfmt is the RFC-166 official Nix formatter; nixpkgs-fmt is
       # archived. nixpkgs ≥ 25.11 ships nixfmt as the default and the
       # `nixfmt-rfc-style` alias is a deprecation shim. Use `nixfmt`.
       programs.nixfmt.enable = true;
+
+      # dprint covers the Markdown / JSON / TOML / YAML surface that
+      # native Go/Nix formatters don't touch. Wasm plugins are pinned
+      # via nixpkgs (pkgs.dprint-plugins.getPluginList) so the plugin
+      # set is hermetic — no URL fetch from inside the Nix sandbox.
+      # Pretty YAML (g-plane) is anchor-aware, which matters since
+      # GitHub Actions enabled YAML anchors in Sept 2025.
+      programs.dprint = {
+        enable = true;
+        includes = [
+          "*.md"
+          "*.json"
+          "*.jsonc"
+          "*.toml"
+          "*.yaml"
+          "*.yml"
+        ];
+        settings = {
+          lineWidth = 100;
+          indentWidth = 2;
+          # Preserve author line breaks for ADRs / READMEs / SKILL.md;
+          # "never" would flatten every paragraph to one long line and
+          # "always" would re-flow prose to fit lineWidth (also bad).
+          markdown.textWrap = "maintain";
+          json = { };
+          toml = { };
+          yaml = { };
+          plugins = pkgs.dprint-plugins.getPluginList (
+            plugins: with plugins; [
+              dprint-plugin-markdown
+              dprint-plugin-json
+              dprint-plugin-toml
+              g-plane-pretty_yaml
+            ]
+          );
+        };
+      };
     };
   };
 

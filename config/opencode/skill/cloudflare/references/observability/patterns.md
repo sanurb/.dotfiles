@@ -25,6 +25,7 @@ export default {
 ```
 
 **Query for billing**:
+
 ```sql
 SELECT
   blob1 AS customer_id,
@@ -40,3 +41,4 @@ ORDER BY total_api_calls DESC
 ```typescript
 async function monitoredFetch(url: string, env: Env): Promise<Response> {
   const start = Date.now(
+```

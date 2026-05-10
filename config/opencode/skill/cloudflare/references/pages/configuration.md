@@ -63,6 +63,7 @@ id = "preview-namespace-id"
 ## Build Config
 
 **Git deployment**: Dashboard → Project → Settings → Build settings
+
 - Build command: `npm run build`
 - Output directory: `dist` / `out` / `build`
 - Environment variables: Set per environment (preview/production)
@@ -72,6 +73,7 @@ id = "preview-namespace-id"
 ## Environment Variables
 
 ### Local Secrets (.dev.vars)
+
 ```bash
 # .dev.vars (never commit)
 SECRET_KEY="local-secret-key"
@@ -80,6 +82,7 @@ DATABASE_URL="http://localhost:5432"
 ```
 
 ### Production Secrets
+
 ```bash
 # Interactive
 echo "super-secret-value" | npx wrangler pages secret put SECRET_KEY --project-name=my-project
@@ -99,6 +102,7 @@ Access like bindings: `env.SECRET_KEY`
 ## Static Config Files
 
 ### _redirects
+
 Place in build output (e.g., `dist/_redirects`):
 
 ```txt
@@ -126,6 +130,7 @@ Place in build output (e.g., `dist/_redirects`):
 **Important**: Redirects don't apply to Functions routes. Functions take precedence.
 
 ### _headers
+
 ```txt
 # Security
 /secure/*
@@ -156,6 +161,7 @@ https://:project.pages.dev/*
 **Important**: Headers don't apply to Functions responses. Set in Response object.
 
 ### _routes.json
+
 Controls which requests invoke Functions (auto-generated for most frameworks):
 
 ```json
@@ -180,6 +186,7 @@ Controls which requests invoke Functions (auto-generated for most frameworks):
 ## TypeScript
 
 Generate types:
+
 ```bash
 npx wrangler types --path='./functions/types.d.ts'
 ```

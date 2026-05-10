@@ -3,6 +3,7 @@
 ## Schema Validation Setup
 
 **Upload schema (Dashboard):**
+
 ```
 Security > API Shield > Schema validation > Add validation
 - Upload .yml/.yaml/.json (OpenAPI v3.0)
@@ -11,12 +12,14 @@ Security > API Shield > Schema validation > Add validation
 ```
 
 **Change default action:**
+
 ```
 Security > API Shield > Settings > Schema validation
 Per-endpoint: Filter → ellipses → Change action
 ```
 
 **Fallthrough rule** (catch-all unknown endpoints):
+
 ```
 Security > API Shield > Settings > Fallthrough > Use Template
 - Select hostnames
@@ -28,6 +31,7 @@ Security > API Shield > Settings > Fallthrough > Use Template
 ## JWT Validation
 
 **Setup token config:**
+
 ```
 Security > API Shield > Settings > JWT Settings > Add configuration
 - Name: "Auth0 JWT Config"
@@ -36,6 +40,7 @@ Security > API Shield > Settings > JWT Settings > Add configuration
 ```
 
 **Create validation rule:**
+
 ```
 Security > API Shield > API Rules > Add rule
 - Hostname: api.example.com
@@ -46,11 +51,13 @@ Security > API Shield > API Rules > Add rule
 ```
 
 **Rate limit by JWT claim:**
+
 ```wirefilter
 lookup_json_string(http.request.jwt.claims["{config_id}"][0], "sub")
 ```
 
 **Special cases:**
+
 - Two JWTs, different IdPs: Create 2 configs, select both, "Validate all"
 - IdP migration: 2 configs + 2 rules, adjust actions per state
 - Bearer prefix: API Shield handles with/without
@@ -59,6 +66,7 @@ lookup_json_string(http.request.jwt.claims["{config_id}"][0], "sub")
 ## Mutual TLS (mTLS)
 
 **Setup:**
+
 ```
 SSL/TLS > Client Certificates > Create Certificate
 - Generate CF-managed CA (all plans)
@@ -66,6 +74,7 @@ SSL/TLS > Client Certificates > Create Certificate
 ```
 
 **Configure mTLS rule:**
+
 ```
 Security > API Shield > mTLS
 - Select hostname(s)
@@ -74,6 +83,7 @@ Security > API Shield > mTLS
 ```
 
 **Test:**
+
 ```bash
 openssl req -x509 -newkey rsa:4096 -keyout client-key.pem -out client-cert.pem -days 365
 curl https://api.example.com/endpoint --cert client-cert.pem --key client-key.pem
@@ -86,6 +96,7 @@ Critical for Sequence Mitigation + analytics. Configure header/cookie that uniqu
 **Examples:** JWT sub claim, session token, API key, custom user ID header
 
 **Configure:**
+
 ```
 Security > API Shield > Settings > Session Identifiers
 - Type: Header/Cookie

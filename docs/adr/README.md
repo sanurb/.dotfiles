@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
-This directory holds ADRs for `dots`. An ADR records *that* a decision
-was made and *why* — nothing more. It is not a design doc, not a
+This directory holds ADRs for `dots`. An ADR records _that_ a decision
+was made and _why_ — nothing more. It is not a design doc, not a
 proposal, not a status page.
 
 The bar for adding an ADR is intentionally high. Empty slots are fine;
@@ -23,7 +23,7 @@ Create the `docs/adr/` directory lazily — only when the first ADR is needed.
 {1-3 sentences: what's the context, what did we decide, and why.}
 ```
 
-That's it. An ADR can be a single paragraph. The value is in recording *that* a decision was made and *why* — not in filling out sections.
+That's it. An ADR can be a single paragraph. The value is in recording _that_ a decision was made and _why_ — not in filling out sections.
 
 ## Optional sections
 

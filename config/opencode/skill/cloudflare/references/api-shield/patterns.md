@@ -60,6 +60,7 @@ PUT /zones/{zone_id}/api_gateway/settings/schema_validation
 ## Architecture Patterns
 
 ### Public API (High Security)
+
 ```
 Cloudflare Edge
 ├── API Discovery (identify endpoints)
@@ -71,6 +72,7 @@ Cloudflare Edge
 ```
 
 ### Partner API (mTLS + Schema)
+
 ```
 Cloudflare Edge
 ├── mTLS (verify client certs)
@@ -80,6 +82,7 @@ Cloudflare Edge
 ```
 
 ### Internal API (Discovery + Monitoring)
+
 ```
 Cloudflare Edge
 ├── API Discovery (map shadow APIs)
@@ -90,34 +93,37 @@ Cloudflare Edge
 
 ## OWASP API Security Top 10 Mapping
 
-| OWASP Issue | API Shield Solutions |
-|-------------|---------------------|
+| OWASP Issue                       | API Shield Solutions                                            |
+| --------------------------------- | --------------------------------------------------------------- |
 | Broken Object Level Authorization | BOLA detection, Sequence mitigation, Schema, JWT, Rate Limiting |
-| Broken Authentication | Auth Posture, mTLS, JWT, Credential Checks, Bot Management |
-| Broken Object Property Auth | Schema validation, JWT validation |
-| Unrestricted Resource | Rate Limiting, Sequence, Bot Management, GraphQL protection |
-| Broken Function Level Auth | Schema validation, JWT validation |
-| Unrestricted Business Flows | Sequence mitigation, Bot Management, GraphQL |
-| SSRF | Schema, WAF managed rules, WAF custom |
-| Security Misconfiguration | Sequence, Schema, WAF managed, GraphQL |
-| Improper Inventory | Discovery, Schema learning |
-| Unsafe API Consumption | JWT validation, WAF managed |
+| Broken Authentication             | Auth Posture, mTLS, JWT, Credential Checks, Bot Management      |
+| Broken Object Property Auth       | Schema validation, JWT validation                               |
+| Unrestricted Resource             | Rate Limiting, Sequence, Bot Management, GraphQL protection     |
+| Broken Function Level Auth        | Schema validation, JWT validation                               |
+| Unrestricted Business Flows       | Sequence mitigation, Bot Management, GraphQL                    |
+| SSRF                              | Schema, WAF managed rules, WAF custom                           |
+| Security Misconfiguration         | Sequence, Schema, WAF managed, GraphQL                          |
+| Improper Inventory                | Discovery, Schema learning                                      |
+| Unsafe API Consumption            | JWT validation, WAF managed                                     |
 
 ## Monitoring
 
 **Security Events:**
+
 ```
 Security > Events
 Filter: Action = block, Service = API Shield
 ```
 
 **Firewall Analytics:**
+
 ```
 Analytics > Security
 Filter by cf.api_gateway.* fields
 ```
 
 **Logpush fields:**
+
 ```json
 {
   "APIGatewayAuthIDPresent": true,
@@ -130,16 +136,16 @@ Filter by cf.api_gateway.* fields
 
 ## Availability
 
-| Feature | Availability |
-|---------|-------------|
-| mTLS (CF-managed CA) | All plans |
-| Endpoint Management | All plans (limited ops) |
-| Schema Validation | All plans (limited ops) |
-| API Discovery | Enterprise only |
-| JWT Validation | Enterprise (add-on) |
-| Sequence Mitigation | Enterprise (closed beta) |
-| BOLA Detection | Enterprise (add-on) |
-| Volumetric Abuse | Enterprise (add-on) |
-| Full Suite | Enterprise add-on |
+| Feature              | Availability             |
+| -------------------- | ------------------------ |
+| mTLS (CF-managed CA) | All plans                |
+| Endpoint Management  | All plans (limited ops)  |
+| Schema Validation    | All plans (limited ops)  |
+| API Discovery        | Enterprise only          |
+| JWT Validation       | Enterprise (add-on)      |
+| Sequence Mitigation  | Enterprise (closed beta) |
+| BOLA Detection       | Enterprise (add-on)      |
+| Volumetric Abuse     | Enterprise (add-on)      |
+| Full Suite           | Enterprise add-on        |
 
 Enterprise: 10K ops (contact for higher), non-contract preview available.

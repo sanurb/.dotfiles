@@ -3,18 +3,20 @@
 ## SQLite-backed (Recommended)
 
 **wrangler.jsonc:**
+
 ```jsonc
 {
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["Counter", "Session", "RateLimiter"]
-    }
-  ]
+      "new_sqlite_classes": ["Counter", "Session", "RateLimiter"],
+    },
+  ],
 }
 ```
 
 **wrangler.toml:**
+
 ```toml
 [[migrations]]
 tag = "v1"
@@ -24,14 +26,15 @@ new_sqlite_classes = ["Counter", "Session"]
 ## KV-backed (Legacy)
 
 **wrangler.jsonc:**
+
 ```jsonc
 {
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["OldCounter"]
-    }
-  ]
+      "new_classes": ["OldCounter"],
+    },
+  ],
 }
 ```
 
@@ -75,8 +78,8 @@ export default {
 ```jsonc
 {
   "limits": {
-    "cpu_ms": 300000  // 5 minutes (default 30s)
-  }
+    "cpu_ms": 300000, // 5 minutes (default 30s)
+  },
 }
 ```
 

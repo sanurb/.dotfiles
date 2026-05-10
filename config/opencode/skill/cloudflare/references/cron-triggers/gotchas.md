@@ -16,10 +16,10 @@
 
 ## Limits
 
-| Plan | Triggers/Worker | CPU Time | Execution |
-|------|----------------|----------|-----------|
-| Free | 3 | 10ms | At-least-once |
-| Paid | Unlimited | 50ms | At-least-once |
+| Plan | Triggers/Worker | CPU Time | Execution     |
+| ---- | --------------- | -------- | ------------- |
+| Free | 3               | 10ms     | At-least-once |
+| Paid | Unlimited       | 50ms     | At-least-once |
 
 ```typescript
 // ❌ BAD: await processLargeDataset(); // May exceed CPU

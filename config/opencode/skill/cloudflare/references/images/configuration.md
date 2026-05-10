@@ -43,3 +43,4 @@ Store account hash as an environment variable:
 # wrangler.toml
 [vars]
 IMAGES_ACCOUNT
+```

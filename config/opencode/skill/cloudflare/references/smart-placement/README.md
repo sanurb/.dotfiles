@@ -9,12 +9,14 @@ Smart Placement automatically analyzes Worker request duration across Cloudflare
 ### When to Use
 
 **Enable Smart Placement when:**
+
 - Worker makes multiple round trips to backend services/databases
 - Backend infrastructure is geographically concentrated
 - Request duration dominated by backend latency rather than network latency from user
 - Running backend logic in Workers (APIs, data aggregation, SSR with DB calls)
 
 **Do NOT enable for:**
+
 - Workers serving only static content or cached responses
 - Workers without significant backend communication
 - Pure edge logic (auth checks, redirects, simple transformations)
@@ -23,6 +25,7 @@ Smart Placement automatically analyzes Worker request duration across Cloudflare
 ### Key Architecture Pattern
 
 **Recommended:** Split full-stack applications into separate Workers:
+
 ```
 User → Frontend Worker (at edge, close to user)
          ↓ Service Binding
@@ -39,7 +42,7 @@ This maintains fast, reactive frontends while optimizing backend latency.
 # wrangler.toml
 [placement]
 mode = "smart"
-hint = "wnam"  # Optional: West North America
+hint = "wnam" # Optional: West North America
 ```
 
 Deploy and wait 15 minutes for analysis. Check status via API or dashboard metrics.

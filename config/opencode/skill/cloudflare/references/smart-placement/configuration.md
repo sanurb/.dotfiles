@@ -10,7 +10,7 @@ mode = "smart"
 # With placement hint (preferred region)
 [placement]
 mode = "smart"
-hint = "wnam"  # West North America
+hint = "wnam" # West North America
 ```
 
 ## wrangler.json/wrangler.jsonc
@@ -20,8 +20,8 @@ hint = "wnam"  # West North America
   "$schema": "./node_modules/wrangler/config-schema.json",
   "placement": {
     "mode": "smart",
-    "hint": "wnam"  // Optional region hint
-  }
+    "hint": "wnam", // Optional region hint
+  },
 }
 ```
 
@@ -33,8 +33,9 @@ hint = "wnam"  # West North America
 ## Placement Hints
 
 Optional region hints guide Smart Placement decisions:
+
 - `"wnam"` - West North America
-- `"enam"` - East North America  
+- `"enam"` - East North America
 - `"weur"` - Western Europe
 - `"eeur"` - Eastern Europe
 - `"apac"` - Asia Pacific
@@ -75,21 +76,25 @@ database_id = "xxx"
 ## Requirements & Limitations
 
 ### Requirements
+
 - **Wrangler version:** 2.20.0+
 - **Analysis time:** Up to 15 minutes
 - **Traffic requirements:** Consistent multi-location traffic
 - **Workers plan:** All plans (Free, Paid, Enterprise)
 
 ### What Smart Placement Affects
+
 - ✅ **Affects:** `fetch` event handlers only
 - ❌ **Does NOT affect:** RPC methods, named entrypoints, Workers without fetch handlers
 
 ### Baseline Traffic
+
 Smart Placement automatically routes 1% of requests WITHOUT optimization as baseline for performance comparison.
 
 ## Dashboard Configuration
 
 **Enable via Dashboard:**
+
 1. Navigate to **Workers & Pages** in Cloudflare dashboard
 2. Select your Worker
 3. Go to **Settings** → **General**

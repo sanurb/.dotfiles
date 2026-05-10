@@ -5,23 +5,26 @@ See [README.md](./README.md), [configuration.md](./configuration.md), [api.md](.
 ## Limits
 
 **Config:**
-| Limit | Free | Paid |
-|-------|------|------|
-| Max configs | 10 | 25 |
+
+| Limit            | Free     | Paid     |
+| ---------------- | -------- | -------- |
+| Max configs      | 10       | 25       |
 | Username/DB name | 63 bytes | 63 bytes |
 
 **Connections:**
-| Limit | Free | Paid |
-|-------|------|------|
-| Connection timeout | 15s | 15s |
-| Idle timeout | 10min | 10min |
-| Max origin connections | ~20 | ~100 |
+
+| Limit                  | Free  | Paid  |
+| ---------------------- | ----- | ----- |
+| Connection timeout     | 15s   | 15s   |
+| Idle timeout           | 10min | 10min |
+| Max origin connections | ~20   | ~100  |
 
 **Queries:**
-| Limit | Value |
-|-------|-------|
-| Max duration | 60s |
-| Max cached response | 50MB |
+
+| Limit               | Value |
+| ------------------- | ----- |
+| Max duration        | 60s   |
+| Max cached response | 50MB  |
 
 **Note:** Queries >60s terminated. Responses >50MB returned but not cached.
 
@@ -71,6 +74,7 @@ try {
 ## Monitor Connections
 
 **PostgreSQL:**
+
 ```sql
 -- Show Hyperdrive connections
 SELECT usename, application_name, client_addr, state
@@ -84,24 +88,28 @@ SELECT COUNT(*) FROM pg_stat_activity WHERE application_name = 'Cloudflare Hyper
 ## Troubleshooting
 
 **Connection refused:**
+
 1. Check firewall allows Cloudflare IPs
 2. Verify DB listening on port
 3. Confirm service running
 4. Check credentials
 
 **Pool exhausted:**
+
 1. Reduce transaction duration
 2. Avoid long queries (>60s)
 3. Don't hold connections during external calls
 4. Upgrade to paid plan
 
 **SSL/TLS failed:**
+
 1. Add `sslmode=require` (Postgres) or `sslMode=REQUIRED` (MySQL)
 2. Upload CA cert if self-signed
 3. Verify DB has SSL enabled
 4. Check cert expiry
 
 **Queries not cached:**
+
 1. Verify non-mutating (SELECT)
 2. Check for volatile functions (NOW(), RANDOM())
 3. Confirm caching not disabled
@@ -109,18 +117,21 @@ SELECT COUNT(*) FROM pg_stat_activity WHERE application_name = 'Cloudflare Hyper
 5. Check `prepare=true` for postgres.js
 
 **Query timeout (>60s):**
+
 1. Optimize with indexes
 2. Reduce dataset (LIMIT)
 3. Break into smaller queries
 4. Use async processing
 
 **Local DB connection:**
+
 1. Verify `localConnectionString` correct
 2. Check DB running
 3. Confirm env var name matches binding
 4. Test with psql/mysql client
 
 **Env var not working:**
+
 1. Format: `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>`
 2. Binding matches wrangler.jsonc
 3. Variable exported in shell
@@ -144,6 +155,7 @@ SELECT COUNT(*) FROM pg_stat_activity WHERE application_name = 'Cloudflare Hyper
 ## Supported Databases
 
 **PostgreSQL:**
+
 - PostgreSQL 11+
 - CockroachDB, Timescale, Materialize
 - Neon, Supabase
@@ -151,12 +163,14 @@ SELECT COUNT(*) FROM pg_stat_activity WHERE application_name = 'Cloudflare Hyper
 Recommended: `pg` >= 8.16.3
 
 **MySQL:**
+
 - MySQL 5.7+
 - PlanetScale
 
 Recommended: `mysql2` >= 3.13.0
 
 **SSL/TLS:**
+
 - PostgreSQL `sslmode`: `require`, `verify-ca`, `verify-full`
 - MySQL `sslMode`: `REQUIRED`, `VERIFY_CA`, `VERIFY_IDENTITY`
 
@@ -169,6 +183,7 @@ Recommended: `mysql2` >= 3.13.0
 ❌ DB with strict connection limits already exceeded
 
 **Alternatives:**
+
 - D1 - Cloudflare native distributed SQL
 - Durable Objects - Stateful Workers
 - KV - Global key-value

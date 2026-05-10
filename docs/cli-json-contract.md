@@ -76,15 +76,15 @@ Examples: `dots apply`, `dots sync`, `dots update`, `dots rollback`.
 The error envelope adds three control-flow fields the agent branches
 on, plus a remediation string an agent can execute or surface.
 
-| Field | Purpose |
-|---|---|
-| `error.code` | SCREAMING_SNAKE id from the closed catalog (below). Fine-grained pattern match. |
-| `error.message` | Per-occurrence human-readable detail. |
-| `retryable` | True if retrying the same command might succeed (e.g., transient or user-fixable). |
-| `user_action_required` | True if the user must intervene before any retry. |
-| `fix` | Plain-language remediation. Catalog default unless the verb supplies a more specific fix. |
-| `next_actions` | Contextual follow-ups, same shape as success. |
-| `run_id` / `log_path` | Present only when the failing command is long-running. |
+| Field                  | Purpose                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| `error.code`           | SCREAMING_SNAKE id from the closed catalog (below). Fine-grained pattern match.           |
+| `error.message`        | Per-occurrence human-readable detail.                                                     |
+| `retryable`            | True if retrying the same command might succeed (e.g., transient or user-fixable).        |
+| `user_action_required` | True if the user must intervene before any retry.                                         |
+| `fix`                  | Plain-language remediation. Catalog default unless the verb supplies a more specific fix. |
+| `next_actions`         | Contextual follow-ups, same shape as success.                                             |
+| `run_id` / `log_path`  | Present only when the failing command is long-running.                                    |
 
 ```json
 {
@@ -114,12 +114,12 @@ on, plus a remediation string an agent can execute or surface.
 The two boolean flags map to the four agent behaviors the CLI ever
 needs to express:
 
-| `retryable` | `user_action_required` | Agent should |
-|:---:|:---:|---|
-| true | false | Retry the command as-is (likely transient). |
-| true | true | Surface the `fix` to the user; retry after they act. |
-| false | true | Escalate to user; do not retry. |
-| false | false | Terminal user-initiated decision (e.g., declined consent). Do not retry, do not escalate. |
+| `retryable` | `user_action_required` | Agent should                                                                              |
+| :---------: | :--------------------: | ----------------------------------------------------------------------------------------- |
+|    true     |         false          | Retry the command as-is (likely transient).                                               |
+|    true     |          true          | Surface the `fix` to the user; retry after they act.                                      |
+|    false    |          true          | Escalate to user; do not retry.                                                           |
+|    false    |         false          | Terminal user-initiated decision (e.g., declined consent). Do not retry, do not escalate. |
 
 ## Streaming (long-running commands)
 
@@ -169,21 +169,21 @@ Each action's `command` is either a literal string (run as-is, no
 `params`) or a POSIX/docopt template with placeholders that the agent
 fills from `params`:
 
-| Syntax | Meaning |
-|---|---|
-| `<name>` | Required positional or named value. |
-| `[--flag <value>]` | Optional flag with a value. |
-| `[--flag]` | Optional boolean flag. |
+| Syntax             | Meaning                             |
+| ------------------ | ----------------------------------- |
+| `<name>`           | Required positional or named value. |
+| `[--flag <value>]` | Optional flag with a value.         |
+| `[--flag]`         | Optional boolean flag.              |
 
 The `params` map describes each placeholder:
 
-| Field | Purpose |
-|---|---|
-| `description` | Human-readable explanation. |
-| `value` | Pre-filled from current context (the action emitter knows the concrete value). |
-| `default` | The value when the flag is omitted. |
-| `enum` | Closed set of accepted values. |
-| `required` | True for positionals; absent or false for optional flags. |
+| Field         | Purpose                                                                        |
+| ------------- | ------------------------------------------------------------------------------ |
+| `description` | Human-readable explanation.                                                    |
+| `value`       | Pre-filled from current context (the action emitter knows the concrete value). |
+| `default`     | The value when the flag is omitted.                                            |
+| `enum`        | Closed set of accepted values.                                                 |
+| `required`    | True for positionals; absent or false for optional flags.                      |
 
 When `params` is absent the command is a literal — no substitution.
 
@@ -192,23 +192,23 @@ When `params` is absent the command is a literal — no substitution.
 The closed set of `error.code` values, with their default agent
 control-flow flags.
 
-| Code | retryable | user_action | When |
-|---|:---:|:---:|---|
-| `ABORTED` | false | false | Wizard aborted (Ctrl-C, Cancel). |
-| `ACTIVATION_FAILED` | false | true | Build OK, home-manager activation step failed. |
-| `BOOTSTRAP_REQUIRED` | true | true | Workspace missing; bootstrap requires interactive consent. |
-| `BUILD_FAILED` | false | true | Nix evaluation or derivation build failed. |
-| `CONFIG_INVALID` | false | true | `--config` parsed but failed validation. |
-| `CONFIG_NOT_FOUND` | false | true | `--config PATH` did not resolve. |
-| `DECLINED` | false | false | User declined a consent prompt. |
-| `INTERNAL_ERROR` | false | true | Invariant violation; ships with a file-an-issue link. |
-| `INVALID_ARGUMENT` | false | true | Flag value or positional outside the verb's accepted shape. |
-| `PLAN_STALE` | true | false | `--plan FILE` hash diverged from a freshly-computed plan. |
-| `PREFLIGHT_FAILED` | true | true | `dots doctor` flagged a SevFail before activation. |
-| `STATE_INVALID` | false | true | `.dots-state.toml` parsed but a pillar value is outside its closed set. |
-| `STATE_PARSE_FAILED` | false | true | `.dots-state.toml` is syntactically malformed. |
-| `UNKNOWN_COMMAND` | false | true | Unknown verb or alias. |
-| `WORKSPACE_NOT_FOUND` | true | true | Verb requires a cloned dotfiles workspace; none was found. |
+| Code                  | retryable | user_action | When                                                                    |
+| --------------------- | :-------: | :---------: | ----------------------------------------------------------------------- |
+| `ABORTED`             |   false   |    false    | Wizard aborted (Ctrl-C, Cancel).                                        |
+| `ACTIVATION_FAILED`   |   false   |    true     | Build OK, home-manager activation step failed.                          |
+| `BOOTSTRAP_REQUIRED`  |   true    |    true     | Workspace missing; bootstrap requires interactive consent.              |
+| `BUILD_FAILED`        |   false   |    true     | Nix evaluation or derivation build failed.                              |
+| `CONFIG_INVALID`      |   false   |    true     | `--config` parsed but failed validation.                                |
+| `CONFIG_NOT_FOUND`    |   false   |    true     | `--config PATH` did not resolve.                                        |
+| `DECLINED`            |   false   |    false    | User declined a consent prompt.                                         |
+| `INTERNAL_ERROR`      |   false   |    true     | Invariant violation; ships with a file-an-issue link.                   |
+| `INVALID_ARGUMENT`    |   false   |    true     | Flag value or positional outside the verb's accepted shape.             |
+| `PLAN_STALE`          |   true    |    false    | `--plan FILE` hash diverged from a freshly-computed plan.               |
+| `PREFLIGHT_FAILED`    |   true    |    true     | `dots doctor` flagged a SevFail before activation.                      |
+| `STATE_INVALID`       |   false   |    true     | `.dots-state.toml` parsed but a pillar value is outside its closed set. |
+| `STATE_PARSE_FAILED`  |   false   |    true     | `.dots-state.toml` is syntactically malformed.                          |
+| `UNKNOWN_COMMAND`     |   false   |    true     | Unknown verb or alias.                                                  |
+| `WORKSPACE_NOT_FOUND` |   true    |    true     | Verb requires a cloned dotfiles workspace; none was found.              |
 
 The catalog is the single source of truth. It lives at
 `apps/cli/internal/envelope/catalog.go` and is exercised by
@@ -221,12 +221,12 @@ These were considered and dropped, each with a real reason. None of
 them are forbidden forever — when a real reader asks for one, it is
 added (additive evolution).
 
-| Field | Cut reason |
-|---|---|
-| `schema_version` | Ceremony. The shape is the contract; additive evolution is the migration plan. |
-| `type` (docs URL) | Without versioning, the URL is just lookup convenience. The catalog is the index. |
-| `error_category` | Redundant with `retryable` + `user_action_required` for agent control flow. dots is one local system, not heterogeneous backends. |
-| `exit_code` | The shell knows the exit code; programmatic callers reading the JSON already have the wait status. |
-| `retry_after` | Meaningful only for network rate-limits. dots is local; no scenario produces a meaningful retry window. |
-| `progress` event | Would require parsing nh's stdout format; coupling the contract to a downstream tool's output is fragile. |
-| `log` event | Inlining nh's stderr line-by-line would blow the agent's context. Logs go to `log_path`. |
+| Field             | Cut reason                                                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`  | Ceremony. The shape is the contract; additive evolution is the migration plan.                                                    |
+| `type` (docs URL) | Without versioning, the URL is just lookup convenience. The catalog is the index.                                                 |
+| `error_category`  | Redundant with `retryable` + `user_action_required` for agent control flow. dots is one local system, not heterogeneous backends. |
+| `exit_code`       | The shell knows the exit code; programmatic callers reading the JSON already have the wait status.                                |
+| `retry_after`     | Meaningful only for network rate-limits. dots is local; no scenario produces a meaningful retry window.                           |
+| `progress` event  | Would require parsing nh's stdout format; coupling the contract to a downstream tool's output is fragile.                         |
+| `log` event       | Inlining nh's stderr line-by-line would blow the agent's context. Logs go to `log_path`.                                          |

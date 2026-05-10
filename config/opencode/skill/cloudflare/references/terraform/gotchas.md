@@ -6,8 +6,9 @@ Common issues, security considerations, and best practices.
 
 ### "Error: couldn't find resource"
 
-**Cause**: Resource deleted outside Terraform  
+**Cause**: Resource deleted outside Terraform\
 **Solution**:
+
 ```bash
 terraform import cloudflare_zone.example <zone-id>
 # Or remove from state:
@@ -16,13 +17,14 @@ terraform state rm cloudflare_zone.example
 
 ### "409 Conflict" on worker deployment
 
-**Cause**: Worker deployed by both Terraform and wrangler  
+**Cause**: Worker deployed by both Terraform and wrangler\
 **Solution**: Choose one deployment method. If using Terraform, remove wrangler deployments.
 
 ### DNS record already exists
 
-**Cause**: Existing record not imported into Terraform  
+**Cause**: Existing record not imported into Terraform\
 **Solution**:
+
 ```bash
 # Find record ID in Cloudflare dashboard
 terraform import cloudflare_dns_record.example <zone-id>/<record-id>
@@ -30,8 +32,9 @@ terraform import cloudflare_dns_record.example <zone-id>/<record-id>
 
 ### "Invalid provider configuration"
 
-**Cause**: API token missing or invalid  
+**Cause**: API token missing or invalid\
 **Solution**:
+
 ```bash
 export CLOUDFLARE_API_TOKEN="your-token"
 # Or check token permissions in dashboard
@@ -39,8 +42,9 @@ export CLOUDFLARE_API_TOKEN="your-token"
 
 ### State locking errors
 
-**Cause**: Multiple Terraform runs or stale lock  
+**Cause**: Multiple Terraform runs or stale lock\
 **Solution**:
+
 ```bash
 # Remove stale lock (with caution!)
 terraform force-unlock <lock-id>
@@ -188,15 +192,15 @@ terraform state push terraform.tfstate
 
 ## Limits
 
-| Resource | Limit | Notes |
-|----------|-------|-------|
-| API token rate limit | Varies by plan | Use `api_client_logging = true` to debug
-| Worker script size | 10 MB | Includes all dependencies
-| KV keys per namespace | Unlimited | Pay per operation
-| R2 storage | Unlimited | Pay per GB
-| D1 databases | 50,000 per account | Free tier: 10
-| Pages projects | 500 per account | 100 for free accounts
-| DNS records | 3,500 per zone | Free plan
+| Resource              | Limit              | Notes                                    |
+| --------------------- | ------------------ | ---------------------------------------- |
+| API token rate limit  | Varies by plan     | Use `api_client_logging = true` to debug |
+| Worker script size    | 10 MB              | Includes all dependencies                |
+| KV keys per namespace | Unlimited          | Pay per operation                        |
+| R2 storage            | Unlimited          | Pay per GB                               |
+| D1 databases          | 50,000 per account | Free tier: 10                            |
+| Pages projects        | 500 per account    | 100 for free accounts                    |
+| DNS records           | 3,500 per zone     | Free plan                                |
 
 ## See Also
 

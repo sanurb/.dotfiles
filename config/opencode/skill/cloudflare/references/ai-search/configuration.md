@@ -1,23 +1,26 @@
 ### Configuration
 
 **wrangler.toml:**
+
 ```toml
 [ai]
 binding = "AI"
 ```
 
 **wrangler.jsonc:**
+
 ```jsonc
 {
   "ai": {
-    "binding": "AI"
-  }
+    "binding": "AI",
+  },
 }
 ```
 
 ### Code Patterns
 
 #### AI Search with Generation
+
 ```typescript
 // Generate AI response with retrieved context
 const answer = await env.AI.autorag("my-autorag").aiSearch({
@@ -39,6 +42,7 @@ const answer = await env.AI.autorag("my-autorag").aiSearch({
 ```
 
 #### Search Only (No Generation)
+
 ```typescript
 // Retrieve relevant chunks without generation
 const results = await env.AI.autorag("my-autorag").search({
@@ -50,3 +54,4 @@ const results = await env.AI.autorag("my-autorag").search({
   },
   reranking: {
     enab
+```

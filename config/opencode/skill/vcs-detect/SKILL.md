@@ -34,17 +34,17 @@ fi
 
 ## Command Mappings
 
-| Operation | git | jj |
-|-----------|-----|-----|
-| Status | `git status` | `jj status` |
-| Log | `git log` | `jj log` |
-| Diff | `git diff` | `jj diff` |
-| Commit | `git commit` | `jj commit` / `jj describe` |
-| Branch list | `git branch` | `jj branch list` |
-| New branch | `git checkout -b <name>` | `jj branch create <name>` |
-| Push | `git push` | `jj git push` |
-| Pull/Fetch | `git pull` / `git fetch` | `jj git fetch` |
-| Rebase | `git rebase` | `jj rebase` |
+| Operation   | git                      | jj                          |
+| ----------- | ------------------------ | --------------------------- |
+| Status      | `git status`             | `jj status`                 |
+| Log         | `git log`                | `jj log`                    |
+| Diff        | `git diff`               | `jj diff`                   |
+| Commit      | `git commit`             | `jj commit` / `jj describe` |
+| Branch list | `git branch`             | `jj branch list`            |
+| New branch  | `git checkout -b <name>` | `jj branch create <name>`   |
+| Push        | `git push`               | `jj git push`               |
+| Pull/Fetch  | `git pull` / `git fetch` | `jj git fetch`              |
+| Rebase      | `git rebase`             | `jj rebase`                 |
 
 ## Usage
 
@@ -65,6 +65,7 @@ Agent: [Runs `jj log` instead of `git log`]
 ## Colocated Repos
 
 When both `.jj/` and `.git/` exist, the repo is "colocated":
+
 - jj manages the working copy
 - git is available for compatibility (GitHub, etc.)
 - **Always prefer jj commands** in colocated repos

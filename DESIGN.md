@@ -95,8 +95,8 @@ components:
 
   step-header:
     typography:
-      heading_prefix: muted     # "Step N:"
-      heading_title:  heading   # focal title
+      heading_prefix: muted # "Step N:"
+      heading_title: heading # focal title
     leading_glyph: none
     trailing_separator: blank line (margin_bottom 1)
     role: |
@@ -162,7 +162,10 @@ components:
       "[<key>]" mnemonic in muted.
     icon: { foreground: accent.secondary }
     label: { typography: body }
-    separator: { glyph: "────────────────────────", typography: muted }
+    separator: {
+      glyph: "────────────────────────",
+      typography: muted,
+    }
     role: |
       Contextual reading material / shortcuts (e.g. "Learn about Neovim",
       "View Keymaps"). Non-focusable in cursor flow; bound to the screen's
@@ -171,7 +174,7 @@ components:
 
   keybind-footer:
     layout: inline, separated by " • " in muted
-    key_label_format: "[<key>]"        # e.g. [Enter], [Esc], [Ctrl-C]
+    key_label_format: "[<key>]" # e.g. [Enter], [Esc], [Ctrl-C]
     arrow_keys_format: "<arrow>/<vim>" # e.g. ↑/k, ↓/j
     key_label: typography keybind-hint
     description: typography muted
@@ -180,9 +183,9 @@ components:
 
   status-badge:
     states:
-      ok:    { glyph: "✓", typography: status-success }
-      fail:  { glyph: "✗", typography: status-error }
-      warn:  { glyph: "○", typography: status-warn }
+      ok: { glyph: "✓", typography: status-success }
+      fail: { glyph: "✗", typography: status-error }
+      warn: { glyph: "○", typography: status-warn }
     role: terminal-leading mark for outcome rows
 
   detected-default-marker:
@@ -208,10 +211,11 @@ components:
 ## Overview
 
 `dots` is an opinionated, Nix-native dotfiles platform — a flake + Home Manager
-+ Moon + Proto monorepo whose CLI **declares**, never scripts. The TUI is the
-human face of that contract: a wizard that captures persona pillars (shell /
-terminal / multiplexer), surfaces brownfield collisions, snapshots them, and
-hands realization to `moon run modules:deploy`. Doctor hard-gates deploy.
+
+- Moon + Proto monorepo whose CLI **declares**, never scripts. The TUI is the
+  human face of that contract: a wizard that captures persona pillars (shell /
+  terminal / multiplexer), surfaces brownfield collisions, snapshots them, and
+  hands realization to `moon run modules:deploy`. Doctor hard-gates deploy.
 
 Visual identity follows from that posture:
 
@@ -248,7 +252,7 @@ to compensate. Two consequences:
    YAML) and a check that the role still reads on the dark surface.
 
 The `surface.base` token is documented but not painted — it describes the
-*expected* terminal background, so future widgets that legitimately need a
+_expected_ terminal background, so future widgets that legitimately need a
 filled surface (e.g., a selected-row highlight) have a token to anchor to.
 
 Reserved meaning:
@@ -322,7 +326,7 @@ a separate step, not to fake depth.
 ## Shapes
 
 **Omitted with rationale.** Terminals have no corner radii or stroke widths.
-The only shape concern is *which* box-drawing character set frames the
+The only shape concern is _which_ box-drawing character set frames the
 panel, and that is captured under `components.panel.border: rounded` —
 i.e., the Lipgloss `RoundedBorder()` glyphs. Treating that as a Shapes-level
 token would imply we have multiple shape primitives; we don't, and we
@@ -344,7 +348,7 @@ introduce new ones without first adding tokens here.
   glyph in the wizard flow itself.
 
 - **`stepper`** — three states (`complete`, `current`, `upcoming`).
-  Inline, separated by ` → ` in `muted`. Complete steps render `✓ Label`
+  Inline, separated by `→` in `muted`. Complete steps render `✓ Label`
   in `status.success`; the current step renders `● Label` in
   `accent.primary` bold; upcoming steps render the label only, in
   `muted`. This is the **only** place where all three status/accent
@@ -354,9 +358,9 @@ introduce new ones without first adding tokens here.
   `default-marked`, `plain`). The `cursor` row is the focus indicator: `▸`
   prefix in `accent.primary`, bold; the row's text adopts `accent.primary`
   too. `selected` is the committed value in a single-select — no `[x]`,
-  just `accent.primary` foreground. `multiselect-checked` keeps `[x] ` in
+  just `accent.primary` foreground. `multiselect-checked` keeps `[x]` in
   `accent.primary` for capability matrices. `default-marked` carries a
-  trailing ` (default)` in `muted`. `plain` is two leading spaces and
+  trailing `(default)` in `muted`. `plain` is two leading spaces and
   `text.primary`. A row may be `cursor` and `selected` simultaneously; in
   that case the `▸` prefix wins on the lead and `accent.primary` is the
   text foreground throughout.
@@ -370,7 +374,7 @@ introduce new ones without first adding tokens here.
   the cursor flow (focus → commit) reaches the option list first.
 
 - **`keybind-footer`** — last row of the screen, never wrapped. Entries
-  separated by ` • ` in `muted`. Key labels render as `[<key>]` in
+  separated by `•` in `muted`. Key labels render as `[<key>]` in
   `keybind-hint` (arrow keys keep the `↑/k`, `↓/j` form); each followed
   by a `muted` description. Every screen MUST advertise its exit key.
 
@@ -383,7 +387,7 @@ introduce new ones without first adding tokens here.
   label. Used in select lists when a value was auto-detected from the
   environment. Distinct from `default-marked` list-item state, which marks
   the item the wizard would pick if the user hits enter; the dot marks
-  *what was found on the machine*. Both can appear on the same row.
+  _what was found on the machine_. Both can appear on the same row.
 
 - **`spinner-indicator`** / **`progress-bar`** — shown only when work
   crosses the perceptible-delay threshold (~250 ms). Spinner uses the dot
@@ -394,7 +398,7 @@ introduce new ones without first adding tokens here.
 ## Do's and Don'ts
 
 **Do reserve `accent.primary` for one element at a time.** The current step
-*or* the user's active selection — never both at once. If two things on
+_or_ the user's active selection — never both at once. If two things on
 screen claim primacy, neither feels primary.
 
 **Do echo the underlying command in `command-echo`** during long steps.
@@ -422,7 +426,7 @@ double-line frames. Use whitespace and color weight.
 
 **Don't compete with the stepper's `current`.** When a screen is
 inside a step, the screen's own `step-header` should not introduce a
-*second* magenta heading on the same vertical axis as the stepper's
+_second_ magenta heading on the same vertical axis as the stepper's
 current cell. Pick one focal heading per screen.
 
 **Don't render auxiliary actions above the option list.** The auxiliary

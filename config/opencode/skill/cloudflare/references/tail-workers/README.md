@@ -1,9 +1,11 @@
 # Cloudflare Tail Workers Skill
 
 ## Purpose
+
 Expert guidance on Cloudflare Tail Workers—specialized Workers that consume execution events from producer Workers for logging, debugging, analytics, and observability.
 
 ## When to Use
+
 - User implements observability/logging for Cloudflare Workers
 - User needs to process Worker execution events, logs, exceptions
 - User builds custom analytics or error tracking
@@ -13,7 +15,9 @@ Expert guidance on Cloudflare Tail Workers—specialized Workers that consume ex
 ## Core Concepts
 
 ### What Are Tail Workers?
+
 Tail Workers automatically process events from producer Workers (the Workers being monitored). They receive:
+
 - HTTP request/response info
 - Console logs (console.log/error/warn/debug)
 - Uncaught exceptions
@@ -21,13 +25,16 @@ Tail Workers automatically process events from producer Workers (the Workers bei
 - Diagnostic channel events
 
 **Key characteristics:**
+
 - Invoked AFTER producer finishes executing
 - Capture entire request lifecycle including Service Bindings and Dynamic Dispatch sub-requests
 - Billed by CPU time, not request count
 - Available on Workers Paid and Enterprise tiers
 
 ### Alternative: OpenTelemetry Export
+
 For batch exports to observability tools (Sentry, Grafana, Honeycomb):
+
 - Consider OTEL export instead of Tail Workers
 - OTEL sends logs/traces in batches (more efficient)
 - Tail Workers = advanced mode for custom processing
@@ -45,6 +52,7 @@ export default {
 ```
 
 **Parameters:**
+
 - `events`: Array of `TailItem` objects (one per producer invocation)
 - `env`: Bindings (KV, D1, R2, env vars, etc.)
 - `ctx`: Context with `waitUntil()` for async work
@@ -96,12 +104,14 @@ interface TailItem {
 ### Configuration
 
 **Producer Worker wrangler.toml:**
+
 ```toml
 name = "my-producer-worker"
-tail_consumers = [{service = "my-tail-worker"}]
+tail_consumers = [{ service = "my-tail-worker" }]
 ```
 
 **Producer Worker wrangler.jsonc:**
+
 ```json
 {
   "name": "my-producer-worker",
@@ -114,6 +124,7 @@ tail_consumers = [{service = "my-tail-worker"}]
 ```
 
 **Tail Worker wrangler.toml:**
+
 ```toml
 name = "my-tail-worker"
 # No special config needed, just must have tail() handler
@@ -313,18 +324,22 @@ export default {
 ## Security & Privacy
 
 ### Automatic Redaction
+
 By default, sensitive data is redacted from `TailRequest`:
 
 **Header redaction:**
+
 - Headers containing: `auth`, `key`, `secret`, `token`, `jwt` (case-insensitive)
 - `cookie` and `set-cookie` headers
 - Redacted values show as `"REDACTED"`
 
 **URL redaction:**
+
 - Hex IDs: 32+ hex digits → `"REDACTED"`
 - Base-64 IDs: 21+ chars with 2+ upper, 2+ lower, 2+ digits → `"REDACTED"`
 
 ### Bypassing Redaction
+
 ```typescript
 // Use with extreme caution
 const unredacted = event.event?.request?.getUnredacted();
@@ -332,6 +347,7 @@ const unredacted = event.event?.request?.getUnredacted();
 ```
 
 **Best practices:**
+
 - Only call `getUnredacted()` when absolutely necessary
 - Never log unredacted sensitive data
 - Implement additional filtering before external transmission
@@ -340,23 +356,27 @@ const unredacted = event.event?.request?.getUnredacted();
 ## Wrangler CLI Usage
 
 ### Deploy Tail Worker
+
 ```bash
 wrangler deploy
 ```
 
 ### View Live Tail Locally (NOT Tail Workers)
+
 ```bash
 # This streams logs to terminal, different from Tail Workers
 wrangler tail <producer-worker-name>
 ```
 
 ### Update Producer Configuration
+
 ```bash
 # Edit wrangler.toml to add tail_consumers
 wrangler deploy
 ```
 
 ### Remove Tail Consumer
+
 ```toml
 # Remove from wrangler.toml or set empty array
 tail_consumers = []
@@ -388,9 +408,11 @@ interface Env {
 ## Testing & Development
 
 ### Local Testing
+
 Tail Workers cannot be fully tested locally with `wrangler dev`. Deploy to staging environment for testing.
 
 ### Testing Strategy
+
 1. Deploy producer Worker to staging
 2. Deploy Tail Worker to staging
 3. Configure `tail_consumers` in producer
@@ -398,6 +420,7 @@ Tail Workers cannot be fully tested locally with `wrangler dev`. Deploy to stagi
 5. Verify Tail Worker receives events (check destination logs/storage)
 
 ### Debugging Tips
+
 ```typescript
 export default {
   async tail(events, env, ctx) {
@@ -419,6 +442,7 @@ export default {
 ## Advanced Patterns
 
 ### Batching Events
+
 ```typescript
 // Use KV or Durable Objects to batch events before sending
 export default {
@@ -430,6 +454,7 @@ export default {
 ```
 
 ### Sampling
+
 ```typescript
 // Only process a percentage of events
 export default {
@@ -445,7 +470,9 @@ export default {
 ```
 
 ### Workers for Platforms
+
 For dynamic dispatch Workers, `events` array contains TWO elements:
+
 1. Dynamic dispatch Worker event
 2. User Worker event
 
@@ -474,7 +501,7 @@ export default {
        fetch(endpoint, { body: JSON.stringify(events) });
      }
    };
-   
+
    // ✅ CORRECT
    export default {
      async tail(events, env, ctx) {
@@ -500,6 +527,7 @@ export default {
 ## Integration Examples
 
 ### Sentry
+
 ```typescript
 export default {
   async tail(events, env, ctx) {
@@ -529,6 +557,7 @@ export default {
 ```
 
 ### Datadog
+
 ```typescript
 export default {
   async tail(events, env, ctx) {
@@ -558,6 +587,7 @@ export default {
 ```
 
 ## Related Resources
+
 - Tail Workers Docs: https://developers.cloudflare.com/workers/observability/logs/tail-workers/
 - Tail Handler API: https://developers.cloudflare.com/workers/runtime-apis/handlers/tail/
 - Analytics Engine: https://developers.cloudflare.com/analytics/analytics-engine/
@@ -585,6 +615,7 @@ Need observability for Workers?
 ## Code Quality Guidelines
 
 ### Type Safety
+
 ```typescript
 // ✅ Use proper types
 interface Env {
@@ -611,6 +642,7 @@ export default {
 ```
 
 ### Error Handling
+
 ```typescript
 export default {
   async tail(events, env, ctx) {
@@ -632,9 +664,11 @@ export default {
 ```
 
 ### Minimal, Surgical Changes
+
 - Process only necessary events (filter early)
 - Avoid unnecessary data transformations
 - Keep handlers focused and simple
 
 ## Summary
+
 Tail Workers provide real-time, custom event processing for Cloudflare Workers. Use them when you need fine-grained control over logging, error tracking, or analytics that goes beyond standard OTEL export. Always use `ctx.waitUntil()` for async work, be mindful of sensitive data redaction, and consider Analytics Engine for aggregated metrics.

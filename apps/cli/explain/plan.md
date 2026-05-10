@@ -11,12 +11,13 @@ on the same host therefore hash identically (the timestamp is excluded from
 the hash on purpose).
 
 Why it's a first-class artifact, not an internal detail:
-  - It serializes to JSON, so CI can diff plans across commits.
-  - It can be reviewed once and replayed: `dots plan > p.json` on one host,
-    `dots apply --plan p.json` on another. Schema-version mismatches fail
-    loudly rather than silently re-planning.
-  - The same shape backs `dots status`'s "last applied" receipt: the hash
-    in `applied.toml` is the hash of the Plan that ran.
+
+- It serializes to JSON, so CI can diff plans across commits.
+- It can be reviewed once and replayed: `dots plan > p.json` on one host,
+  `dots apply --plan p.json` on another. Schema-version mismatches fail
+  loudly rather than silently re-planning.
+- The same shape backs `dots status`'s "last applied" receipt: the hash
+  in `applied.toml` is the hash of the Plan that ran.
 
 Steps carry an action verb (+ add, ~ change, - remove), a stable kind
 (`bootstrap-nix`, `apply-profile`, …), a human summary, and the exact

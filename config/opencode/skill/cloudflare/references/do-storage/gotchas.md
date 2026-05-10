@@ -83,9 +83,9 @@ await this.ctx.storage.get("key", { allowConcurrency: true, noCache: true });
 
 ## Common Errors & Best Practices
 
-**Slow perf:** Use sync KV API (`ctx.storage.kv`) vs async  
-**Races:** Check concurrent calls from same event (not protected)  
-**High billing:** Check `rowsRead`/`rowsWritten`; verify unused objects call `deleteAll()`  
+**Slow perf:** Use sync KV API (`ctx.storage.kv`) vs async\
+**Races:** Check concurrent calls from same event (not protected)\
+**High billing:** Check `rowsRead`/`rowsWritten`; verify unused objects call `deleteAll()`\
 **Overload:** Single DO soft limit ~1K req/sec; shard
 
 **Do:** Use SQLite-backed; sync KV for simple key-value; don't await writes unnecessarily (output gate protects); use `blockConcurrencyWhile()` for init; delete alarms AND storage when cleaning

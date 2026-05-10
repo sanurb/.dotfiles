@@ -12,6 +12,7 @@ my-skill/
 ```
 
 **When to use:**
+
 - Instructions fit in <200 lines
 - No external resources needed
 - Simple procedural guidance
@@ -28,6 +29,7 @@ my-skill/
 ```
 
 **When to use:**
+
 - Repeatable automation tasks
 - Deterministic operations or tools (validation, conversion)
 - Code that would be rewritten each time
@@ -46,6 +48,7 @@ my-skill/
 ```
 
 **When to use:**
+
 - Domain knowledge model lacks
 - Detailed specs/schemas needed
 - Content too large for single file
@@ -67,13 +70,14 @@ my-skill/
 ```
 
 **When to use:**
+
 - Multi-step workflows
 - Mix of documentation + automation
 - Templates/boilerplate needed
 
 **Example:** Release process, deployment pipeline, project scaffolding.
 
-### Progressive Skill 
+### Progressive Skill
 
 ```
 my-platform/
@@ -90,6 +94,7 @@ my-platform/
 ```
 
 **When to use:**
+
 - Large platforms (10+ products/features)
 - Need to avoid loading everything at once
 - Different products for different tasks
@@ -98,42 +103,43 @@ my-platform/
 
 ## File Size Guidelines
 
-| File Type | Target | Max |
-|-----------|--------|-----|
-| SKILL.md | 150-200 lines | 500 lines |
-| Reference file | 100-150 lines | 200 lines |
-| Any single file | - | 500 lines |
+| File Type       | Target        | Max       |
+| --------------- | ------------- | --------- |
+| SKILL.md        | 150-200 lines | 500 lines |
+| Reference file  | 100-150 lines | 200 lines |
+| Any single file | -             | 500 lines |
 
 **Why these limits?**
+
 - Agent loads full file into context when reading
 - Large files = context rot = worse performance
 - Split content, not tokens
 
 ## Directory Naming
 
-| Rule | Good | Bad |
-|------|------|-----|
-| Lowercase + hyphens | `my-skill` | `MySkill`, `my_skill` |
-| Match `name:` field | `pdf-processor` | `pdf_proc` |
-| Descriptive | `data-validator` | `util`, `helper` |
-| Gerund form preferred | `processing-pdfs` | `pdf-tools` |
+| Rule                  | Good              | Bad                   |
+| --------------------- | ----------------- | --------------------- |
+| Lowercase + hyphens   | `my-skill`        | `MySkill`, `my_skill` |
+| Match `name:` field   | `pdf-processor`   | `pdf_proc`            |
+| Descriptive           | `data-validator`  | `util`, `helper`      |
+| Gerund form preferred | `processing-pdfs` | `pdf-tools`           |
 
 ## File Naming
 
-| Directory | Convention |
-|-----------|------------|
-| `references/` | Descriptive: `api.md`, `schemas.md`, `workflows.md` |
-| `scripts/` | Action-based: `validate.sh`, `deploy.sh`, `convert.sh` |
-| `assets/` | Content-based: `template.yaml`, `logo.png` |
+| Directory     | Convention                                             |
+| ------------- | ------------------------------------------------------ |
+| `references/` | Descriptive: `api.md`, `schemas.md`, `workflows.md`    |
+| `scripts/`    | Action-based: `validate.sh`, `deploy.sh`, `convert.sh` |
+| `assets/`     | Content-based: `template.yaml`, `logo.png`             |
 
 ## Token Budget by Pattern
 
-| Pattern | Typical Load | Notes |
-|---------|--------------|-------|
-| Minimal | ~500 tokens | Single file |
-| With scripts | ~600 tokens | SKILL.md + script refs |
-| Reference-heavy | ~800-2000 tokens | Depends on files read |
-| Progressive | ~2000-5000 tokens | SKILL.md + relevant refs |
+| Pattern         | Typical Load      | Notes                    |
+| --------------- | ----------------- | ------------------------ |
+| Minimal         | ~500 tokens       | Single file              |
+| With scripts    | ~600 tokens       | SKILL.md + script refs   |
+| Reference-heavy | ~800-2000 tokens  | Depends on files read    |
+| Progressive     | ~2000-5000 tokens | SKILL.md + relevant refs |
 
 ## See Also
 

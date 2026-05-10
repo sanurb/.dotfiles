@@ -5,6 +5,7 @@ Flexible message queuing for async task processing with guaranteed at-least-once
 ## Overview
 
 Queues provide:
+
 - At-least-once delivery guarantee
 - Push-based (Worker) and pull-based (HTTP) consumers
 - Configurable batching and retries
@@ -37,13 +38,13 @@ export default {
 
 ## Core Operations
 
-| Operation | Purpose | Limit |
-|-----------|---------|-------|
-| `send(body, options?)` | Publish message | 128 KB |
-| `sendBatch(messages)` | Bulk publish | 100 msgs/256 KB |
-| `message.ack()` | Acknowledge success | - |
-| `message.retry(options?)` | Retry with delay | - |
-| `batch.ackAll()` | Ack entire batch | - |
+| Operation                 | Purpose             | Limit           |
+| ------------------------- | ------------------- | --------------- |
+| `send(body, options?)`    | Publish message     | 128 KB          |
+| `sendBatch(messages)`     | Bulk publish        | 100 msgs/256 KB |
+| `message.ack()`           | Acknowledge success | -               |
+| `message.retry(options?)` | Retry with delay    | -               |
+| `batch.ackAll()`          | Ack entire batch    | -               |
 
 ## Architecture
 

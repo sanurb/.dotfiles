@@ -99,16 +99,16 @@ do {
 
 ## Limits
 
-| Limit | Free | Paid |
-|-------|------|------|
-| Reads/day | 100,000 | Unlimited |
-| Writes/day | 1,000 | Unlimited |
-| Writes/second per key | 1 | 1 |
-| Operations per Worker | 1,000 | 1,000 |
-| Key size | 512 bytes | 512 bytes |
-| Value size | 25 MiB | 25 MiB |
-| Metadata size | 1024 bytes | 1024 bytes |
-| Min cacheTtl | 60s | 60s |
-| Bulk get max | 100 keys | 100 keys |
+| Limit                 | Free       | Paid       |
+| --------------------- | ---------- | ---------- |
+| Reads/day             | 100,000    | Unlimited  |
+| Writes/day            | 1,000      | Unlimited  |
+| Writes/second per key | 1          | 1          |
+| Operations per Worker | 1,000      | 1,000      |
+| Key size              | 512 bytes  | 512 bytes  |
+| Value size            | 25 MiB     | 25 MiB     |
+| Metadata size         | 1024 bytes | 1024 bytes |
+| Min cacheTtl          | 60s        | 60s        |
+| Bulk get max          | 100 keys   | 100 keys   |
 
 **Note:** Bulk requests count as 1 operation against 1,000 limit.

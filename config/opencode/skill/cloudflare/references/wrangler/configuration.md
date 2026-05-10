@@ -11,22 +11,25 @@ Configuration reference for wrangler.jsonc (recommended) and wrangler.toml.
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "my-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-01-01",  // Use current date
+  "compatibility_date": "2025-01-01", // Use current date
   "vars": { "API_KEY": "dev-key" },
-  "kv_namespaces": [{ "binding": "MY_KV", "id": "abc123" }]
+  "kv_namespaces": [{ "binding": "MY_KV", "id": "abc123" }],
 }
 ```
 
 ## Field Categories
 
 ### Top-Level Only
+
 - `keep_vars`, `migrations`, `send_metrics`
 
 ### Inheritable (can override per env)
+
 - `name`, `main`, `compatibility_date`, `account_id`
 - `workers_dev`, `routes`, `triggers`, `minify`, `observability`
 
 ### Non-Inheritable (per-env required)
+
 - `vars`, `kv_namespaces`, `d1_databases`, `r2_buckets`
 - `durable_objects`, `vectorize`, `hyperdrive`, `services`, `queues`
 
@@ -40,9 +43,9 @@ Configuration reference for wrangler.jsonc (recommended) and wrangler.toml.
     "production": {
       "name": "my-worker-prod",
       "vars": { "ENV": "prod" },
-      "route": { "pattern": "example.com/*", "zone_name": "example.com" }
-    }
-  }
+      "route": { "pattern": "example.com/*", "zone_name": "example.com" },
+    },
+  },
 }
 ```
 

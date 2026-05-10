@@ -15,9 +15,11 @@ GET    /zones/{zone_id}/spectrum/analytics/events/summary
 ### Supported Protocols
 
 **Pro/Business Plans:**
+
 - Selected protocols only (check Cloudflare docs for current list)
 
 **Enterprise Plans:**
+
 - All TCP ports (1-65535)
 - All UDP ports (1-65535)
 - Port ranges

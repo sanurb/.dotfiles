@@ -38,6 +38,7 @@ Error: Secret 'my_secret' not found in store
 ```
 
 Fix:
+
 1. `wrangler secrets-store secret list <store-id> --remote`
 2. Check `secret_name` matches exactly (case-sensitive)
 3. Ensure secret has `workers` scope
@@ -50,6 +51,7 @@ Error: Cannot access secret 'API_KEY' in local dev
 ```
 
 Fix:
+
 ```bash
 # Create local-only (no --remote)
 wrangler secrets-store secret create <store-id> --name API_KEY --scopes workers
@@ -65,6 +67,7 @@ const key = await env.API_KEY.get();
 ```
 
 Fix:
+
 ```typescript
 interface Env {
   API_KEY: { get(): Promise<string> };
@@ -78,6 +81,7 @@ Error: Binding 'API_KEY' already exists
 ```
 
 Fix:
+
 1. Remove duplicate from dashboard Settings → Bindings
 2. Check `wrangler.toml` vs dashboard conflicts
 3. Delete old Worker secret: `wrangler secret delete API_KEY`
@@ -89,6 +93,7 @@ Error: Account secret quota exceeded (100/100)
 ```
 
 Fix:
+
 1. `wrangler secrets-store quota --remote`
 2. Delete unused secrets
 3. Consolidate duplicates
@@ -103,15 +108,15 @@ Fix:
 
 ## Comparison Table
 
-| Feature | Secrets Store | Worker Secrets |
-|---------|---------------|----------------|
-| Scope | Account-level | Per-Worker |
-| Reusability | Multi-Worker | Single Worker |
-| Access | `await env.BINDING.get()` | `env.SECRET_NAME` |
-| Management | Centralized | Per-Worker |
-| Commands | `secrets-store` | `secret` |
-| Local dev | Separate local secrets | `.dev.vars`/`.env` |
-| Limits | 100/account | Per-Worker |
+| Feature     | Secrets Store             | Worker Secrets     |
+| ----------- | ------------------------- | ------------------ |
+| Scope       | Account-level             | Per-Worker         |
+| Reusability | Multi-Worker              | Single Worker      |
+| Access      | `await env.BINDING.get()` | `env.SECRET_NAME`  |
+| Management  | Centralized               | Per-Worker         |
+| Commands    | `secrets-store`           | `secret`           |
+| Local dev   | Separate local secrets    | `.dev.vars`/`.env` |
+| Limits      | 100/account               | Per-Worker         |
 
 ## Best Practices
 

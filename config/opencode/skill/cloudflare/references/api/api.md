@@ -12,6 +12,7 @@ curl "https://api.cloudflare.com/client/v4/zones" \
 ```
 
 **Token scopes**: Always use minimal permissions
+
 - Zone-specific vs account-level
 - Read vs edit permissions
 - Time-limited tokens for CI/CD
@@ -25,6 +26,7 @@ curl "https://api.cloudflare.com/client/v4/zones" \
 ```
 
 **Limitations**:
+
 - Full account access (insecure)
 - Cannot scope permissions
 - No expiration

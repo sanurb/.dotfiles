@@ -11,12 +11,12 @@ iteration loop is not bound to Nix evaluation.
 
 ## Considered Options
 
-- **A symlink-only layer** (per *Use Nix Less*: a small POSIX script
+- **A symlink-only layer** (per _Use Nix Less_: a small POSIX script
   that links `config/<tool>/` into `$XDG_CONFIG_HOME` and a separate
   `home.packages = [ ... ]` for installs) — rejected for the parts of
   the surface Home Manager actually pays for (services composition,
   generation-based rollback, declared-once-across-systems). Adopted
-  *in spirit* for live-editable configs via `mkOutOfStoreSymlink`.
+  _in spirit_ for live-editable configs via `mkOutOfStoreSymlink`.
 
 ## Consequences
 

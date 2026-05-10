@@ -1,6 +1,7 @@
 ## Common Use Cases
 
 ### 1. API Gateway
+
 ```javascript
 export default {
   async fetch(request, env, ctx) {
@@ -21,6 +22,7 @@ export default {
 ```
 
 ### 2. A/B Testing
+
 ```javascript
 export default {
   async fetch(request, env, ctx) {
@@ -40,3 +42,4 @@ export default {
       : 'https://b.example.com';
     
     con
+```

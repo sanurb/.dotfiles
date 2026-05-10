@@ -1,6 +1,7 @@
 ## API Quick Reference
 
 ### Puppeteer
+
 ```typescript
 // Browser
 puppeteer.launch(env.MYBROWSER, opts?)
@@ -27,6 +28,7 @@ page.select(selector, value)
 ```
 
 ### Playwright
+
 ```typescript
 // Browser
 launch(env.MYBROWSER, opts?)
@@ -52,3 +54,4 @@ page.press(selector, key)
 
 // Context
 con
+```

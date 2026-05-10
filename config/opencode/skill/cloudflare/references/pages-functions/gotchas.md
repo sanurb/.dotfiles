@@ -7,6 +7,7 @@
 All requests serve static, functions never run.
 
 **Fix:**
+
 - `/functions` in correct location (project root)
 - Check `pages_build_output_dir` in wrangler.json
 - Files have `.js` or `.ts` extension
@@ -17,6 +18,7 @@ All requests serve static, functions never run.
 `context.env.MY_BINDING is undefined`
 
 **Fix:**
+
 - Binding in wrangler.json or dashboard
 - Name matches exactly (case-sensitive)
 - Local dev: pass flags OR configure wrangler.json
@@ -27,6 +29,7 @@ All requests serve static, functions never run.
 Type errors for `context.env`
 
 **Fix:**
+
 ```typescript
 interface Env { MY_BINDING: KVNamespace; }
 
@@ -40,6 +43,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 `_middleware.js` not executing
 
 **Fix:**
+
 - Named exactly `_middleware.js`
 - In correct directory for route scope
 - `onRequest` or method handler exported
@@ -50,6 +54,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 `context.env.VAR_NAME is undefined`
 
 **Fix:**
+
 - `vars` in wrangler.json
 - Secrets: `.dev.vars` locally, dashboard/wrangler.json for prod
 - Redeploy after changes
@@ -97,6 +102,7 @@ npx wrangler pages deployment tail --status error
 ## Best Practices
 
 **Performance:**
+
 - Minimize deps for cold starts
 - KV for infrequent reads, D1 for relational, R2 for large files
 - Set `Cache-Control` headers
@@ -104,6 +110,7 @@ npx wrangler pages deployment tail --status error
 - Handle errors gracefully
 
 **Security:**
+
 - Never commit secrets
 - Use secrets (encrypted) not vars for sensitive data
 - Validate all input

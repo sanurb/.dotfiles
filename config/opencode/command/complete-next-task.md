@@ -76,19 +76,23 @@ If progress.txt doesn't exist, create it:
 
 ```markdown
 # Progress Log
+
 PRD: <prdName from PRD>
 Started: <YYYY-MM-DD>
 
 ## Codebase Patterns
+
 <!-- Consolidate reusable patterns here -->
 
 ---
+
 <!-- Task logs below - APPEND ONLY -->
 ```
 
 ### 3. Branch Setup
 
 Extract `prdName` from PRD, then:
+
 - jj: `jj new -m '<prdName>'`
 - git: `git checkout -b <prdName>` (or checkout if exists)
 
@@ -96,10 +100,10 @@ Extract `prdName` from PRD, then:
 
 Work on the single task until verification steps pass.
 
-
 ### 5. Feedback Loops (REQUIRED)
 
 Before committing, run ALL applicable:
+
 - Type checking
 - Tests
 - Linting
@@ -117,6 +121,7 @@ Append to progress.txt:
 
 ```markdown
 ## Task - [task.id]
+
 - What was implemented
 - Files changed
 - **Learnings:** patterns, gotchas

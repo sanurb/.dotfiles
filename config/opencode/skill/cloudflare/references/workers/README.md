@@ -5,6 +5,7 @@ Expert guidance for building, deploying, and optimizing Cloudflare Workers appli
 ## Overview
 
 Cloudflare Workers run on V8 isolates (NOT containers/VMs):
+
 - Extremely fast cold starts (< 1ms)
 - Global deployment across 300+ locations
 - Web standards compliant (fetch, URL, Headers, Request, Response)
@@ -23,6 +24,7 @@ export default {
 ```
 
 **Handler parameters**:
+
 - `request`: Incoming HTTP request (standard Request object)
 - `env`: Environment bindings (KV, D1, R2, secrets, vars)
 - `ctx`: Execution context (`waitUntil`, `passThroughOnException`)
@@ -75,8 +77,8 @@ async tail(events: TraceItem[], env: Env, ctx: ExecutionContext): Promise<void>
 
 ## Resources
 
-**Docs**: https://developers.cloudflare.com/workers/  
-**Examples**: https://developers.cloudflare.com/workers/examples/  
+**Docs**: https://developers.cloudflare.com/workers/\
+**Examples**: https://developers.cloudflare.com/workers/examples/\
 **Runtime APIs**: https://developers.cloudflare.com/workers/runtime-apis/
 
 ## In This Reference

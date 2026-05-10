@@ -13,6 +13,7 @@ release-manager/
 ```
 
 **Example frontmatter:**
+
 ```yaml
 name: release-manager
 description: Create releases with changelogs. Use when preparing release or bumping versions.
@@ -35,6 +36,7 @@ pdf-processor/
 ```
 
 **Example frontmatter:**
+
 ```yaml
 name: pdf-processor
 description: Extract, merge, split PDF files. Use when working with PDFs.
@@ -57,6 +59,7 @@ code-standards/
 ```
 
 **Example frontmatter:**
+
 ```yaml
 name: code-standards
 description: Team coding standards. Use when writing code or reviewing PRs.
@@ -66,7 +69,7 @@ description: Team coding standards. Use when writing code or reviewing PRs.
 
 **When to use:** Established standards, consistency enforcement.
 
-## Pattern 4: Platform 
+## Pattern 4: Platform
 
 For large platforms with many products.
 
@@ -82,6 +85,7 @@ cloud-platform/
 ```
 
 **Example frontmatter:**
+
 ```yaml
 name: cloud-platform
 description: Cloud platform APIs. Use for deployments or infrastructure.
@@ -102,6 +106,7 @@ github-automation/
 ```
 
 **Example frontmatter:**
+
 ```yaml
 name: github-automation
 description: GitHub operations via gh CLI. Use for PRs, issues, releases.
@@ -124,13 +129,13 @@ deployment-pipeline/            # Workflow + Integration
 
 ## Pattern Selection
 
-| Need | Pattern |
-|------|---------|
-| Step-by-step process | Workflow |
-| Multiple operations | Task-based |
-| Standards/rules | Reference |
-| Many products | Platform |
-| External service | Integration |
+| Need                 | Pattern     |
+| -------------------- | ----------- |
+| Step-by-step process | Workflow    |
+| Multiple operations  | Task-based  |
+| Standards/rules      | Reference   |
+| Many products        | Platform    |
+| External service     | Integration |
 
 ## See Also
 

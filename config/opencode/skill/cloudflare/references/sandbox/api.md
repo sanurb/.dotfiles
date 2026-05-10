@@ -174,5 +174,6 @@ SandboxClient (aggregator)
 ```
 
 **Execution Modes**:
+
 1. **Foreground** (exec): Blocking, captures output
 2. **Background** (execStream/startProcess): Non-blocking, uses FIFOs, concurrent

@@ -21,15 +21,15 @@ binding = "AI"
 {
   "durable_objects": {
     "bindings": [
-      {"name": "MyAgent", "class_name": "MyAgent"}
-    ]
+      { "name": "MyAgent", "class_name": "MyAgent" },
+    ],
   },
   "migrations": [
-    {"tag": "v1", "new_sqlite_classes": ["MyAgent"]}
+    { "tag": "v1", "new_sqlite_classes": ["MyAgent"] },
   ],
   "ai": {
-    "binding": "AI"
-  }
+    "binding": "AI",
+  },
 }
 ```
 

@@ -200,14 +200,14 @@ async () => {
 
 ### grep vs astGrep
 
-| Use Case | Tool |
-|----------|------|
-| Text/regex pattern | `grep` |
-| Function declarations | `astGrep`: `function $NAME($$$) { $$$ }` |
-| Arrow functions | `astGrep`: `const $N = ($$$) => $_` |
-| Class definitions | `astGrep`: `class $NAME extends $PARENT` |
-| Import statements | `astGrep`: `import { $$$IMPORTS } from "$MOD"` |
-| JSX components | `astGrep`: `<$COMP $$$PROPS />` |
+| Use Case              | Tool                                           |
+| --------------------- | ---------------------------------------------- |
+| Text/regex pattern    | `grep`                                         |
+| Function declarations | `astGrep`: `function $NAME($$$) { $$$ }`       |
+| Arrow functions       | `astGrep`: `const $N = ($$$) => $_`            |
+| Class definitions     | `astGrep`: `class $NAME extends $PARENT`       |
+| Import statements     | `astGrep`: `import { $$$IMPORTS } from "$MOD"` |
+| JSX components        | `astGrep`: `<$COMP $$$PROPS />`                |
 
 ## Repository Exploration
 

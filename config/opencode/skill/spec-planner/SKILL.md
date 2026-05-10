@@ -22,6 +22,7 @@ CLARIFY ──[user responds]──► DISCOVER ──[done]──► DRAFT ─�
 ```
 
 **State phase at end of every response:**
+
 ```
 ---
 Phase: CLARIFY | Waiting for: answers to questions 1-4
@@ -35,7 +36,7 @@ Phase: CLARIFY | Waiting for: answers to questions 1-4
 
 1. **STOP.** Do not proceed to planning.
 2. Identify gaps in: scope, motivation, constraints, edge cases, success criteria
-3. Ask 3-5 pointed questions that would change the approach. USE YOUR QUESTION TOOL. 
+3. Ask 3-5 pointed questions that would change the approach. USE YOUR QUESTION TOOL.
 4. **Wait for responses**
 
 **IMPORTANT: Always use the `question` tool to ask clarifying questions.** Do NOT output questions as freeform text. The question tool provides structured options and better UX. Example:
@@ -55,16 +56,17 @@ question({
 })
 ```
 
-| Category | Example |
-|----------|---------|
-| Scope | "Share where? Social media? Direct link? Embed?" |
-| Motivation | "What user problem are we actually solving?" |
+| Category    | Example                                                  |
+| ----------- | -------------------------------------------------------- |
+| Scope       | "Share where? Social media? Direct link? Embed?"         |
+| Motivation  | "What user problem are we actually solving?"             |
 | Constraints | "Does this need to work with existing privacy settings?" |
-| Success | "How will we know this worked?" |
+| Success     | "How will we know this worked?"                          |
 
 **Escape prevention:** Even if request seems complete, ask 2+ clarifying questions. Skip only for mechanical requests (e.g., "rename X to Y").
 
 **Anti-patterns to resist:**
+
 - "Just give me a rough plan" → Still needs scope questions
 - "I'll figure out the details" → Those details ARE the spec
 - Very long initial request → Longer ≠ clearer; probe assumptions
@@ -87,11 +89,11 @@ Task(
 )
 ```
 
-| Target | What to Find |
-|--------|--------------|
-| Affected area | Files, modules that will change |
-| Existing patterns | How similar features are implemented |
-| Integration points | APIs, events, data flows touched |
+| Target             | What to Find                         |
+| ------------------ | ------------------------------------ |
+| Affected area      | Files, modules that will change      |
+| Existing patterns  | How similar features are implemented |
+| Integration points | APIs, events, data flows touched     |
 
 **If unfamiliar tech involved**, invoke Librarian:
 
@@ -120,8 +122,9 @@ Apply planning framework from [decision-frameworks.md](./references/decision-fra
 5. **Recommendation** — One clear choice with reasoning
 
 Use appropriate template from [templates.md](./references/templates.md):
+
 - **Quick Decision** — Scoped technical choices
-- **Feature Plan** — New feature development  
+- **Feature Plan** — New feature development
 - **ADR** — Architecture decisions
 - **RFC** — Larger proposals
 
@@ -133,16 +136,16 @@ Use appropriate template from [templates.md](./references/templates.md):
 
 Run completeness check:
 
-| Criterion | Check |
-|-----------|-------|
-| Scope bounded | Every deliverable listed; non-goals explicit |
-| Ambiguity resolved | No "TBD" or "to be determined" |
-| Acceptance testable | Each criterion pass/fail verifiable |
-| Dependencies ordered | Clear what blocks what |
-| Types defined | Data shapes specified (not "some object") |
-| Effort estimated | Each deliverable has S/M/L/XL |
-| Risks identified | At least 2 risks with mitigations |
-| Open questions | Resolved OR assigned owner |
+| Criterion            | Check                                        |
+| -------------------- | -------------------------------------------- |
+| Scope bounded        | Every deliverable listed; non-goals explicit |
+| Ambiguity resolved   | No "TBD" or "to be determined"               |
+| Acceptance testable  | Each criterion pass/fail verifiable          |
+| Dependencies ordered | Clear what blocks what                       |
+| Types defined        | Data shapes specified (not "some object")    |
+| Effort estimated     | Each deliverable has S/M/L/XL                |
+| Risks identified     | At least 2 risks with mitigations            |
+| Open questions       | Resolved OR assigned owner                   |
 
 **If any criterion fails:** Return to dialogue. "To finalize, I need clarity on: [failing criteria]."
 
@@ -190,16 +193,17 @@ Open Questions:
 
 ## Effort Estimates
 
-| Size | Time | Scope |
-|------|------|-------|
-| **S** | <1 hour | Single file, isolated change |
-| **M** | 1-3 hours | Few files, contained feature |
-| **L** | 1-2 days | Cross-cutting, multiple components |
-| **XL** | >2 days | Major refactor, new system |
+| Size   | Time      | Scope                              |
+| ------ | --------- | ---------------------------------- |
+| **S**  | <1 hour   | Single file, isolated change       |
+| **M**  | 1-3 hours | Few files, contained feature       |
+| **L**  | 1-2 days  | Cross-cutting, multiple components |
+| **XL** | >2 days   | Major refactor, new system         |
 
 ## Scope Control
 
 When scope creeps:
+
 1. **Name it:** "That's scope expansion. Let's finish X first."
 2. **Park it:** "Added to Open Questions. Revisit after core spec stable."
 3. **Cost it:** "Adding Y changes effort from M to XL. Worth it?"
@@ -208,16 +212,16 @@ When scope creeps:
 
 ## References
 
-| File | When to Read |
-|------|--------------|
-| [templates.md](./references/templates.md) | Output formats for plans, ADRs, RFCs |
-| [decision-frameworks.md](./references/decision-frameworks.md) | Complex multi-factor decisions |
-| [estimation.md](./references/estimation.md) | Breaking down work, avoiding underestimation |
-| [technical-debt.md](./references/technical-debt.md) | Evaluating refactoring ROI |
+| File                                                          | When to Read                                 |
+| ------------------------------------------------------------- | -------------------------------------------- |
+| [templates.md](./references/templates.md)                     | Output formats for plans, ADRs, RFCs         |
+| [decision-frameworks.md](./references/decision-frameworks.md) | Complex multi-factor decisions               |
+| [estimation.md](./references/estimation.md)                   | Breaking down work, avoiding underestimation |
+| [technical-debt.md](./references/technical-debt.md)           | Evaluating refactoring ROI                   |
 
 ## Integration
 
-| Agent | When to Invoke |
-|-------|----------------|
-| **Librarian** | Research unfamiliar tech, APIs, frameworks |
-| **Oracle** | Deep architectural analysis, complex debugging |
+| Agent         | When to Invoke                                 |
+| ------------- | ---------------------------------------------- |
+| **Librarian** | Research unfamiliar tech, APIs, frameworks     |
+| **Oracle**    | Deep architectural analysis, complex debugging |
