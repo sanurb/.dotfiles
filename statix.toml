@@ -1,0 +1,17 @@
+# statix — Nix antipattern linter. See https://github.com/nerdypepper/statix
+#
+# Disabled rules:
+#
+#   repeated_keys (W20) — flags `programs.atuin.enable = true;` plus
+#   `programs.zoxide.enable = true;` and asks for a merged
+#   `programs = { atuin.enable = ...; zoxide.enable = ...; }`. The flat
+#   form is the de facto NixOS / Home Manager convention: each line is
+#   1:1 with an option path (`programs.atuin.enable`), greppable in
+#   isolation, and trivially movable between modules. The merged form
+#   trades that for fewer lines and is harder to skim past 3-4 keys.
+#   We pick the convention deliberately, not by accident.
+disabled = ["repeated_keys"]
+
+# .direnv is the direnv layout cache; .devenv is devenv's runtime
+# scratch; both contain generated .nix that we never own.
+ignore = [".direnv", ".devenv", ".moon/cache"]

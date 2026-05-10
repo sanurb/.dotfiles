@@ -31,11 +31,16 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
+        # cache: false on the release path is deliberate. zizmor flags
+        # the default cache-on for release workflows as a cache-poisoning
+        # vector: a PR could populate the actions cache with malicious
+        # build artifacts that a later tag-triggered release picks up.
+        # The release pipeline runs rarely, the dependency graph is
+        # small, and immutable tag refs deserve the determinism premium.
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: apps/cli/go.mod
-          cache: true
-          cache-dependency-path: apps/cli/go.sum
+          cache: false
 
       - name: Install cosign
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1

@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # gh — GitHub's official CLI. ssh as the protocol so `gh repo clone`
   # produces SSH remotes that play nice with the SSH-format commit
   # signing wired up in modules/home/git.nix. Editor / pager track the

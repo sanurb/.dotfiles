@@ -1,5 +1,4 @@
-{ pkgs, lib, ... }:
-{
+_: {
   programs.alacritty = {
     enable = true;
     settings = {

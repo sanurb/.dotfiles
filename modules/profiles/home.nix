@@ -1,8 +1,6 @@
 {
   pkgs,
   lib,
-  inputs,
-  system,
   ...
 }:
 let
@@ -14,7 +12,7 @@ let
   # output (mkOutOfStoreSymlink) so a missing workspace produces no
   # symlink rather than a dangling pointer to "/".
   envWS = builtins.getEnv "DOTS_WORKSPACE_ROOT";
-  isDarwin = pkgs.stdenv.isDarwin;
+  inherit (pkgs.stdenv) isDarwin;
   fallbackHome = if isDarwin then "/Users/dots" else "/home/dots";
 
   # Identity boundary — name/email come from a host-local file that is

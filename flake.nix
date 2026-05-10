@@ -73,7 +73,6 @@
 
   outputs =
     inputs@{
-      self,
       nixpkgs,
       nixpkgs-edge,
       flake-parts,
