@@ -55,6 +55,10 @@
       flake = false;
     };
 
+    # devenv's treefmt module reads this input directly; dropping it
+    # produces a "To use 'treefmt', add the following to flake.nix"
+    # error during enterShell even though the rest of the flake still
+    # evaluates. devenv uses it, we keep it.
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
 
