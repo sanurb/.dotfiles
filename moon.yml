@@ -11,9 +11,10 @@ project:
   description: "Workspace-root tasks (formatting, repo-wide gates)."
 
 tasks:
-  # Canonical formatter — treefmt wraps gofumpt (Go) + nixpkgs-fmt (Nix)
-  # via devenv.nix. `--fail-on-change` makes this both formatter and
-  # lint-clean assertion; CI and `dots doctor` consume the exit code.
+  # Canonical formatter — treefmt orchestrates gofumpt (Go), nixfmt (Nix),
+  # and dprint (md/json/toml/yaml) via devenv.nix. `--fail-on-change`
+  # makes this both formatter and lint-clean assertion; CI and the
+  # pre-commit hook consume the exit code.
   fmt:
     command: "treefmt"
     args:
@@ -21,7 +22,84 @@ tasks:
     inputs:
       - "**/*.go"
       - "**/*.nix"
+      - "**/*.md"
+      - "**/*.json"
+      - "**/*.jsonc"
+      - "**/*.toml"
+      - "**/*.yaml"
+      - "**/*.yml"
       - "/devenv.nix"
       - "/flake.nix"
     options:
       cache: true
+
+  # Repo-wide lint gates — non-mutating, advisory-or-blocking depending
+  # on the consumer. Each leaf task owns one concern with a scoped
+  # input set so Moon's content hash cache is precise: editing a .nix
+  # file does not invalidate the GH Actions lint cache, and vice versa.
+  #
+  # Aggregator `lint` runs all leaves in parallel via deps. CI invokes
+  # `moon run root:lint`; pre-push invokes the leaves with --affected
+  # so a Go-only change skips the Nix/Actions linters entirely.
+  lint-actions:
+    command: "actionlint"
+    args:
+      - "-no-color"
+    inputs:
+      - "/.github/workflows/**/*.yml"
+      - "/.github/workflows/**/*.yaml"
+      - "/.github/actions/**/*.yml"
+      - "/.github/actions/**/*.yaml"
+    options:
+      cache: true
+
+  lint-actions-security:
+    command: "zizmor"
+    args:
+      - "--no-progress"
+      - "--color=never"
+      - ".github/workflows"
+    inputs:
+      - "/.github/workflows/**/*.yml"
+      - "/.github/workflows/**/*.yaml"
+    options:
+      cache: true
+
+  lint-actions-pin:
+    command: "pinact"
+    args:
+      - "run"
+      - "--check"
+    inputs:
+      - "/.github/workflows/**/*.yml"
+      - "/.github/workflows/**/*.yaml"
+    options:
+      cache: true
+
+  lint-nix-dead:
+    command: "deadnix"
+    args:
+      - "--fail"
+    inputs:
+      - "**/*.nix"
+    options:
+      cache: true
+
+  lint-nix-style:
+    command: "statix"
+    args:
+      - "check"
+    inputs:
+      - "**/*.nix"
+      - "/statix.toml"
+    options:
+      cache: true
+
+  lint:
+    command: "noop"
+    deps:
+      - "~:lint-actions"
+      - "~:lint-actions-security"
+      - "~:lint-actions-pin"
+      - "~:lint-nix-dead"
+      - "~:lint-nix-style"

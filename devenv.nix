@@ -65,6 +65,17 @@
       jq
       git
 
+      # CI gates — repo-wide static checkers wired through Moon as
+      # `root:lint`. Each tool owns one concern:
+      #   - actionlint : GitHub Actions YAML semantics (+ shellcheck on `run:` blocks)
+      #   - zizmor     : GH Actions security (template injection, untrusted input,
+      #                  cache poisoning). Complements actionlint, doesn't replace.
+      #   - pinact     : asserts third-party actions are pinned to commit SHAs.
+      # Nix linters (deadnix, statix) come for free via languages.nix.enable.
+      actionlint
+      zizmor
+      pinact
+
       # Language Servers — declarative, pinned to the same nixpkgs hash as
       # the rest of the environment. "Declare, don't script": every binary
       # the workspace needs is materialized by entering the directory; no

@@ -21,10 +21,12 @@ vcs:
     pre-commit:
       - "moon run root:fmt --affected --status=staged"
     pre-push:
-      # One invocation, two tag selectors: Moon parallelizes targets
+      # One invocation, multiple selectors: Moon parallelizes targets
       # within a single run, saving the second startup + project-graph
-      # hydration. A future modules:lint won't be picked up by `#go:*`.
-      - "moon run '#go:lint' '#go:test' --affected"
+      # hydration. With --affected, leaf tasks whose scoped inputs
+      # don't intersect the changed files become cache hits — a Go-only
+      # push skips the Nix/Actions linters, a docs-only push skips Go.
+      - "moon run '#go:lint' '#go:test' root:lint --affected"
   syncHooks: true
 
 runner:

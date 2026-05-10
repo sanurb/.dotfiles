@@ -38,6 +38,32 @@ jobs:
       - name: Run flake checks
         run: nix flake check --impure --accept-flake-config --print-build-logs
 
+  repo-lint:
+    name: repo lint (actions, nix)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+        with:
+          extra-conf: |
+            accept-flake-config = true
+
+      - name: Seed devenv-root
+        run: echo "$PWD" > .devenv-root
+
+      - name: actionlint · zizmor · pinact · deadnix · statix
+        run: |
+          nix develop --impure --accept-flake-config \
+            --override-input devenv-root "file+file://$PWD/.devenv-root" \
+            -c moon run root:lint
+
   cli-quality:
     name: cli quality (vet, test, fmt)
     runs-on: ubuntu-latest
