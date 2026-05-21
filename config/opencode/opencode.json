@@ -104,6 +104,11 @@
       "url": "https://mcp.context7.com/mcp",
       "enabled": true
     },
+    "fff": {
+      "type": "local",
+      "command": ["fff-mcp"],
+      "enabled": true
+    },
     "grep_app": {
       "type": "remote",
       "url": "https://mcp.grep.app",
@@ -127,6 +132,15 @@
         "mcp"
       ],
       "enabled": false
+    },
+    "pencil": {
+      "command": [
+        "/Applications/Pencil.app/Contents/Resources/app.asar.unpacked/out/mcp-server-darwin-arm64",
+        "--app",
+        "desktop"
+      ],
+      "enabled": true,
+      "type": "local"
     }
   }
 }
