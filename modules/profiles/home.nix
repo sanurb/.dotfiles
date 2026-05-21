@@ -66,6 +66,7 @@ let
       opencode = true;
       osquery = true;
       procs = true;
+      tgrep = true;
     };
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
@@ -101,7 +102,7 @@ in
     # Foundation + git are mandatory infrastructure (identity is sourced
     # externally per modules/home/git.nix); the wizard never asks about
     # them. Editor and font remain user-toggleable capabilities.
-    # Satellite tools (amoxide, ast-grep, bat, delta, gh, jaq, lazygit, opencode, osquery, procs) default-true
+    # Satellite tools (amoxide, ast-grep, bat, delta, gh, jaq, lazygit, opencode, osquery, procs, tgrep) default-true
     # via `modules.<name> or true`, preserving v1 behavior on hosts
     # whose state file predates the [modules] section.
     [
@@ -122,7 +123,8 @@ in
     ++ lib.optional (modules.lazygit or true) homeModules.lazygit
     ++ lib.optional (modules.opencode or true) homeModules.opencode
     ++ lib.optional (modules.osquery or true) homeModules.osquery
-    ++ lib.optional (modules.procs or true) homeModules.procs;
+    ++ lib.optional (modules.procs or true) homeModules.procs
+    ++ lib.optional (modules.tgrep or true) homeModules.tgrep;
 
   home.username = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;
