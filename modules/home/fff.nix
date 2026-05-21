@@ -4,24 +4,9 @@
   ...
 }:
 let
-  # fff — file-search toolkit shipping (a) the `fff-mcp` MCP server,
-  # consumed by AI agents (claude-code, opencode, cursor) via
-  # config/opencode/opencode.json, and (b) the native cdylib that
-  # backs fff.nvim, consumed from config/nvim/lua/plugins/fff.lua.
-  #
-  # One workspace, one source pin, one buildRustPackage. The Lua
-  # plugin tree (lua/, plugin/, doc/) is copied alongside the cdylib
-  # under $out/share/fff.nvim/target/release/ so the loader at
-  # lua/fff/rust/init.lua resolves the lib via its relative-path
-  # search — no env-var indirection inside the lua side.
-  #
-  # zlob (the Zig-compiled C globbing library) is a workspace
-  # *optional* dep: enabled by fff-mcp's `default = ["zlob"]` and by
-  # the explicit `zlob` feature on fff-nvim. Dropping defaults with
-  # buildNoDefaultFeatures strips zlob entirely, falling back to
-  # pure-Rust globset. This avoids pulling Zig 0.16 into the closure
-  # (the upstream flake's reason for zig-overlay + crane). The
-  # performance cost is bounded to glob matching, not core search.
+  # zlob is workspace-optional and only fff-mcp's default features
+  # enable it. buildNoDefaultFeatures keeps Zig 0.16 out of the closure
+  # (the reason upstream's flake otherwise needs zig-overlay + crane).
   fff = pkgs.rustPlatform.buildRustPackage {
     pname = "fff";
     version = "0.8.1";
@@ -36,34 +21,30 @@ let
     cargoHash = "sha256-esh3G7+3dXjqLBh8tQnJZaWb0G/nbjeRe3s/5TGctTI=";
 
     buildNoDefaultFeatures = true;
+    # Without --bin/--lib filters, `-p fff-nvim` builds ~11 bench and
+    # profiler binaries declared in its Cargo.toml — each a fat-LTO
+    # final link we'd then have to delete. Filter to only what ships.
     cargoBuildFlags = [
-      "-p"
+      "--package"
       "fff-mcp"
-      "-p"
+      "--bin"
+      "fff-mcp"
+      "--package"
       "fff-nvim"
+      "--lib"
     ];
 
-    # Tests hit real filesystems, spawn MCP transports, and read
-    # $HOME/.config — none of which survive the Nix sandbox.
+    # Tests spawn MCP transports and write $HOME — not sandbox-safe.
     doCheck = false;
 
+    # lua/fff/rust/init.lua hard-codes <plugin>/../../../target/release
+    # as the cdylib search path, so lazy.nvim's `dir = $out/share/fff.nvim`
+    # only resolves the lib if it lands at that exact relative offset.
     postInstall = ''
-      # fff-nvim's Cargo.toml declares ~10 dev/bench binaries
-      # (test_watcher, jemalloc_profile, grep_profiler, ...) that
-      # buildRustPackage's install phase happily ships. We only
-      # publish fff-mcp; the rest is build-time scaffolding.
-      shopt -s extglob
-      rm -f $out/bin/!(fff-mcp)
-
-      # Lay out the nvim plugin tree so its rust/init.lua loader
-      # (which searches <plugin>/../../../target/release/lib*.{so,dylib})
-      # resolves the cdylib without any env-var inside the lua.
-      # lazy.nvim's `dir = ...` points at $out/share/fff.nvim and
-      # the relative path lands on target/release/libfff_nvim.*.
       mkdir -p $out/share/fff.nvim/target/release
       cp -r lua plugin doc $out/share/fff.nvim/
       mv $out/lib/libfff_nvim.* $out/share/fff.nvim/target/release/
-      rmdir $out/lib
+      rm -rf $out/lib
     '';
 
     meta = {
@@ -73,20 +54,12 @@ let
       mainProgram = "fff-mcp";
       platforms = lib.platforms.unix;
     };
-
-    # Consumed by config/nvim/lua/plugins/fff.lua via FFF_NVIM_DIR
-    # (set below) — keeps the lua spec free of literal store paths.
-    passthru.nvimPluginDir = "/share/fff.nvim";
   };
 in
 {
   home.packages = [ fff ];
 
-  # Bridge the nix-store-resident plugin tree into the user's nvim
-  # session. The lazy.nvim spec reads vim.env.FFF_NVIM_DIR and uses
-  # it as `dir = ...`. When the var is empty (host where this module
-  # is disabled, or no DOTS_WORKSPACE_ROOT), the spec falls back to
-  # the upstream GitHub clone + download-binary build hook —
-  # graceful degradation rather than a broken plugin.
-  home.sessionVariables.FFF_NVIM_DIR = "${fff}${fff.passthru.nvimPluginDir}";
+  # Empty on hosts where this module is disabled — fff.lua nil-checks
+  # and falls back to lazy.nvim's upstream clone + build hook.
+  home.sessionVariables.FFF_NVIM_DIR = "${fff}/share/fff.nvim";
 }

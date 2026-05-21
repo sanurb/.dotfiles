@@ -1,13 +1,6 @@
--- fff.nvim — file search backed by a Rust native lib (libfff_nvim).
---
--- modules/home/fff.nix builds the cdylib and copies the upstream
--- lua/, plugin/, doc/ tree under $out/share/fff.nvim, exposed to
--- this spec via vim.env.FFF_NVIM_DIR. When set, lazy.nvim uses
--- that store path as `dir` and skips both the GitHub clone and
--- the build-hook download. When unset (host where the fff module
--- is disabled, or DOTS_WORKSPACE_ROOT not exported), the spec
--- falls back to lazy.nvim's normal install path so the plugin
--- still works.
+-- FFF_NVIM_DIR points at modules/home/fff.nix's $out/share/fff.nvim.
+-- The cdylib loader at lua/fff/rust/init.lua hard-codes a relative
+-- search off `dir`, so `dir` must be that store path verbatim.
 
 local fff_dir = vim.env.FFF_NVIM_DIR
 local nix_managed = fff_dir ~= nil and fff_dir ~= ""
@@ -19,7 +12,7 @@ return {
 		build = nix_managed and false or function()
 			require("fff.download").download_or_build_binary()
 		end,
-		lazy = false, -- the plugin lazy-initialises itself
+		lazy = false,
 		keys = {
 			{ "<leader>ff", function() require("fff").find_files() end, desc = "FFFind files" },
 			{ "<leader>fg", function() require("fff").live_grep() end, desc = "LiFFFe grep" },
