@@ -125,6 +125,7 @@
       # (lazy.nvim, npm, Nix) or adds churn that obscures real diffs.
       settings.global.excludes = [
         "config/nvim/lazy-lock.json"
+        "config/nvim/.undodir/**"
         "config/opencode/package-lock.json"
         "flake.lock"
         "*.lock"
