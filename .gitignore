@@ -42,3 +42,13 @@ dist/
 # Local bootstrap / install logs — per-machine, never committed
 bootstrap.log
 proto-*-install.log
+
+# OrbStack-managed fish completions. OrbStack's installer writes these as
+# symlinks into ~/.config/fish/completions/ pointing at the .app bundle;
+# they land here because modules/home/shells/fish.nix mkOutOfStoreSymlinks
+# the whole completions dir back into the repo. Same convention as
+# config/fish/conf.d/orbstack.fish — the repo owns the hook, OrbStack
+# owns the artifact.
+config/fish/completions/docker.fish
+config/fish/completions/kubectl.fish
+config/fish/completions/orbctl.fish
