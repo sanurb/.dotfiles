@@ -1,8 +1,12 @@
 $schema: "https://moonrepo.dev/schemas/tasks.json"
 
+# moon v2 moved global task/fileGroup config from `.moon/tasks.yml` to
+# `.moon/tasks/all.yml`. With no `inheritedBy` block, this is inherited
+# by *all* projects — the v1 global-tasks semantics.
+#
 # Workspace-wide fileGroups. Keep this minimal — over-broad groups
 # (e.g. `sources: ["**/*"]`) invite whole-repo re-hashing.
-# Project-shape file groups belong in .moon/tasks/tag-*.yml; per-project
+# Project-shape file groups belong in .moon/tasks/<scope>.yml; per-project
 # file groups belong in moon.yml.
 fileGroups:
   configs:

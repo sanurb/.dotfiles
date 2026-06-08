@@ -1,0 +1,11 @@
+$schema: "https://moonrepo.dev/schemas/toolchain.json"
+
+# moon v2 renamed this file `toolchain.yml` → `toolchains.yml`.
+#
+# moon's toolchains are Wasm plugins; built-in ones (go, rust, node, …)
+# auto-resolve, so a `plugin:` locator is only needed to override them.
+# We deliberately add none: proto already manages Go via .prototools,
+# and moon executes go via PATH inside the dev shell. No double-wrapping.
+#
+# This file is intentionally minimal — its presence registers the
+# workspace; toolchain configuration lives in .prototools.

@@ -1,12 +1,12 @@
 $schema: "https://moonrepo.dev/schemas/project.json"
 
-type: application
+layer: application
 language: go
 tags:
   - go
 
 project:
-  name: cli
+  title: cli
   description: "dots — interactive workspace frontend."
 
 # tidy / lint / test / build inherit from .moon/tasks/tag-go.yml.
@@ -21,8 +21,10 @@ tasks:
 
   run:
     command: "go run ."
-    local: true
     options:
+      # v2 dropped `local: true`; `runInCI: false` is the faithful
+      # replacement (keeps it out of `moon ci`, no persistent preset).
+      runInCI: false
       cache: false
 
   # CI gate — binary health only. `--binary-only` skips persona checks
@@ -39,9 +41,10 @@ tasks:
     options:
       cache: false
 
-  # Deploy gate — full doctor including persona. `local: true` keeps it
-  # out of `moon ci` because it asserts host realization, not binary
+  # Deploy gate — full doctor including persona. `runInCI: false` keeps
+  # it out of `moon ci` because it asserts host realization, not binary
   # health. modules:deploy depends on this task, not on cli:check.
+  # (`runInCI: false` replaces v1's `local: true`, removed in moon v2.)
   doctor:
     command: "./bin/dots doctor"
     deps:
@@ -49,6 +52,6 @@ tasks:
     inputs:
       - "/.prototools"
       - "/devenv.nix"
-    local: true
     options:
+      runInCI: false
       cache: false

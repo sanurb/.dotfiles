@@ -1,5 +1,11 @@
 $schema: "https://moonrepo.dev/schemas/tasks.json"
 
+# moon v2 drives task inheritance from `inheritedBy`, not the `tag-`
+# filename prefix (that v1 convention is gone). Scope these tasks to
+# projects tagged `go` — i.e. apps/cli.
+inheritedBy:
+  tag: "go"
+
 fileGroups:
   go-sources:
     - "**/*.go"

@@ -3,11 +3,14 @@ $schema: "https://moonrepo.dev/schemas/project.json"
 # Workspace-root project. Owns tasks whose inputs cross project
 # boundaries (treefmt, repo-wide gates) — anchored at "." so a single
 # hash key covers every formattable file.
-type: tool
+#
+# `layer` was `type` and `project.title` was `project.name` before moon
+# v2 ("Phobos") renamed them.
+layer: tool
 language: bash
 
 project:
-  name: root
+  title: root
   description: "Workspace-root tasks (formatting, repo-wide gates)."
 
 tasks:

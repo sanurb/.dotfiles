@@ -10,7 +10,7 @@ go   = "1.26"   # 2026.02 release line
 rust = "stable" # rustup channel — proto's rust plugin shells through
 
 # Tooling that participates in the same hermetic boundary as runtimes.
-moon = "1.40"
+moon = "2.3.2" # v2 "Phobos" — config schema migrated (toolchains.yml, layer:, pipeline:)
 
 [plugins]
 # Built-in proto plugins (node, bun, deno, go, rust, python) load

@@ -1,10 +1,10 @@
 $schema: "https://moonrepo.dev/schemas/project.json"
 
-type: configuration
+layer: configuration
 language: bash
 
 project:
-  name: modules
+  title: modules
   description: "Home Manager projection."
 
 # The activation path (dots apply → nh home switch) is dots-direct;
@@ -26,7 +26,10 @@ tasks:
 
   update:
     command: "nix flake update"
-    local: true
     options:
+      # v2 removed `local: true`; its only effect here was excluding the
+      # task from `moon ci`. `runInCI: false` preserves that exactly —
+      # without the `server` preset's persistent/interactive side effects.
+      runInCI: false
       cache: false
       runFromWorkspaceRoot: true

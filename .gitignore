@@ -11,6 +11,10 @@ result-*
 # Moon
 .moon/cache/
 .moon/docker/
+# Generated git hooks (moon v2 writes them here and points core.hooksPath
+# at this dir). `vcs.sync: true` regenerates them on any `moon run`, so
+# they're derived artifacts — not source. See .moon/workspace.yml:hooks.
+.moon/hooks/
 
 # Proto
 .proto/

@@ -1,9 +1,0 @@
-$schema: "https://moonrepo.dev/schemas/toolchain.json"
-
-# Moon ≥1.40 requires explicit Wasm plugin locators for first-class
-# language toolchains (e.g. `go.plugin = "https://.../go_plugin.wasm"`).
-# We deliberately avoid that: proto already manages Go via .prototools,
-# and Moon executes go via PATH inside the dev shell. No double-wrapping.
-#
-# This file is intentionally minimal — its presence registers the
-# workspace; toolchain configuration lives in .prototools.
