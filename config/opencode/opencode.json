@@ -106,7 +106,9 @@
     },
     "fff": {
       "type": "local",
-      "command": ["fff-mcp"],
+      "command": [
+        "fff-mcp"
+      ],
       "enabled": true
     },
     "grep_app": {
@@ -137,7 +139,9 @@
       "command": [
         "/Applications/Pencil.app/Contents/Resources/app.asar.unpacked/out/mcp-server-darwin-arm64",
         "--app",
-        "desktop"
+        "desktop",
+        "--agent",
+        "openCodeCLI"
       ],
       "enabled": true,
       "type": "local"

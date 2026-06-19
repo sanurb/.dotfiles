@@ -46,7 +46,8 @@ func TestSnapshotSuccessShape(t *testing.T) {
 // same shape as snapshot success.
 func TestLongRunningSuccessShape(t *testing.T) {
 	var buf bytes.Buffer
-	if err := OKLong(&buf, "dots apply",
+	if err := OKLong(
+		&buf, "dots apply",
 		"01HV2K3X9Y4Z5A6B7C8D9E0F1G",
 		"/tmp/dots_logs/01HV2K3X9Y4Z5A6B7C8D9E0F1G/apply.log",
 		map[string]string{"steps": "5"},

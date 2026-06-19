@@ -40,6 +40,11 @@ dist/
 # Claude Code (per-session state, hooks, transcripts)
 .claude/
 
+# Neovim machine-generated state — undo history and per-buffer context
+# files written under %-escaped path names (e.g. CodeCompanion/AI plugins).
+# Per-machine, may contain non-UTF-8 bytes; never committed or formatted.
+config/nvim/.undodir/
+
 # OS
 .DS_Store
 
