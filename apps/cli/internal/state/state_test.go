@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -71,10 +72,22 @@ git    = true
 	}
 }
 
+// TestSatellitesManifestNonEmpty guards the embedded SATELLITES file:
+// an empty manifest would silently disable every satellite import in
+// home.nix without any obvious failure mode.
+func TestSatellitesManifestNonEmpty(t *testing.T) {
+	if len(Satellites) == 0 {
+		t.Fatalf("Satellites is empty; SATELLITES manifest must list at least one module")
+	}
+	if !sort.StringsAreSorted(Satellites) {
+		t.Fatalf("Satellites is not sorted: %v", Satellites)
+	}
+}
+
 // TestModulesV1BackcompatAllTrue is the load half of the v1→v2 schema
 // migration contract: a v1 file (no [modules] section) parses to
 // all-satellites-enabled. A regression here would silently strip
-// bat/delta/gh/opencode from existing hosts on the next deploy.
+// satellites from existing hosts on the next deploy.
 func TestModulesV1BackcompatAllTrue(t *testing.T) {
 	v1 := `schema_version = 1
 
@@ -91,30 +104,23 @@ font   = true
 	if err != nil {
 		t.Fatalf("parse v1: %v", err)
 	}
-	if !got.Modules.Bat || !got.Modules.Delta || !got.Modules.Gh || !got.Modules.Opencode {
-		t.Fatalf("v1 backcompat: every satellite should default true, got %+v", got.Modules)
+	for _, name := range Satellites {
+		if !got.Modules[name] {
+			t.Fatalf("v1 backcompat: satellite %q should default true, got false", name)
+		}
 	}
 }
 
 // TestModulesRoundTrip pins emit/parse symmetry per satellite. A drift
 // between writer and reader would mean a TUI toggle silently doesn't
 // reach home.nix, mirroring the protection the Font round-trip test
-// provides for capabilities.
+// provides for capabilities. Iterates Satellites so a new entry in
+// SATELLITES is exercised automatically.
 func TestModulesRoundTrip(t *testing.T) {
-	tests := []struct {
-		name   string
-		mutate func(*Modules)
-	}{
-		{"bat off", func(m *Modules) { m.Bat = false }},
-		{"delta off", func(m *Modules) { m.Delta = false }},
-		{"gh off", func(m *Modules) { m.Gh = false }},
-		{"opencode off", func(m *Modules) { m.Opencode = false }},
-		{"all off", func(m *Modules) { *m = Modules{} }},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, name := range Satellites {
+		t.Run(name+" off", func(t *testing.T) {
 			s := Default()
-			tc.mutate(&s.Modules)
+			s.Modules[name] = false
 
 			var buf bytes.Buffer
 			if err := emit(&buf, s); err != nil {
@@ -124,11 +130,39 @@ func TestModulesRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse: %v", err)
 			}
-			if got.Modules != s.Modules {
-				t.Fatalf("Modules round-trip drift: got %+v, want %+v", got.Modules, s.Modules)
+			if got.Modules[name] {
+				t.Fatalf("round-trip lost opt-out for %q: got true, want false", name)
+			}
+			for _, other := range Satellites {
+				if other == name {
+					continue
+				}
+				if !got.Modules[other] {
+					t.Fatalf("round-trip flipped sibling %q: got false, want true", other)
+				}
 			}
 		})
 	}
+
+	t.Run("all off", func(t *testing.T) {
+		s := Default()
+		for _, name := range Satellites {
+			s.Modules[name] = false
+		}
+		var buf bytes.Buffer
+		if err := emit(&buf, s); err != nil {
+			t.Fatalf("emit: %v", err)
+		}
+		got, err := parse(&buf)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		for _, name := range Satellites {
+			if got.Modules[name] {
+				t.Fatalf("round-trip flipped %q back on after all-off", name)
+			}
+		}
+	})
 }
 
 // TestModulesDefaultIsAllOn pins parity with the home.nix `or true`
@@ -138,8 +172,10 @@ func TestModulesRoundTrip(t *testing.T) {
 // kind of split-brain the schema-version contract exists to prevent.
 func TestModulesDefaultIsAllOn(t *testing.T) {
 	d := Default().Modules
-	if !d.Bat || !d.Delta || !d.Gh || !d.Opencode {
-		t.Fatalf("Default().Modules should be all-true, got %+v", d)
+	for _, name := range Satellites {
+		if !d[name] {
+			t.Fatalf("Default().Modules[%q] = false, want true", name)
+		}
 	}
 }
 
@@ -147,27 +183,32 @@ func TestModulesDefaultIsAllOn(t *testing.T) {
 // status/profile/doctor surfaces. The slice is order-stable (matches
 // emit order) so renderings concatenate predictably.
 func TestModulesSkippedReportsOptOuts(t *testing.T) {
-	tests := []struct {
-		name string
-		m    Modules
-		want []string
-	}{
-		{"none skipped", Modules{Bat: true, Delta: true, Gh: true, Opencode: true}, nil},
-		{"all skipped", Modules{}, []string{"bat", "delta", "gh", "opencode"}},
-		{"partial", Modules{Bat: true, Delta: false, Gh: true, Opencode: false}, []string{"delta", "opencode"}},
+	none := Default().Modules
+	if got := none.Skipped(); len(got) != 0 {
+		t.Fatalf("Skipped() with no opt-outs = %v, want empty", got)
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := tc.m.Skipped()
-			if len(got) != len(tc.want) {
-				t.Fatalf("Skipped() = %v, want %v", got, tc.want)
+
+	all := make(Modules, len(Satellites))
+	if got := all.Skipped(); len(got) != len(Satellites) {
+		t.Fatalf("Skipped() with all-off = %v, want every satellite", got)
+	} else {
+		for i, name := range Satellites {
+			if got[i] != name {
+				t.Fatalf("Skipped()[%d] = %q, want %q (manifest order)", i, got[i], name)
 			}
-			for i, name := range tc.want {
-				if got[i] != name {
-					t.Fatalf("Skipped()[%d] = %q, want %q", i, got[i], name)
-				}
-			}
-		})
+		}
+	}
+
+	if len(Satellites) >= 2 {
+		partial := Default().Modules
+		first, last := Satellites[0], Satellites[len(Satellites)-1]
+		partial[first] = false
+		partial[last] = false
+		got := partial.Skipped()
+		want := []string{first, last}
+		if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+			t.Fatalf("Skipped() partial = %v, want %v (manifest order)", got, want)
+		}
 	}
 }
 
@@ -232,5 +273,45 @@ bat = "yes"
 	}
 	if !strings.Contains(err.Error(), "modules.bat") {
 		t.Fatalf("error should mention `modules.bat`, got %q", err)
+	}
+}
+
+// TestParseDiscardsUnknownSatellite locks in the typo-tolerance policy:
+// a key not in SATELLITES is dropped rather than retained, so a stray
+// entry can't get round-tripped into canon by the next Save().
+func TestParseDiscardsUnknownSatellite(t *testing.T) {
+	in := `schema_version = 2
+
+[pillars]
+shell       = "fish"
+terminal    = "ghostty"
+multiplexer = "zellij"
+
+[modules]
+not-a-real-satellite = false
+`
+	got, err := parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if _, present := got.Modules["not-a-real-satellite"]; present {
+		t.Fatalf("parse retained unknown satellite key; want dropped")
+	}
+}
+
+// TestEmitListsEverySatellite pins the writer to the manifest. A
+// regression where emit() forgets a row would put us back in the
+// pre-refactor world where a Save() silently dropped opt-outs that
+// the writer didn't know about.
+func TestEmitListsEverySatellite(t *testing.T) {
+	var buf bytes.Buffer
+	if err := emit(&buf, Default()); err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	out := buf.String()
+	for _, name := range Satellites {
+		if !strings.Contains(out, name+" ") && !strings.Contains(out, name+"=") {
+			t.Fatalf("emit() omitted satellite %q.\nFile:\n%s", name, out)
+		}
 	}
 }
