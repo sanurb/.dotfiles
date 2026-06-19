@@ -47,7 +47,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          fetch-depth: 1
+          # Full history so `git merge-base origin/main HEAD` can reach the
+          # branch point. moon v2 resolves a base revision from the CI PR
+          # context (GITHUB_BASE_REF) on `moon run` and diffs against it;
+          # a shallow checkout has no common ancestor and it aborts.
+          fetch-depth: 0
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
@@ -57,6 +61,12 @@ jobs:
 
       - name: Seed devenv-root
         run: echo "$PWD" > .devenv-root
+
+      # moon v2 diffs against `main` to compute touched files; the PR
+      # checkout has neither a local `main` nor `origin/main`. Materialize
+      # the remote-tracking ref so moon's `origin/main` fallback resolves.
+      - name: Provide base branch for moon
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: actionlint · zizmor · pinact · deadnix · statix
         run: |

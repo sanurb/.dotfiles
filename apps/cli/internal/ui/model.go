@@ -394,7 +394,8 @@ func (m Model) renderDoneSummary() string {
 			theme.Body.Render(fmt.Sprintf("%d path(s) → %s",
 				m.snapshotResult.Count, m.snapshotResult.Path))))
 	}
-	rows = append(rows,
+	rows = append(
+		rows,
 		summaryRow(theme.BadgeOK, "persona", theme.Body.Render(m.personaLine())),
 		summaryRow(theme.BadgeOK, "extras ", theme.Body.Render(m.extrasLine())),
 		m.deployRow(),

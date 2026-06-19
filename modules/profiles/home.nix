@@ -44,6 +44,17 @@ let
     lib.removeSuffix "\n" (builtins.readFile ../../apps/cli/internal/state/SCHEMA_VERSION)
   );
 
+  # Satellite roster — same shared-source pattern as SCHEMA_VERSION.
+  # The manifest is the closed set of opt-out modules; Go embeds it
+  # (apps/cli/internal/state/state.go's `Satellites`), this side reads
+  # it via builtins.readFile. Adding a satellite means: drop the .nix
+  # under modules/home/ and append the name here. No edit to the
+  # import chain or the defaultState attrset below — both derive from
+  # this list.
+  satellites = lib.filter (s: s != "") (
+    lib.splitString "\n" (builtins.readFile ../../apps/cli/internal/state/SATELLITES)
+  );
+
   defaultState = {
     schema_version = schemaVersion;
     pillars = {
@@ -55,19 +66,7 @@ let
       editor = true;
       font = true;
     };
-    modules = {
-      amoxide = true;
-      ast-grep = true;
-      bat = true;
-      delta = true;
-      gh = true;
-      jaq = true;
-      lazygit = true;
-      opencode = true;
-      osquery = true;
-      procs = true;
-      fff = true;
-    };
+    modules = lib.genAttrs satellites (_: true);
   };
   stateFile = if envWS != "" then "${envWS}/.dots-state.toml" else "";
   state =
@@ -96,15 +95,25 @@ let
   shellModule = homeModules.shells.${pillars.shell} or homeModules.shells.fish;
   terminalModule = homeModules.terminals.${pillars.terminal} or homeModules.terminals.ghostty;
   multiplexerModule = homeModules.multiplexers.${pillars.multiplexer} or null;
+
+  # Satellite imports — fold the manifest into a `lib.optional` chain.
+  # `modules.<name> or true` keeps v1 backcompat: a v1 state file (no
+  # [modules] section) yields modules = {}, and every satellite reads
+  # back as enabled. A name in SATELLITES with no matching .nix file
+  # under modules/home/ is a build-time error — the manifest is the
+  # contract; the filesystem must satisfy it.
+  satelliteImports = lib.concatMap (
+    name: lib.optional (modules.${name} or true) homeModules.${name}
+  ) satellites;
 in
 {
   imports =
     # Foundation + git are mandatory infrastructure (identity is sourced
     # externally per modules/home/git.nix); the wizard never asks about
     # them. Editor and font remain user-toggleable capabilities.
-    # Satellite tools (amoxide, ast-grep, bat, delta, fff, gh, jaq, lazygit, opencode, osquery, procs) default-true
-    # via `modules.<name> or true`, preserving v1 behavior on hosts
-    # whose state file predates the [modules] section.
+    # Satellite tools are derived from apps/cli/internal/state/SATELLITES,
+    # default-true via `modules.<name> or true`, preserving v1 behavior
+    # on hosts whose state file predates the [modules] section.
     [
       homeModules.foundation
       homeModules.git
@@ -114,17 +123,7 @@ in
     ++ lib.optional (multiplexerModule != null) multiplexerModule
     ++ lib.optional (caps.editor or true) homeModules.editor
     ++ lib.optional (caps.font or true) homeModules.font
-    ++ lib.optional (modules.amoxide or true) homeModules.amoxide
-    ++ lib.optional (modules."ast-grep" or true) homeModules."ast-grep"
-    ++ lib.optional (modules.bat or true) homeModules.bat
-    ++ lib.optional (modules.delta or true) homeModules.delta
-    ++ lib.optional (modules.gh or true) homeModules.gh
-    ++ lib.optional (modules.jaq or true) homeModules.jaq
-    ++ lib.optional (modules.lazygit or true) homeModules.lazygit
-    ++ lib.optional (modules.opencode or true) homeModules.opencode
-    ++ lib.optional (modules.osquery or true) homeModules.osquery
-    ++ lib.optional (modules.procs or true) homeModules.procs
-    ++ lib.optional (modules.fff or true) homeModules.fff;
+    ++ satelliteImports;
 
   home.username = if envUser != "" then envUser else "dots";
   home.homeDirectory = if envHome != "" then envHome else fallbackHome;

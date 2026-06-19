@@ -11,7 +11,7 @@ projects:
     root: "."
 
 vcs:
-  manager: "git"
+  client: "git"
   defaultBranch: "main"
   # Hooks are Moon tasks. Both shell out to `moon run`, so the verdict
   # uses the same content-hash cache as a regular task. `--affected
@@ -27,9 +27,11 @@ vcs:
       # don't intersect the changed files become cache hits — a Go-only
       # push skips the Nix/Actions linters, a docs-only push skips Go.
       - "moon run '#go:lint' '#go:test' root:lint --affected"
-  syncHooks: true
+  sync: true
 
-runner:
+# `pipeline` was `runner` before moon v2 (the block was renamed in the
+# "Phobos" release); the cache + color knobs are unchanged.
+pipeline:
   cacheLifetime: "7 days"
   inheritColorsForPipedTasks: true
 

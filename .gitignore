@@ -11,6 +11,10 @@ result-*
 # Moon
 .moon/cache/
 .moon/docker/
+# Generated git hooks (moon v2 writes them here and points core.hooksPath
+# at this dir). `vcs.sync: true` regenerates them on any `moon run`, so
+# they're derived artifacts — not source. See .moon/workspace.yml:hooks.
+.moon/hooks/
 
 # Proto
 .proto/
@@ -35,6 +39,11 @@ dist/
 
 # Claude Code (per-session state, hooks, transcripts)
 .claude/
+
+# Neovim machine-generated state — undo history and per-buffer context
+# files written under %-escaped path names (e.g. CodeCompanion/AI plugins).
+# Per-machine, may contain non-UTF-8 bytes; never committed or formatted.
+config/nvim/.undodir/
 
 # OS
 .DS_Store

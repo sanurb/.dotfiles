@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -30,6 +31,16 @@ import (
 //go:embed SCHEMA_VERSION
 var schemaVersionRaw string
 
+// SATELLITES is the canonical roster of opt-out satellite modules,
+// shared with Nix the same way SCHEMA_VERSION is: Go embeds it here,
+// modules/profiles/home.nix reads it via builtins.readFile. Adding a
+// satellite is one file edit — both consumers re-derive the closed set
+// automatically (default-true entries in Default(), [modules] table
+// rows in emit(), and the lib.optional import chain in home.nix).
+//
+//go:embed SATELLITES
+var satellitesRaw string
+
 // FileName is the canonical state file name, written at the workspace root.
 const FileName = ".dots-state.toml"
 
@@ -40,6 +51,50 @@ var SchemaVersion = func() int {
 		panic("state: SCHEMA_VERSION must be an integer, got " + strconv.Quote(schemaVersionRaw))
 	}
 	return n
+}()
+
+// Satellites is the sorted, deduped list of satellite module names
+// declared in SATELLITES. Read-only; treat as a const.
+var Satellites = func() []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for line := range strings.SplitSeq(satellitesRaw, "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" || strings.HasPrefix(name, "#") {
+			continue
+		}
+		if _, dup := seen[name]; dup {
+			panic("state: duplicate satellite " + strconv.Quote(name) + " in SATELLITES")
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}()
+
+// satelliteSet mirrors Satellites as a membership set so parse() can
+// drop unknown keys (typos, removed-but-still-in-disk modules) in O(1)
+// without re-scanning the slice per line.
+var satelliteSet = func() map[string]struct{} {
+	s := make(map[string]struct{}, len(Satellites))
+	for _, name := range Satellites {
+		s[name] = struct{}{}
+	}
+	return s
+}()
+
+// satelliteWidth aligns the `<name> = <bool>` columns in emit() so the
+// generated file stays readable as the roster grows. Recomputed from
+// the manifest — no hand-tuned constant to drift.
+var satelliteWidth = func() int {
+	w := 0
+	for _, name := range Satellites {
+		if n := len(name); n > w {
+			w = n
+		}
+	}
+	return w
 }()
 
 type State struct {
@@ -77,33 +132,23 @@ type Capabilities struct {
 // mutually exclusive choices; Modules is the opt-out surface for
 // always-default-true convenience tools.
 //
-// Default is true for every field. The parser explicitly defaults
-// absent fields to true so a v1 state file (no [modules] section)
-// upgrades to v2 with zero behavior change.
-type Modules struct {
-	Bat      bool
-	Delta    bool
-	Gh       bool
-	Opencode bool
-}
+// The closed set of valid keys lives in SATELLITES (one name per
+// line, embedded above). Modules is a plain map rather than a struct
+// so adding a satellite never requires a Go-side schema edit; the
+// manifest is authoritative and parse/emit/Skipped iterate it. Default
+// is true for every known key; absent keys (v1 files, opt-outs cleared
+// by hand) read back as true via the home.nix `or true` fallback.
+type Modules map[string]bool
 
-// Skipped returns the lower-case names of satellite modules whose
-// install is suppressed in this state. Used by status/profile/doctor
-// surfaces that need to render an opt-out summary; centralized here
-// so the four call-sites never drift on naming or order.
+// Skipped returns the names of satellite modules whose install is
+// suppressed in this state, ordered to match the manifest so the
+// rendering surface (status/profile/doctor) stays deterministic.
 func (m Modules) Skipped() []string {
 	var out []string
-	if !m.Bat {
-		out = append(out, "bat")
-	}
-	if !m.Delta {
-		out = append(out, "delta")
-	}
-	if !m.Gh {
-		out = append(out, "gh")
-	}
-	if !m.Opencode {
-		out = append(out, "opencode")
+	for _, name := range Satellites {
+		if !m[name] {
+			out = append(out, name)
+		}
 	}
 	return out
 }
@@ -119,15 +164,19 @@ var (
 
 // Default returns the opinionated 2026 starting point: behavior-preserving
 // for the modules that previously hard-coded fish + ghostty + zellij.
-// Every Modules field defaults to true so a fresh host gets the full
+// Every Modules entry defaults to true so a fresh host gets the full
 // satellite set; opt-out is explicit (TUI write, --config seed, or
 // hand-edit).
 func Default() State {
+	mods := make(Modules, len(Satellites))
+	for _, name := range Satellites {
+		mods[name] = true
+	}
 	return State{
 		SchemaVersion: SchemaVersion,
 		Pillars:       Pillars{Shell: "fish", Terminal: "ghostty", Multiplexer: "zellij"},
 		Capabilities:  Capabilities{Editor: true, Font: true},
-		Modules:       Modules{Bat: true, Delta: true, Gh: true, Opencode: true},
+		Modules:       mods,
 	}
 }
 
@@ -216,10 +265,7 @@ func (s State) Validate() error {
 //	editor = true
 //	font   = true
 //	[modules]
-//	bat      = true
-//	delta    = true
-//	gh       = true
-//	opencode = true
+//	<name>   = <bool>   # one row per entry in SATELLITES
 //
 // Anything outside this shape is ignored — we never want a typo'd key to
 // surface as a parser error and block a deploy. Validate() catches the
@@ -288,15 +334,11 @@ func parse(r io.Reader) (State, error) {
 			if !ok {
 				return State{}, fmt.Errorf("modules.%s: expected bool, got %q", key, val)
 			}
-			switch key {
-			case "bat":
-				out.Modules.Bat = b
-			case "delta":
-				out.Modules.Delta = b
-			case "gh":
-				out.Modules.Gh = b
-			case "opencode":
-				out.Modules.Opencode = b
+			// Unknown keys are tolerated but discarded — same policy
+			// as the rest of the parser. If we kept them, emit()
+			// would write them back and a typo would become canon.
+			if _, known := satelliteSet[key]; known {
+				out.Modules[key] = b
 			}
 		}
 	}
@@ -304,7 +346,7 @@ func parse(r io.Reader) (State, error) {
 }
 
 func emit(w io.Writer, s State) error {
-	const tmpl = `# .dots-state.toml — managed by the dots CLI. Edit via 'dots install'.
+	const header = `# .dots-state.toml — managed by the dots CLI. Edit via 'dots install'.
 # This file is the single source of truth for the environment's persona:
 # shell, terminal, multiplexer. home.nix reads it via builtins.fromTOML.
 # Mandatory infrastructure (atuin, zoxide, starship, git, nix-index) is
@@ -325,19 +367,32 @@ font   = %v
 # Satellite tools — opt out by setting any to false. Defaults are true.
 # The home-manager profile imports each module via lib.optional, so a
 # false here removes the package from the realized closure on the next
-# 'dots apply'.
+# 'dots apply'. The closed roster lives in
+# apps/cli/internal/state/SATELLITES; both this writer and home.nix
+# derive the rows from that manifest.
 [modules]
-bat      = %v
-delta    = %v
-gh       = %v
-opencode = %v
 `
-	_, err := fmt.Fprintf(w, tmpl,
+	if _, err := fmt.Fprintf(
+		w, header,
 		s.SchemaVersion,
 		s.Pillars.Shell, s.Pillars.Terminal, s.Pillars.Multiplexer,
 		s.Capabilities.Editor, s.Capabilities.Font,
-		s.Modules.Bat, s.Modules.Delta, s.Modules.Gh, s.Modules.Opencode)
-	return err
+	); err != nil {
+		return err
+	}
+	for _, name := range Satellites {
+		// Default to true for satellites the in-memory map doesn't
+		// know about (e.g., a Default() never built or a hand-crafted
+		// State). Matches home.nix's `or true` semantics.
+		v, ok := s.Modules[name]
+		if !ok {
+			v = true
+		}
+		if _, err := fmt.Fprintf(w, "%-*s = %v\n", satelliteWidth, name, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func unquote(v string) (string, bool) {

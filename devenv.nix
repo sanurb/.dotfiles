@@ -160,6 +160,16 @@
         settings = {
           lineWidth = 100;
           indentWidth = 2;
+          # dprint self-traverses (it does not consume treefmt's file
+          # list), so treefmt's `global.excludes` never reaches it. Its
+          # own `excludes` is the only thing that keeps it out of nvim's
+          # machine-generated undo/context dir, whose %-escaped *.md files
+          # carry invalid UTF-8 and abort the whole `treefmt:run` task.
+          excludes = [
+            "config/nvim/.undodir/**"
+            "config/nvim/lazy-lock.json"
+            "config/opencode/package-lock.json"
+          ];
           # Preserve author line breaks for ADRs / READMEs / SKILL.md;
           # "never" would flatten every paragraph to one long line and
           # "always" would re-flow prose to fit lineWidth (also bad).
