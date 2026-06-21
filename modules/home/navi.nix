@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # navi — interactive cheatsheet TUI. The `navi` binary works from any
   # shell (it prints the selected command on stdout). The widget hook
   # — Ctrl+G fuzzy-search that writes the chosen command into the

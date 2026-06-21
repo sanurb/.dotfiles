@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # tealdeer — fast Rust client for the tldr community cheatsheets
   # (binary: `tldr`). Complements navi (modules/home/navi.nix) without
   # overlapping it: navi is interactive, curated, and you author the
