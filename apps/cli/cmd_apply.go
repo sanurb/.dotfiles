@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -488,23 +489,27 @@ func runHomeActivation(profile string, env []string) int {
 		return exitcode.Failure
 	}
 
-	nhPath, err := activation.LookPathIn(nix.ToolNh, env)
+	root, err := workspace.Root()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "apply: nh not reachable:")
-		fmt.Fprintln(os.Stderr, "  what: nh executable not found")
-		fmt.Fprintln(os.Stderr, "  why:  not on PATH and not at <workspace>/.devenv/profile/bin/nh")
-		fmt.Fprintln(os.Stderr, "  next: install nh, or activate the dev shell (direnv allow / nix develop)")
+		fmt.Fprintln(os.Stderr, "apply: workspace not resolved:")
+		fmt.Fprintf(os.Stderr, "  why:  %v\n", err)
+		fmt.Fprintln(os.Stderr, "  next: rerun `dots apply` from inside the cloned workspace")
 		return exitcode.Failure
 	}
 
-	runErr := nix.Cmd{
-		Name:   nhPath,
-		Args:   activationArgs(sys),
-		Env:    env,
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}.Run(context.Background())
+	cmd, err := buildActivationCmd(sys, root, env)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "apply: nh not reachable:")
+		fmt.Fprintln(os.Stderr, "  what: nh executable not found and could not be provisioned")
+		fmt.Fprintf(os.Stderr, "  why:  %v\n", err)
+		fmt.Fprintln(os.Stderr, "  next: install nh, or run `direnv allow` in the workspace")
+		return exitcode.Failure
+	}
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	runErr := cmd.Run(context.Background())
 	if runErr == nil {
 		return exitcode.Success
 	}
@@ -518,6 +523,86 @@ func runHomeActivation(profile string, env []string) int {
 	fmt.Fprintf(os.Stderr, "  why:  %v\n", runErr)
 	fmt.Fprintln(os.Stderr, "  next: run `dots doctor` to diagnose the toolchain")
 	return exitcode.Failure
+}
+
+// nixBinary is the driver used to provision nh on demand. Resolved on
+// the process PATH (Determinate/system nix installs land it there);
+// distinct from the nh/proto tool names in the nix package because
+// this is the bootstrapping driver, not an activation-path tool.
+const nixBinary = "nix"
+
+// devenvRootFile is the per-machine sentinel the flake's devShell
+// asserts on. It must hold the absolute workspace path; .envrc keeps
+// it current when direnv is active, and buildActivationCmd writes it
+// for the direnv-less bootstrap path.
+const devenvRootFile = ".devenv-root"
+
+// buildActivationCmd resolves how to run `nh home switch` for sys with
+// the workspace at root. Two paths:
+//
+//   - Fast path: nh is already resolvable (on PATH, or at
+//     <root>/.devenv/profile/bin/nh via the activation env). Run it
+//     directly.
+//   - Fallback: nh is absent — the common state on a machine that has
+//     only Nix and has never entered the dev shell. Provision nh from
+//     the flake's pinned dev shell via `nix develop -c nh …` rather
+//     than forcing the user to `direnv allow` first. This is what lets
+//     `dots apply` converge end-to-end from a bare Nix install.
+//
+// Dir is set to root in both cases so nh's `.` flake ref resolves to
+// the workspace regardless of the caller's cwd — `dots` is invoked
+// from anywhere, not only from inside ~/.dotfiles. The caller wires
+// stdio.
+func buildActivationCmd(sys, root string, env []string) (nix.Cmd, error) {
+	cmd := nix.Cmd{Args: activationArgs(sys), Env: env, Dir: root}
+
+	if nhPath, err := activation.LookPathIn(nix.ToolNh, env); err == nil {
+		cmd.Name = nhPath
+		return cmd, nil
+	}
+
+	nixPath, err := exec.LookPath(nixBinary)
+	if err != nil {
+		return nix.Cmd{}, fmt.Errorf("nh not found and nix is unavailable to provision it: %w", err)
+	}
+	if err := writeDevenvRoot(root); err != nil {
+		return nix.Cmd{}, err
+	}
+	cmd.Name = nixPath
+	cmd.Args = nixDevelopArgs(root, activationArgs(sys))
+	return cmd, nil
+}
+
+// nixDevelopArgs wraps nhArgs so nh runs inside the flake's dev shell.
+// Mirrors the .envrc incantation exactly: --impure and the devenv-root
+// override are both mandatory — without the override the devShell is a
+// stub that prints guidance and exits 1 (see flake.nix devShells.default).
+func nixDevelopArgs(root string, nhArgs []string) []string {
+	override := "file+file://" + filepath.Join(root, devenvRootFile)
+	args := []string{
+		"develop", root,
+		"--impure", "--accept-flake-config",
+		"--override-input", "devenv-root", override,
+		"-c", nix.ToolNh,
+	}
+	return append(args, nhArgs...)
+}
+
+// writeDevenvRoot maintains <root>/.devenv-root the way .envrc does:
+// it holds the absolute workspace path the flake's devShell asserts on.
+// Written idempotently — .devenv-root is a watched flake input, so an
+// unconditional write would bump its mtime and needlessly invalidate
+// the nix-direnv cache on every apply.
+func writeDevenvRoot(root string) error {
+	p := filepath.Join(root, devenvRootFile)
+	want := root + "\n"
+	if cur, err := os.ReadFile(p); err == nil && string(cur) == want {
+		return nil
+	}
+	if err := os.WriteFile(p, []byte(want), 0o644); err != nil {
+		return fmt.Errorf("write %s sentinel: %w", devenvRootFile, err)
+	}
+	return nil
 }
 
 // shouldParallelizeRuntimes decides whether install-runtimes can run

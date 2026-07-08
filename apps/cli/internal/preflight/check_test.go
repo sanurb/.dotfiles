@@ -28,9 +28,19 @@ func TestFrom(t *testing.T) {
 			wantFails: []string{"workspace: not in a dotfiles workspace"},
 		},
 		{
-			name:      "nh missing only",
-			probes:    preflight.Probes{Nh: notFound},
-			wantFails: []string{"nh: not on PATH and not at <ws>/.devenv/profile/bin/nh"},
+			// nh alone is not fatal: apply provisions it via
+			// `nix develop -c nh` when nix is present.
+			name:   "nh missing but nix present is provisionable",
+			probes: preflight.Probes{Nh: notFound},
+			wantOK: true,
+		},
+		{
+			name:   "nh and nix both missing fails on both",
+			probes: preflight.Probes{Nh: notFound, Nix: notFound},
+			wantFails: []string{
+				"nh: not on PATH and not at <ws>/.devenv/profile/bin/nh",
+				"nix: not on PATH",
+			},
 		},
 		{
 			name:      "nix missing only",
