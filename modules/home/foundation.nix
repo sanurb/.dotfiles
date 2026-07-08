@@ -5,6 +5,20 @@
   workspaceRoot,
   ...
 }:
+let
+  # pnpm's `setup` lays out $PNPM_HOME/{bin,global,store} identically on
+  # every OS — the pnpm/pnpx shims and everything from `pnpm add -g` land
+  # in $PNPM_HOME/bin (confirmed via `pnpm bin -g`). Only the base dir is
+  # platform-specific, matching pnpm's own defaults: macOS parks it under
+  # ~/Library/pnpm, while Linux follows the XDG spec. config.xdg.dataHome
+  # (always defined by HM, honouring $XDG_DATA_HOME) keeps us correct if
+  # the user relocates their data dir rather than hardcoding ~/.local/share.
+  pnpmHome =
+    if pkgs.stdenv.isDarwin then
+      "${config.home.homeDirectory}/Library/pnpm"
+    else
+      "${config.xdg.dataHome}/pnpm";
+in
 {
   # Foundation — the "air" the environment breathes. These three tools
   # (Atuin, Zoxide, Starship) are mandatory infrastructure for every
@@ -156,7 +170,18 @@
     "${config.home.homeDirectory}/go/bin" # go install
     "${config.home.homeDirectory}/.bun/bin" # bun
     "${config.home.homeDirectory}/.deno/bin" # deno
+    "${pnpmHome}/bin" # pnpm global bins (see pnpmHome in let-block)
   ];
+
+  # pnpm keeps its globally-installed binaries and self-managed Node under
+  # $PNPM_HOME. `pnpm setup` normally appends this to the shellrc, but HM
+  # owns the zsh/bash rc symlinks (read-only, /nix/store), so that edit
+  # fails silently. Declare it here instead — $PNPM_HOME/bin is on
+  # home.sessionPath above so `pnpm`, `pnpx`, and `pnpm add -g` shims
+  # resolve on PATH across macOS and Linux alike.
+  home.sessionVariables = {
+    PNPM_HOME = pnpmHome;
+  };
 
   programs.direnv = {
     enable = true;
