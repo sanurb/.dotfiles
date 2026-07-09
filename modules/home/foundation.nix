@@ -6,11 +6,13 @@
   ...
 }:
 let
-  # pnpm's `setup` lays out $PNPM_HOME/{bin,global,store} identically on
-  # every OS — the pnpm/pnpx shims and everything from `pnpm add -g` land
-  # in $PNPM_HOME/bin (confirmed via `pnpm bin -g`). Only the base dir is
-  # platform-specific, matching pnpm's own defaults: macOS parks it under
-  # ~/Library/pnpm, while Linux follows the XDG spec. config.xdg.dataHome
+  # The pnpm *runtime* is proto-managed (pinned in .prototools, shimmed on
+  # ~/.proto/shims which leads PATH) — same as node/bun. $PNPM_HOME is a
+  # separate concern: it's where `pnpm add -g` drops global packages and
+  # their bins, the pnpm analogue of ~/.bun/bin below. Unlike bun, pnpm
+  # *requires* PNPM_HOME to be set or `add -g` errors, so we declare it
+  # here. Base dir is platform-specific, matching pnpm's own defaults:
+  # macOS ~/Library/pnpm, Linux the XDG data dir. config.xdg.dataHome
   # (always defined by HM, honouring $XDG_DATA_HOME) keeps us correct if
   # the user relocates their data dir rather than hardcoding ~/.local/share.
   pnpmHome =
@@ -158,8 +160,8 @@ in
   # Proto (~/.proto/{shims,bin}) leads so a workspace's .prototools
   # pin wins against any system-installed Go/Node/etc. The user-level
   # package-manager directories follow because their binaries (pipx,
-  # cargo install, go install, bun add -g, deno install) live outside
-  # Nix and need to be reachable without the user editing ~/.zshrc by
+  # cargo install, go install, bun add -g, deno install, pnpm add -g)
+  # live outside Nix and need to be reachable without editing ~/.zshrc by
   # hand — a workaround that fails silently when HM owns the shellrc
   # symlink.
   home.sessionPath = [
@@ -173,12 +175,12 @@ in
     "${pnpmHome}/bin" # pnpm global bins (see pnpmHome in let-block)
   ];
 
-  # pnpm keeps its globally-installed binaries and self-managed Node under
-  # $PNPM_HOME. `pnpm setup` normally appends this to the shellrc, but HM
-  # owns the zsh/bash rc symlinks (read-only, /nix/store), so that edit
-  # fails silently. Declare it here instead — $PNPM_HOME/bin is on
-  # home.sessionPath above so `pnpm`, `pnpx`, and `pnpm add -g` shims
-  # resolve on PATH across macOS and Linux alike.
+  # pnpm reads $PNPM_HOME to decide where `add -g` installs global packages
+  # and their bins. `pnpm setup` would set this by appending to the shellrc,
+  # but HM owns the zsh/bash rc symlinks (read-only, /nix/store), so that
+  # edit fails silently — declare it here instead. $PNPM_HOME/bin is on
+  # home.sessionPath above so those global bins resolve across macOS and
+  # Linux alike. (pnpm itself comes from proto, not from here.)
   home.sessionVariables = {
     PNPM_HOME = pnpmHome;
   };
