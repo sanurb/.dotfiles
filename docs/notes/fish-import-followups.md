@@ -21,13 +21,26 @@ error: attribute 'font' missing
 The lesson: any new pillar/capability under `caps.<name>` must land
 the matching `modules/home/<name>.nix` in the same commit.
 
-## 2. Adding fish to `/etc/shells` requires sudo
+## 2. Adding fish to `/etc/shells` requires sudo — RESOLVED
 
-`internal/loginshell` skips with `SkipNotInEtcShells` when fish is
-installed but not registered in `/etc/shells`. The user-facing hint
-asks for `sudo tee -a /etc/shells`, but we don't run sudo from
-`dots apply`. A future enhancement could either:
+`internal/loginshell` now returns `RegisterShell` (was
+`SkipNotInEtcShells`) when the selected shell is installed but not
+registered in `/etc/shells`. `Apply` acts on it instead of only
+hinting:
 
-- Surface a `dots doctor` finding with a one-liner copy/paste fix.
-- Offer a guarded `dots apply --register-shell` opt-in that prompts
-  for the password.
+- **Interactive `dots apply`** — prompts for consent (defaults to yes,
+  since the shell was chosen in the wizard), then `sudo`-appends the
+  path to `/etc/shells` (idempotent `grep -qxF` guard) and runs
+  `chsh -s`. One password prompt finishes the switch, self-service.
+- **Headless / stream path** — no TTY, so it degrades to the copy/paste
+  one-liner and never blocks. Same for `DOTS_REGISTER_SHELL=never`.
+- **Escape hatches** — `DOTS_YES=1` or `DOTS_REGISTER_SHELL=always`
+  skip the y/n prompt (sudo still gates); `DOTS_REGISTER_SHELL=never`
+  opts out entirely.
+- **`dots doctor`** now carries a `login shell` finding: `SevPass`
+  when active, `SevWarn` with the exact fix when installed-but-inactive.
+
+The target is `~/.nix-profile/bin/<shell>` — the per-user profile is a
+GC root, so the current generation's binary is retained by
+`nix-collect-garbage`; that path is the stable choice over a bare store
+path (which is not itself a root).
