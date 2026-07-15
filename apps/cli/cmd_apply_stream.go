@@ -98,8 +98,14 @@ func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string,
 			}
 			// Login-shell hookup is best-effort, same as the prose
 			// path: a failure here doesn't fail apply, it logs and
-			// continues.
-			if _, err := loginshell.Apply(context.Background(), profile, logFile); err != nil {
+			// continues. Use p.Profile (the resolved pillar shell, e.g.
+			// "fish") rather than the raw `profile` arg: the wizard
+			// records the choice in .dots-state.toml, not as --profile,
+			// so `profile` is empty on a TUI-driven install. Passing it
+			// unresolved makes Decide see Target="" -> SkipUnsupported,
+			// silently leaving the login shell as /bin/zsh. The prose
+			// path already resolves via p.Profile; match it.
+			if _, err := loginshell.Apply(context.Background(), p.Profile, logFile); err != nil {
 				fmt.Fprintln(logFile, "login-shell:", err)
 			}
 
