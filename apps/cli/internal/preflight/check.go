@@ -68,12 +68,18 @@ func Check() Result {
 
 // From assembles a Result from probe outcomes. Pure: same inputs,
 // same Result, regardless of host.
+//
+// A missing nh is only a hard failure when nix is *also* missing.
+// `dots apply` provisions nh on demand through the flake's pinned dev
+// shell (`nix develop -c nh …`, see buildActivationCmd) when the binary
+// isn't already resolvable, so nh-absent-but-nix-present is a working
+// state, not a blocker.
 func From(p Probes) Result {
 	var fs []string
 	if p.Workspace != nil {
 		fs = append(fs, fmt.Sprintf("workspace: %v", p.Workspace))
 	}
-	if p.Nh != nil {
+	if p.Nh != nil && p.Nix != nil {
 		fs = append(fs, msgNh)
 	}
 	if p.Nix != nil {

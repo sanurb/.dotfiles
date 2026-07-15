@@ -195,19 +195,21 @@ func runHomeActivationTo(profile string, env []string, logW io.Writer) int {
 		fmt.Fprintf(logW, "apply: cannot resolve nix system identifier (GOOS=%s GOARCH=%s)\n", runtime.GOOS, runtime.GOARCH)
 		return exitcode.Failure
 	}
-	nhPath, err := activation.LookPathIn(nix.ToolNh, env)
+	root, err := workspace.Root()
+	if err != nil {
+		fmt.Fprintln(logW, "apply: workspace not resolved:", err)
+		return exitcode.Failure
+	}
+	cmd, err := buildActivationCmd(sys, root, env)
 	if err != nil {
 		fmt.Fprintln(logW, "apply: nh not reachable:", err)
 		return exitcode.Failure
 	}
-	runErr := nix.Cmd{
-		Name:   nhPath,
-		Args:   activationArgs(sys),
-		Env:    env,
-		Stdin:  nil,
-		Stdout: logW,
-		Stderr: logW,
-	}.Run(context.Background())
+	cmd.Stdin = nil
+	cmd.Stdout = logW
+	cmd.Stderr = logW
+
+	runErr := cmd.Run(context.Background())
 	if runErr == nil {
 		return exitcode.Success
 	}

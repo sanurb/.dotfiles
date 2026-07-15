@@ -5,9 +5,13 @@
 
 node = "24"     # Active LTS as of Oct 2025; current LTS in May 2026
 npm  = "11"     # Current major; proto manages it independently of Node's bundled npm
+pnpm = "11"     # Built-in proto plugin; runtime shim replaces the standalone installer
 bun  = "1"      # Latest 1.x stable
 go   = "1.26"   # 2026.02 release line
 rust = "stable" # rustup channel — proto's rust plugin shells through
+python = "3.14" # Latest stable minor (3.14.x, Oct 2025 line). Python has no LTS —
+                # each minor gets ~5yr of security fixes; "latest" is the pin.
+                # proto's built-in plugin pulls python-build-standalone.
 
 # Tooling that participates in the same hermetic boundary as runtimes.
 moon = "2.3.2" # v2 "Phobos" — config schema migrated (toolchains.yml, layer:, pipeline:)

@@ -64,5 +64,34 @@ func computeRoot() (string, error) {
 			return dir, nil
 		}
 	}
+	// cwd isn't inside a workspace — fall back to the canonical clone
+	// location. `dots` is a "run from anywhere" frontend (bare `dots`,
+	// `dots update`, …); without this fallback, invoking it outside
+	// ~/.dotfiles reports "no workspace" and the bootstrap path tries
+	// to re-clone over the existing checkout (git exits 128). Only
+	// accept it when the .prototools marker is present, so a stray or
+	// half-cloned directory never masquerades as a workspace.
+	if def, err := DefaultRoot(); err == nil {
+		if _, err := os.Stat(filepath.Join(def, ".prototools")); err == nil {
+			return def, nil
+		}
+	}
 	return "", fmt.Errorf("could not locate workspace root (no .prototools found)")
+}
+
+// DefaultRoot returns the canonical workspace location, independent of
+// cwd: $DOTS_WORKSPACE when set, otherwise ~/.dotfiles. This is where
+// the workspace *should* live — the clone destination — as distinct
+// from Root(), which finds where a workspace *is* relative to cwd.
+// Both the Root() fallback above and the bootstrap clone target
+// resolve through here so the two can never disagree on the path.
+func DefaultRoot() (string, error) {
+	if v := os.Getenv("DOTS_WORKSPACE"); v != "" {
+		return v, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("user home: %w", err)
+	}
+	return filepath.Join(home, ".dotfiles"), nil
 }

@@ -16,9 +16,22 @@ What "bootstrap" means here, in order:
    `dots install`.
 
 2. Workspace cloned?
-   If absent, dots offers to clone the dotfiles repo to ~/.dotfiles
-   (with explicit consent). On consent it chdir's into the clone and
-   resets the workspace cache so subsequent calls resolve the new root.
+   dots resolves the workspace from anywhere: the cwd walk finds a
+   checkout you are inside, and failing that it falls back to the
+   canonical location ($DOTS_WORKSPACE, else ~/.dotfiles). An existing
+   checkout there is adopted, not re-cloned — running `dots` from your
+   home directory never tries to clone over ~/.dotfiles.
+   Only when no workspace exists does dots offer to clone it (with
+   explicit consent), then chdir into the clone and reset the workspace
+   cache so subsequent calls resolve the new root. A non-empty target
+   that is not a dots workspace is reported as an actionable error
+   rather than a raw `git clone` failure.
+
+   nh (the activation driver) does not need to be pre-installed. When
+   it isn't already on PATH or in <workspace>/.devenv/profile/bin, apply
+   provisions it from the flake's pinned dev shell via `nix develop -c
+   nh …` — so a machine with only Nix converges without `direnv allow`
+   first.
 
 3. Wizard.
    With Nix and the workspace present, the wizard runs:
