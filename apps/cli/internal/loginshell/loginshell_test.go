@@ -54,18 +54,18 @@ func TestDecide(t *testing.T) {
 		}
 	})
 
-	t.Run("when target is on PATH but not in /etc/shells, then chsh is skipped with sudo guidance", func(t *testing.T) {
+	t.Run("when target is on PATH but not in /etc/shells, then registration is required", func(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/bin/zsh",
 			Resolve:      resolveMap(map[string]string{"fish": "/Users/sanurb/.nix-profile/bin/fish"}),
 			EtcShells:    []string{"/bin/zsh"},
 		})
-		if got.Kind != SkipNotInEtcShells {
-			t.Fatalf("Kind = %v, want SkipNotInEtcShells", got.Kind)
+		if got.Kind != RegisterShell {
+			t.Fatalf("Kind = %v, want RegisterShell", got.Kind)
 		}
 		if got.TargetPath == "" {
-			t.Fatal("TargetPath should be populated so the hint can name the path to add")
+			t.Fatal("TargetPath should be populated so registration and the hint can name the path")
 		}
 	})
 

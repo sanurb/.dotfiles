@@ -31,11 +31,14 @@ const (
 	// new HM closure, but PATH for this process still points at the
 	// pre-activation profile. The next `dots apply` finds it.
 	SkipTargetMissing
-	// SkipNotInEtcShells — target exists but /etc/shells doesn't list
-	// it. chsh refuses to switch to a shell missing from /etc/shells;
-	// editing it requires sudo, which we don't escalate from here.
-	// User gets a one-line hint instead.
-	SkipNotInEtcShells
+	// RegisterShell — target exists and belongs as the login shell, but
+	// /etc/shells doesn't list it yet, so chsh would refuse. Registering
+	// it needs root. When a human is driving the apply, Apply prompts
+	// for consent and runs `sudo` to append the line, then chsh; when
+	// headless, Apply degrades to a copy/paste hint so nothing blocks.
+	// The decision itself is pure — it only reports that registration is
+	// the remaining work; whether to escalate is Apply's call.
+	RegisterShell
 	// SkipUnsupported — running on NixOS or another platform where
 	// login shell is system-managed and chsh would either no-op or
 	// be overridden on the next switch-config.
@@ -97,9 +100,9 @@ func Decide(in Inputs) Decision {
 
 	if !etcShellsContains(in.EtcShells, target) {
 		return Decision{
-			Kind:       SkipNotInEtcShells,
+			Kind:       RegisterShell,
 			TargetPath: target,
-			Detail:     target + " is not in /etc/shells; add it (sudo tee -a /etc/shells), then rerun `dots apply`",
+			Detail:     target + " needs registering in /etc/shells before it can become your login shell",
 		}
 	}
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/sanurb/.dotfiles/apps/cli/internal/loginshell"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/state"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/workspace"
 )
@@ -600,6 +601,33 @@ func checkPersona() []Check {
 		} else {
 			c.Severity = SevPass
 			c.Actual = path
+		}
+		out = append(out, c)
+	}
+
+	// Login-shell wiring. A shell binary on PATH isn't the same as the
+	// OS login shell; this surfaces the gap (and its one-liner fix)
+	// before an apply, so "I picked fish but still land in zsh" is a
+	// visible finding rather than a surprise.
+	if shellBinary(s.Pillars.Shell) != "" {
+		d := loginshell.Probe(s.Pillars.Shell)
+		c := Check{Name: "login shell", Category: cat, Required: false}
+		switch d.Kind {
+		case loginshell.NoChange:
+			c.Severity = SevPass
+			c.Actual = d.TargetPath
+		case loginshell.RegisterShell:
+			c.Severity = SevWarn
+			c.Detail = fmt.Sprintf("%s installed but not your login shell — `dots apply` will offer to set it, or run: %s", s.Pillars.Shell, loginshell.RegisterHint(d.TargetPath))
+		case loginshell.Chsh:
+			c.Severity = SevWarn
+			c.Detail = fmt.Sprintf("%s is in /etc/shells but not active — run `dots apply` or: %s", s.Pillars.Shell, loginshell.RegisterHint(d.TargetPath))
+		default:
+			// SkipTargetMissing / SkipUnsupported — nothing actionable
+			// here (covered by the pillar-binary probe above or managed
+			// by the OS), so stay quiet.
+			c.Severity = SevPass
+			c.Actual = d.Detail
 		}
 		out = append(out, c)
 	}
