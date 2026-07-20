@@ -45,6 +45,11 @@ dist/
 # Per-machine, may contain non-UTF-8 bytes; never committed or formatted.
 config/nvim/.undodir/
 
+# pi extension workspace deps — installed via `npm install` in config/pi;
+# derived artifacts, never committed (see modules/home/pi.nix)
+config/pi/node_modules/
+config/pi/agent/extensions/**/node_modules/
+
 # OS
 .DS_Store
 

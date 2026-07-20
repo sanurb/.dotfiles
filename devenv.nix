@@ -127,6 +127,12 @@
         "config/nvim/lazy-lock.json"
         "config/nvim/.undodir/**"
         "config/opencode/package-lock.json"
+        "config/pi/package-lock.json"
+        "config/pi/node_modules/**"
+        "config/pi/agent/extensions/**/node_modules/**"
+        # Vendored skill content (mattpocock/skills + Cloudflare docs
+        # bundle) — reformatting would churn every future re-vendor diff.
+        "config/pi/agent/skills/**"
         "flake.lock"
         "*.lock"
         ".moon/cache/**"
@@ -169,6 +175,10 @@
             "config/nvim/.undodir/**"
             "config/nvim/lazy-lock.json"
             "config/opencode/package-lock.json"
+            "config/pi/package-lock.json"
+            "config/pi/node_modules/**"
+            "config/pi/agent/extensions/**/node_modules/**"
+            "config/pi/agent/skills/**"
           ];
           # Preserve author line breaks for ADRs / READMEs / SKILL.md;
           # "never" would flatten every paragraph to one long line and
