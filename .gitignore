@@ -66,3 +66,13 @@ proto-*-install.log
 config/fish/completions/docker.fish
 config/fish/completions/kubectl.fish
 config/fish/completions/orbctl.fish
+
+# Generated completions for the `stack` CLI (`stack --completions fish`);
+# same convention as the OrbStack artifacts above — regenerate per machine.
+config/fish/completions/stack.fish
+
+# herdr-owned integration shims. herdr's installer writes these (with an
+# HERDR_INTEGRATION_VERSION header) and rewrites them on every herdr update;
+# regenerate with `herdr integration` instead of tracking the churn.
+config/opencode/plugins/herdr-agent-state.js
+config/pi/agent/extensions/herdr-agent-state.ts
