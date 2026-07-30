@@ -46,7 +46,7 @@ const DEFAULTS = {
 	fetchFallbackUserAgent: "opencode",
 	searchEnabled: true,
 	searchProvider: "exa",
-	searchEndpoint: "https://m.mulroy.dev/m/e",
+	searchEndpoint: "https://mcp.exa.ai/mcp",
 	searchTimeoutSeconds: SEARCH_TIMEOUT_SECONDS.default,
 	searchDefaultMaxResults: SEARCH_MAX_RESULTS.default,
 	searchDefaultDepth: "auto",
@@ -94,7 +94,26 @@ export function parseEnumSetting<T extends string>(
 	return allowed.includes(normalized) ? normalized : fallback;
 }
 
-/** Return hardcoded web-tools settings. */
+/**
+ * Search endpoint resolution: WEB_TOOLS_SEARCH_ENDPOINT wins outright;
+ * otherwise the public Exa MCP endpoint, keyed with EXA_API_KEY when present
+ * (keyless requests are rate-limited by Exa).
+ */
+function resolveSearchEndpoint(): string {
+	const override = process.env["WEB_TOOLS_SEARCH_ENDPOINT"]?.trim();
+	if (override) {
+		return override;
+	}
+
+	const apiKey = process.env["EXA_API_KEY"]?.trim();
+	if (apiKey) {
+		return `${DEFAULTS.searchEndpoint}?exaApiKey=${encodeURIComponent(apiKey)}`;
+	}
+
+	return DEFAULTS.searchEndpoint;
+}
+
+/** Return web-tools settings (static defaults plus env-resolved search endpoint). */
 export function getWebToolsSettings(): WebToolsSettings {
 	return {
 		fetch: {
@@ -108,7 +127,7 @@ export function getWebToolsSettings(): WebToolsSettings {
 		search: {
 			enabled: DEFAULTS.searchEnabled,
 			provider: DEFAULTS.searchProvider,
-			endpoint: mustParsePublicHttpUrl(DEFAULTS.searchEndpoint),
+			endpoint: mustParsePublicHttpUrl(resolveSearchEndpoint()),
 			timeoutSeconds: DEFAULTS.searchTimeoutSeconds,
 			defaultMaxResults: DEFAULTS.searchDefaultMaxResults,
 			defaultDepth: DEFAULTS.searchDefaultDepth,
@@ -119,7 +138,7 @@ export function getWebToolsSettings(): WebToolsSettings {
 function mustParsePublicHttpUrl(input: string): PublicHttpUrl {
 	const parsed = parsePublicHttpUrl(input);
 	if (parsed._tag === "err") {
-		throw new Error("Invalid hardcoded web-tools search endpoint");
+		throw new Error("Invalid web-tools search endpoint (check WEB_TOOLS_SEARCH_ENDPOINT)");
 	}
 	return parsed.value;
 }
