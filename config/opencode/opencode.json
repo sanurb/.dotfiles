@@ -145,6 +145,13 @@
       ],
       "enabled": true,
       "type": "local"
+    },
+    "codebase-memory-mcp": {
+      "enabled": true,
+      "type": "local",
+      "command": [
+        "/Users/sanurb/.local/bin/codebase-memory-mcp"
+      ]
     }
   }
 }
