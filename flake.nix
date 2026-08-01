@@ -358,6 +358,13 @@
               fixHint = "modules/home/lazygit.nix must declare xdg.configFile.\"lazygit/config.yml\" via mkOutOfStoreSymlink";
             };
 
+            herdr-config-wired = mkConfigWiredCheck {
+              name = "herdr-config-wired";
+              evaluated = profileEvaluated;
+              expectedKeys = [ "herdr/config.toml" ];
+              fixHint = "modules/home/herdr.nix must declare xdg.configFile.\"herdr/config.toml\" via mkOutOfStoreSymlink";
+            };
+
             # Wezterm and nushell are pillar-conditional and not the
             # defaults (terminal=ghostty, shell=fish), so the profile-
             # level synthetic doesn't import them. Each gets its own

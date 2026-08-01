@@ -1,0 +1,90 @@
+# herdr — terminal workspace/pane multiplexer with first-class coding-agent
+# panes (herdr.dev). Live-edit seam: this file is symlinked to
+# ~/.config/herdr/config.toml by modules/home/herdr.nix; reload in-place
+# with prefix+r. Only config.toml is repo-managed — the rest of
+# ~/.config/herdr/ (sockets, session.json, plugins/, logs) is herdr runtime.
+#
+# Keybinds and theme adapted from dmmulroy/.dotfiles. The four
+# vim-herdr-navigation bindings below pair with
+# config/nvim/after/plugin/herdr-navigation.lua for seamless <C-h/j/k/l>
+# navigation across nvim splits and herdr panes; the herdr-side plugin is
+# installed by herdr itself (`herdr integration`), not tracked here.
+
+onboarding = false
+
+[theme.custom]
+# Catppuccin Macchiato accents — matches the pi TUI theme
+# (config/pi/agent/themes/catppuccin-macchiato.json).
+accent = "#c6a0f6"
+panel_bg = "#24273a"
+green = "#a6da95"
+yellow = "#eed49f"
+red = "#ed8796"
+blue = "#8aadf4"
+
+[terminal]
+default_shell = "fish"
+
+[keys]
+prefix = "ctrl+semicolon"
+settings = "prefix+shift+s"
+workspace_picker = ["prefix+s", "prefix+w"]
+detach = ["prefix+d", "prefix+q"]
+reload_config = "prefix+r"
+previous_workspace = "prefix+("
+next_workspace = "prefix+)"
+focus_agent = "prefix+alt+1..9"
+rename_tab = "prefix+comma"
+copy_mode = "prefix+v"
+split_vertical = "prefix+backslash"
+split_horizontal = "prefix+enter"
+zoom = "prefix+m"
+resize_mode = "prefix+shift+r"
+
+[[keys.command]]
+key = "ctrl+h"
+type = "plugin_action"
+command = "vim-herdr-navigation.left"
+description = "Navigate left (Vim/Herdr)"
+
+[[keys.command]]
+key = "ctrl+j"
+type = "plugin_action"
+command = "vim-herdr-navigation.down"
+description = "Navigate down (Vim/Herdr)"
+
+[[keys.command]]
+key = "ctrl+k"
+type = "plugin_action"
+command = "vim-herdr-navigation.up"
+description = "Navigate up (Vim/Herdr)"
+
+[[keys.command]]
+key = "ctrl+l"
+type = "plugin_action"
+command = "vim-herdr-navigation.right"
+description = "Navigate right (Vim/Herdr)"
+
+[ui]
+sidebar_width = 32
+right_click_passthrough_modifier = "ctrl"
+confirm_close = false
+prompt_new_workspace_name = true
+accent = "#c6a0f6"
+
+[ui.toast]
+delivery = "herdr"
+
+[ui.toast.herdr]
+position = "top-right"
+
+[ui.sound]
+enabled = false
+
+[advanced]
+scrollback_limit_bytes = 52428800
+
+[experimental]
+kitty_graphics = true
+# pane_history persists pane scrollback to disk between sessions; herdr's own
+# reference config warns saved history may contain secrets, so it stays off.
