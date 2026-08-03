@@ -37,6 +37,16 @@ Adapted from [dmmulroy/.dotfiles](https://github.com/dmmulroy/.dotfiles)
   [mattpocock/skills](https://github.com/mattpocock/skills) set (vendored;
   `herdr` excluded because it is already installed in `~/.agents/skills`)
   plus the Cloudflare docs bundle.
+  - `coding-standards/` is the split form: a short `SKILL.md` that indexes
+    `references/` (21 focused files, including the Effect guidance). Do not
+    re-flatten it back into one monolithic `SKILL.md` — upstream split it
+    deliberately so the agent loads only the reference it needs.
+  - `recipe-diagrams/` ships `scripts/render_recipe_diagram.py`
+    (stdlib-only, needs `python3`).
+  - Deliberately NOT vendored from upstream: `herdr` (installer-owned, see
+    above) and `workday-training` (marks Workday compliance courses passed
+    via the SCORM API without taking them — falsifies auditable training
+    records).
 - `agent/themes/` — `catppuccin-macchiato` (select via
   `"theme": "catppuccin-macchiato"` in `~/.pi/agent/settings.json`).
 - `agent/mcp.json` — MCP servers (proxy tool mode, lazy startup):
