@@ -69,6 +69,14 @@ jobs:
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - name: actionlint · zizmor · pinact · deadnix · statix
+        # pinact resolves each pinned SHA back to its tag through the
+        # GitHub API. Unauthenticated, that shares the runner pool's IP
+        # rate limit, and the exhausted request surfaces as the opaque
+        # "list tags: context canceled" rather than a 403 — which is why
+        # this job went red without any workflow change. The default
+        # read-only GITHUB_TOKEN is enough to get a per-repo quota.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           nix develop --impure --accept-flake-config \
             --override-input devenv-root "file+file://$PWD/.devenv-root" \

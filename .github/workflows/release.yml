@@ -67,6 +67,11 @@ jobs:
           private-key: ${{ secrets.HOMEBREW_TAP_APP_PRIVATE_KEY }}
           owner: sanurb
           repositories: homebrew-tap
+          # Without an explicit permission-* input the minted token
+          # inherits every permission the App installation was granted
+          # (zizmor `github-app`, high). GoReleaser only commits
+          # Formula/dots.rb to the tap, so contents is the whole need.
+          permission-contents: write
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
