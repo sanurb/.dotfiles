@@ -29,7 +29,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
-  # Versioned tar.gz archive — preserved for the Homebrew formula and
+  # Versioned tar.gz archive — preserved for the Homebrew cask and
   # for users who want LICENSE/README alongside the binary.
   - id: dots
     ids: [dots]
@@ -93,9 +93,15 @@ sboms:
 
 # Homebrew tap. Requires HOMEBREW_TAP_TOKEN secret on the release workflow
 # (a fine-grained PAT with contents:write on sanurb/homebrew-tap).
-brews:
+#
+# GoReleaser deprecated pre-built binary formulas in v2.16. Casks are the
+# supported replacement for both Homebrew and Linuxbrew. The macOS hook is
+# required until dots is Apple-notarized: Homebrew quarantines cask downloads,
+# while the release's cosign signature is not an Apple Gatekeeper signature.
+homebrew_casks:
   - name: dots
     ids: [dots]
+    binaries: [dots]
     repository:
       owner: sanurb
       name: homebrew-tap
@@ -108,10 +114,12 @@ brews:
     homepage: "https://github.com/sanurb/.dotfiles"
     description: "Interactive frontend for the Nix-managed dotfiles environment."
     license: MIT
-    install: |
-      bin.install "dots"
-    test: |
-      assert_match "dots", shell_output("#{bin}/dots --version")
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dots"]
+          end
 
 release:
   github:
