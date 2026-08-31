@@ -325,6 +325,34 @@
                   ''
               );
 
+            # Pi auto-discovers the repo-owned extensions directory, but unlike
+            # `pi install` it does not install package.json dependencies for
+            # local extensions. Assert that activation validates and installs
+            # the web-tools workspace before Pi tries to import html-to-text.
+            pi-extension-dependencies-activation-contract =
+              let
+                activation = builtins.unsafeDiscardStringContext profileEvaluated.home.activation.installPiExtensionDependencies.data;
+                requiredFragments = [
+                  "createRequire"
+                  "Object.keys(manifest.dependencies ?? {})"
+                  "npm install --ignore-scripts --workspace=pi-web-tools-extension"
+                  "--include-workspace-root=false"
+                ];
+                missing = builtins.filter (fragment: !(nixpkgs.lib.hasInfix fragment activation)) requiredFragments;
+              in
+              pkgs.runCommand "pi-extension-dependencies-activation-contract" { } (
+                if missing == [ ] then
+                  ''
+                    echo "ok: Pi activation installs local extension dependencies" > $out
+                  ''
+                else
+                  ''
+                    echo "Pi extension dependency activation contract missing generated hook fragments:" >&2
+                    ${pkgs.coreutils}/bin/printf '  %s\n' ${nixpkgs.lib.escapeShellArgs missing} >&2
+                    exit 1
+                  ''
+              );
+
             # Herdr's official installer supports Linux and macOS but expects
             # curl, awk, and a SHA-256 utility on PATH. Assert against the
             # generated activation hook on every flake system so neither the

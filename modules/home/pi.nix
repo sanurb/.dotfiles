@@ -6,6 +6,8 @@
 }:
 let
   piPackage = "@earendil-works/pi-coding-agent";
+  piConfigRoot = "${workspaceRoot}/config/pi";
+  piWebToolsRoot = "${piConfigRoot}/agent/extensions/web-tools";
   vpHome = "${config.home.homeDirectory}/.vite-plus";
 in
 {
@@ -43,8 +45,9 @@ in
   # working tree. Only the customization surfaces below are repo-owned:
   #
   #   extensions/  TypeScript event hooks, tools, and slash commands
-  #                (npm workspace — run `npm install` in config/pi once;
-  #                node_modules is gitignored)
+  #                (npm workspace; runtime dependencies are installed by
+  #                installPiExtensionDependencies below; node_modules is
+  #                gitignored)
   #   skills/      user-level skills (vendored mattpocock/skills set +
   #                the Cloudflare docs bundle)
   #   themes/      TUI themes selectable from settings.json
@@ -67,6 +70,60 @@ in
       ".pi/agent/mcp.json" = seam "mcp.json";
       ".pi/agent/cloak.json" = seam "cloak.json";
     }
+  );
+
+  # Auto-discovered local extensions are not package installs: Pi loads
+  # their TypeScript directly and never runs npm install for package.json.
+  # web-tools therefore needs its declared runtime dependencies installed
+  # beside the real extension path under config/pi, where Node's upward
+  # module resolution can find them after ~/.pi/agent/extensions resolves
+  # through the Home Manager symlink.
+  #
+  # Resolve every declared dependency dynamically instead of duplicating
+  # the package list in Nix. A warm machine is a no-op; a fresh clone runs
+  # a workspace-scoped install that leaves unrelated extension workspaces
+  # and the workspace root out of scope.
+  home.activation.installPiExtensionDependencies = lib.mkIf (workspaceRoot != "") (
+    lib.hm.dag.entryAfter
+      [
+        "writeBoundary"
+        "installPi"
+      ]
+      ''
+        export PATH="$HOME/.proto/shims:$HOME/.proto/bin:$PATH"
+
+        if (
+          node --input-type=commonjs - ${lib.escapeShellArg piWebToolsRoot} >/dev/null 2>&1 <<'NODE'
+        const { createRequire } = require("node:module");
+        const { readFileSync } = require("node:fs");
+        const { join } = require("node:path");
+
+        const extensionRoot = process.argv[2];
+        const manifest = JSON.parse(readFileSync(join(extensionRoot, "package.json"), "utf8"));
+        const requireFromExtension = createRequire(join(extensionRoot, "index.ts"));
+
+        for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+          requireFromExtension.resolve(dependency);
+        }
+        NODE
+        ); then
+          $VERBOSE_ECHO "pi: web-tools runtime dependencies already installed; skipping"
+        elif command -v npm >/dev/null 2>&1; then
+          $VERBOSE_ECHO "pi: installing web-tools runtime dependencies"
+          if (
+            cd ${lib.escapeShellArg piConfigRoot}
+            run npm install --ignore-scripts --workspace=pi-web-tools-extension --include-workspace-root=false
+          ); then
+            $VERBOSE_ECHO "pi: web-tools runtime dependencies installed"
+          else
+            echo "pi: failed to install web-tools runtime dependencies." >&2
+            echo "  fix: run \`cd ${piConfigRoot} && npm install\`, then rerun \`dots apply\`." >&2
+          fi
+        else
+          echo "pi: npm not found on PATH — skipped web-tools runtime dependencies." >&2
+          echo "  fix: install the proto-pinned Node/npm runtimes, then rerun \`dots apply\`." >&2
+        fi
+      ''
   );
 
   # Idempotent install hook, same shape as the vp hook in vite-plus.nix:

@@ -58,9 +58,13 @@ Adapted from [dmmulroy/.dotfiles](https://github.com/dmmulroy/.dotfiles)
 
 ```sh
 cd config/pi
-npm install        # once, and after adding extension deps
+npm install        # development dependencies for extension workspaces
 npm run check      # typecheck + tests across extension workspaces
 ```
+
+`dots apply` installs the `web-tools` runtime dependencies automatically.
+This is required because Pi auto-discovers the local extension source but,
+unlike `pi install`, does not install its `package.json` dependencies.
 
 Edits land on pi's next session start; use `/reload` inside a running
 session.
