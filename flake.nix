@@ -293,6 +293,38 @@
             # they reach a user's `dots apply`.
             home-activation = (mkHome system).activationPackage;
 
+            # Vite+'s upstream installer resolves curl and tar by name.
+            # Home Manager activation has a deliberately minimal PATH,
+            # so assert against the generated hook (not just module source)
+            # that both Nix tools reach the child process and the download
+            # is guarded from activation's `set -e` fail-fast behavior.
+            vite-plus-activation-contract =
+              let
+                activation = builtins.unsafeDiscardStringContext profileEvaluated.home.activation.installVitePlus.data;
+                requiredFragments = [
+                  (nixpkgs.lib.makeBinPath [
+                    pkgs.curl
+                    pkgs.gnutar
+                  ])
+                  "if run ${pkgs.curl}/bin/curl"
+                ];
+                missing = builtins.filter (
+                  fragment: !(nixpkgs.lib.hasInfix (builtins.unsafeDiscardStringContext fragment) activation)
+                ) requiredFragments;
+              in
+              pkgs.runCommand "vite-plus-activation-contract" { } (
+                if missing == [ ] then
+                  ''
+                    echo "ok: Vite+ activation supplies curl/tar and fails soft" > $out
+                  ''
+                else
+                  ''
+                    echo "Vite+ activation contract missing generated hook fragments:" >&2
+                    ${pkgs.coreutils}/bin/printf '  %s\n' ${nixpkgs.lib.escapeShellArgs missing} >&2
+                    exit 1
+                  ''
+              );
+
             # Live-edit symlink wiring. Each tool that surfaces its
             # config via mkOutOfStoreSymlink has to declare the matching
             # xdg.configFile entry; without it, the binary lands but the

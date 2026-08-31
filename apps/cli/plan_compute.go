@@ -89,6 +89,23 @@ func computePlan(profile string) (plan.Plan, error) {
 		}
 	}
 
+	// Realize the runtime versions declared in .prototools — Go, Bun,
+	// Node, Rust, etc. ADR-0008 says proto owns these; "Declare, Don't
+	// Script" means the user declares the pin and `dots apply` makes
+	// it real. Runtime installation precedes Home Manager because
+	// activation hooks may consume proto-managed tools (pi uses bun).
+	// workspace.Root() uses .prototools as its marker, so a nil error
+	// guarantees the file exists — no separate stat needed.
+	if _, err := workspace.Root(); err == nil {
+		p.Steps = append(p.Steps, plan.Step{
+			ID:      nextID(),
+			Kind:    plan.KindInstallRuntimes,
+			Action:  plan.ActionChange,
+			Summary: "install proto-pinned runtimes from .prototools",
+			Command: "proto use",
+		})
+	}
+
 	// "+" on a fresh host (no prior receipt) so the first apply reads
 	// as additive; "~" on subsequent applies. Unreadable receipt is
 	// best-effort: prefer "+" so a corrupt file does not block planning.
@@ -105,21 +122,6 @@ func computePlan(profile string) (plan.Plan, error) {
 		Summary: fmt.Sprintf("apply profile %s", planProfileLabel(resolved)),
 		Command: applyProfileCommand(),
 	})
-
-	// Realize the runtime versions declared in .prototools — Go, Bun,
-	// Node, Rust, etc. ADR-0008 says proto owns these; "Declare, Don't
-	// Script" means the user declares the pin and `dots apply` makes
-	// it real. workspace.Root() uses .prototools as its marker, so a
-	// nil error guarantees the file exists — no separate stat needed.
-	if _, err := workspace.Root(); err == nil {
-		p.Steps = append(p.Steps, plan.Step{
-			ID:      nextID(),
-			Kind:    plan.KindInstallRuntimes,
-			Action:  plan.ActionChange,
-			Summary: "install proto-pinned runtimes from .prototools",
-			Command: "proto use",
-		})
-	}
 
 	p.Seal()
 	return p, nil

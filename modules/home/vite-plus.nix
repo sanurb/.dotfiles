@@ -32,7 +32,13 @@ in
   # so the installer (which shells out to node) wouldn't find node. We
   # prepend proto's shim dirs for the hook and keep VP_NODE_MANAGER=no so
   # vp reuses the proto-pinned node instead of installing a second,
-  # competing toolchain under $VP_HOME.
+  # competing toolchain under $VP_HOME. The installer also probes `curl`
+  # and `tar` by name, so its child PATH explicitly includes both Nix
+  # packages rather than relying on Home Manager's activation PATH.
+  #
+  # Both the download and installer are conditions of one `if`: Home
+  # Manager activation scripts use `set -e`, and commands in the condition
+  # are exempt from it. This makes the fail-soft contract below real.
   #
   # This module installs vp and nothing else. pi used to be installed
   # here via `vp install -g`; it now lives in modules/home/pi.nix and is
@@ -47,8 +53,20 @@ in
     else
       $VERBOSE_ECHO "vite-plus: installing vp into ${vpHome}"
       installer="$(mktemp)"
-      run ${pkgs.curl}/bin/curl -fsSL https://vite.plus -o "$installer"
-      run env VP_HOME="${vpHome}" VP_NODE_MANAGER=no ${pkgs.bash}/bin/bash "$installer"
+      if run ${pkgs.curl}/bin/curl -fsSL https://vite.plus -o "$installer" \
+        && run env \
+          PATH="${
+            lib.makeBinPath [
+              pkgs.curl
+              pkgs.gnutar
+            ]
+          }:$PATH" \
+          VP_HOME="${vpHome}" \
+          VP_NODE_MANAGER=no \
+          ${pkgs.bash}/bin/bash "$installer"
+      then
+        $VERBOSE_ECHO "vite-plus: installer completed"
+      fi
       rm -f "$installer"
     fi
 

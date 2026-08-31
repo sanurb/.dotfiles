@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -27,6 +28,35 @@ func TestApply(t *testing.T) {
 		}
 		assertEqual(t, ok, true)
 		assertEqual(t, args, want)
+	})
+
+	t.Run("when Home Manager consumes a proto runtime, then runtimes install before activation", func(t *testing.T) {
+		h := newHarness(t).
+			withStub("nix", nixStubBody).
+			withStub("proto", `#!/bin/sh
+if [ "$1" = "use" ]; then
+  : > "$NH_RECORD.runtimes-ready"
+fi
+exit 0
+`).
+			withStateFile(buildStateTOML(stateOverrides{}))
+		h.installStub(filepath.Join(h.Workspace, ".devenv", "profile", "bin", "nh"), `#!/bin/sh
+case "$1" in
+  --version) echo "nh 4.3.2-stub"; exit 0 ;;
+esac
+if [ ! -f "$NH_RECORD.runtimes-ready" ]; then
+  echo "nh ran before proto use" >&2
+  exit 91
+fi
+printf "%s\n" "$@" > "$NH_RECORD"
+exit 0
+`)
+
+		got := h.run("apply", "--yes")
+
+		assertEqual(t, got.ExitCode, 0)
+		_, activated := h.nhArgs()
+		assertEqual(t, activated, true)
 	})
 
 	t.Run("when user runs apply --dry-run, then plan is rendered to stdout and nh is never invoked", func(t *testing.T) {

@@ -125,18 +125,6 @@ func runApply(rest []string) int {
 		return runApplyStreaming(p, env, profile, rest, noPreflight)
 	}
 
-	// apply-profile (HM activation) and install-runtimes (proto
-	// downloads) write to disjoint trees and share only network +
-	// CPU, so overlapping them collapses wall time to max(activate,
-	// downloads). The fork is gated on proto already being reachable
-	// and clone-workspace not pending — see shouldParallelizeRuntimes.
-	var runtimesAsync <-chan int
-	if shouldParallelizeRuntimes(p, env) {
-		ch := make(chan int, 1)
-		runtimesAsync = ch
-		go func() { ch <- runInstallRuntimes(env) }()
-	}
-
 	// bootstrap-nix is terminal: the just-installed nix is not on this
 	// PATH, so the process must exit before any later step runs.
 	for _, step := range p.Steps {
@@ -197,13 +185,7 @@ func runApply(rest []string) int {
 			}
 
 		case plan.KindInstallRuntimes:
-			var code int
-			if runtimesAsync != nil {
-				code = <-runtimesAsync
-			} else {
-				code = runInstallRuntimes(env)
-			}
-			if code != exitcode.Success {
+			if code := runInstallRuntimes(env); code != exitcode.Success {
 				return code
 			}
 
@@ -603,22 +585,6 @@ func writeDevenvRoot(root string) error {
 		return fmt.Errorf("write %s sentinel: %w", devenvRootFile, err)
 	}
 	return nil
-}
-
-// shouldParallelizeRuntimes decides whether install-runtimes can run
-// concurrently with the rest of the step loop. Preconditions: proto
-// reachable (first-ever apply has HM installing it in this same run,
-// so the goroutine can't fire) and clone-workspace not pending
-// (.prototools lives in the workspace).
-func shouldParallelizeRuntimes(p plan.Plan, env []string) bool {
-	if !p.HasKind(plan.KindInstallRuntimes) {
-		return false
-	}
-	if p.HasKind(plan.KindCloneWorkspace) {
-		return false
-	}
-	_, err := activation.LookPathIn(nix.ToolProto, env)
-	return err == nil
 }
 
 // runInstallRuntimes invokes `proto use` against the workspace,

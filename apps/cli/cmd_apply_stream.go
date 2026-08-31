@@ -56,17 +56,6 @@ func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string,
 		return exitcode.Failure
 	}
 
-	// Mirror runApply's parallel install-runtimes optimization. The
-	// goroutine writes its stderr to the log file (via the same
-	// activation helpers), so step events still bracket each phase
-	// even when they overlap.
-	var runtimesAsync <-chan int
-	if shouldParallelizeRuntimes(p, env) {
-		ch := make(chan int, 1)
-		runtimesAsync = ch
-		go func() { ch <- runInstallRuntimesTo(env, logFile) }()
-	}
-
 	for _, step := range p.Steps {
 		stepName := step.Kind
 		_ = stream.StepStarted(stepName)
@@ -110,13 +99,7 @@ func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string,
 			}
 
 		case plan.KindInstallRuntimes:
-			var code int
-			if runtimesAsync != nil {
-				code = <-runtimesAsync
-			} else {
-				code = runInstallRuntimesTo(env, logFile)
-			}
-			if code != exitcode.Success {
+			if code := runInstallRuntimesTo(env, logFile); code != exitcode.Success {
 				problem = envelope.New(envelope.CodeBuildFailed,
 					fmt.Sprintf("install-runtimes exited %d", code))
 			}
