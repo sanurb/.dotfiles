@@ -325,6 +325,41 @@
                   ''
               );
 
+            # Herdr's official installer supports Linux and macOS but expects
+            # curl, awk, and a SHA-256 utility on PATH. Assert against the
+            # generated activation hook on every flake system so neither the
+            # cross-platform hook nor its explicit prerequisites regress.
+            herdr-activation-contract =
+              let
+                activation = builtins.unsafeDiscardStringContext profileEvaluated.home.activation.installHerdr.data;
+                requiredFragments = [
+                  (nixpkgs.lib.makeBinPath [
+                    pkgs.curl
+                    pkgs.gawk
+                    pkgs.coreutils
+                  ])
+                  "if run ${pkgs.curl}/bin/curl"
+                  "--proto '=https'"
+                  "HERDR_INSTALL_DIR="
+                  "${pkgs.runtimeShell} \"$installer\""
+                ];
+                missing = builtins.filter (
+                  fragment: !(nixpkgs.lib.hasInfix (builtins.unsafeDiscardStringContext fragment) activation)
+                ) requiredFragments;
+              in
+              pkgs.runCommand "herdr-activation-contract" { } (
+                if missing == [ ] then
+                  ''
+                    echo "ok: Herdr activation is cross-platform and supplies installer prerequisites" > $out
+                  ''
+                else
+                  ''
+                    echo "Herdr activation contract missing generated hook fragments:" >&2
+                    ${pkgs.coreutils}/bin/printf '  %s\n' ${nixpkgs.lib.escapeShellArgs missing} >&2
+                    exit 1
+                  ''
+              );
+
             # Live-edit symlink wiring. Each tool that surfaces its
             # config via mkOutOfStoreSymlink has to declare the matching
             # xdg.configFile entry; without it, the binary lands but the
