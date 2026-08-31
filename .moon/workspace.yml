@@ -13,20 +13,22 @@ projects:
 vcs:
   client: "git"
   defaultBranch: "main"
-  # Hooks are Moon tasks. Both shell out to `moon run`, so the verdict
-  # uses the same content-hash cache as a regular task. `--affected
-  # --status=staged` filters to projects whose declared inputs intersect
-  # the staged set — unchanged projects are a cache hit, not a re-run.
+  # Hooks are Moon tasks executed through the canonical Nix dev shell.
+  # The wrapper is a no-op when direnv already activated this checkout;
+  # otherwise it enters `nix develop` so hooks never depend on host-global
+  # copies of treefmt, Go, or the linters. The verdict still uses Moon's
+  # content-hash cache. `--affected --status=staged` filters to projects
+  # whose declared inputs intersect the staged set.
   hooks:
     pre-commit:
-      - "moon run root:fmt --affected --status=staged"
+      - "./scripts/run-in-dev-shell.sh moon run root:fmt --affected --status=staged"
     pre-push:
       # One invocation, multiple selectors: Moon parallelizes targets
       # within a single run, saving the second startup + project-graph
       # hydration. With --affected, leaf tasks whose scoped inputs
       # don't intersect the changed files become cache hits — a Go-only
       # push skips the Nix/Actions linters, a docs-only push skips Go.
-      - "moon run '#go:lint' '#go:test' root:lint --affected"
+      - "./scripts/run-in-dev-shell.sh moon run '#go:lint' '#go:test' root:lint --affected"
   sync: true
 
 # `pipeline` was `runner` before moon v2 (the block was renamed in the
