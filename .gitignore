@@ -50,6 +50,10 @@ config/nvim/.undodir/
 config/pi/node_modules/
 config/pi/agent/extensions/**/node_modules/
 
+# opencode plugin deps — same story: config/opencode/package-lock.json is
+# tracked, so `npm install` there is expected and its tree is derived.
+config/opencode/node_modules/
+
 # OS
 .DS_Store
 
