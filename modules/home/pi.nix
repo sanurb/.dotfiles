@@ -1,5 +1,6 @@
 {
   config,
+  pkgs,
   lib,
   workspaceRoot,
   ...
@@ -9,6 +10,18 @@ let
   piConfigRoot = "${workspaceRoot}/config/pi";
   piWebToolsRoot = "${piConfigRoot}/agent/extensions/web-tools";
   vpHome = "${config.home.homeDirectory}/.vite-plus";
+
+  # PATH prefix for the hooks below. The shim dirs lead so a workspace
+  # .prototools pin still wins, but proto's own bin dir has to be on PATH
+  # too: proto is installed from nixpkgs (foundation.nix), so the binary
+  # lives in the Home Manager profile, NOT at ~/.proto/bin/proto where
+  # proto-shim looks for it. Under `nh home switch`'s minimal PATH the
+  # shims therefore cannot exec proto and every shimmed command dies with
+  #   proto-shim: Failed to execute proto for the shimmed command:
+  #   No such file or directory (os error 2)
+  # which used to abort activation on `installPi`. Pinning the store path
+  # keeps the hook independent of whatever the caller's PATH happens to be.
+  protoPath = "$HOME/.proto/shims:$HOME/.proto/bin:${lib.makeBinPath [ pkgs.proto ]}";
 in
 {
   # pi — terminal coding agent. This module owns pi end to end: the
@@ -90,7 +103,7 @@ in
         "installPi"
       ]
       ''
-        export PATH="$HOME/.proto/shims:$HOME/.proto/bin:$PATH"
+        export PATH="${protoPath}:$PATH"
 
         if (
           node --input-type=commonjs - ${lib.escapeShellArg piWebToolsRoot} >/dev/null 2>&1 <<'NODE'
@@ -130,10 +143,16 @@ in
   # guard on the binary so a warm machine is a no-op, and fail soft so a
   # missing prerequisite prints a hint instead of aborting activation.
   #
-  # `nh home switch` runs with a minimal PATH that lacks the proto shims,
-  # so bun (proto-managed) has to be put back on PATH for the hook.
+  # `nh home switch` runs with a minimal PATH that lacks bun (proto-managed)
+  # and proto itself, so protoPath puts both back for the hook.
+  #
+  # `bun add -g` runs as an `if` condition rather than a bare statement:
+  # activation scripts use `set -e`, from which condition commands are
+  # exempt. Without that, a bun failure aborts the whole activation
+  # instead of printing the fix hint — which is what the fail-soft
+  # contract above promises. Same reasoning as vite-plus.nix.
   home.activation.installPi = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    export PATH="$HOME/.proto/shims:$HOME/.proto/bin:$PATH"
+    export PATH="${protoPath}:$PATH"
 
     # Evict the old vp-managed shim if it is still around. Left in place
     # it wins PATH outright — $VP_HOME/bin is *prepended* by vp's
@@ -149,7 +168,12 @@ in
       $VERBOSE_ECHO "pi: ${piPackage} already installed; skipping"
     elif command -v bun >/dev/null 2>&1; then
       $VERBOSE_ECHO "pi: installing ${piPackage} via bun"
-      run bun add -g "${piPackage}"
+      if run bun add -g "${piPackage}"; then
+        $VERBOSE_ECHO "pi: ${piPackage} installed"
+      else
+        echo "pi: \`bun add -g ${piPackage}\` failed." >&2
+        echo "  fix: run it manually, then rerun \`dots apply\`." >&2
+      fi
     else
       echo "pi: bun not found on PATH — skipped 'bun add -g ${piPackage}'." >&2
       echo "  fix: install proto-pinned bun, then rerun \`dots apply\`." >&2

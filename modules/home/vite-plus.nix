@@ -32,9 +32,17 @@ in
   # so the installer (which shells out to node) wouldn't find node. We
   # prepend proto's shim dirs for the hook and keep VP_NODE_MANAGER=no so
   # vp reuses the proto-pinned node instead of installing a second,
-  # competing toolchain under $VP_HOME. The installer also probes `curl`
-  # and `tar` by name, so its child PATH explicitly includes both Nix
-  # packages rather than relying on Home Manager's activation PATH.
+  # competing toolchain under $VP_HOME. proto's own bin dir is on that
+  # prefix as well: proto comes from nixpkgs, so it is absent from
+  # ~/.proto/bin where proto-shim looks, and without it every shim fails
+  # with "proto-shim: Failed to execute proto for the shimmed command".
+  #
+  # The installer also probes `curl` and `tar` by name, so its child PATH
+  # explicitly includes both Nix packages rather than relying on Home
+  # Manager's activation PATH. gzip rides along because GNU tar does not
+  # decompress .tar.gz itself — it execs gzip by name, and without it the
+  # unpack dies with "tar (child): gzip: Cannot exec: No such file or
+  # directory".
   #
   # Both the download and installer are conditions of one `if`: Home
   # Manager activation scripts use `set -e`, and commands in the condition
@@ -46,7 +54,7 @@ in
   # layout breaks pi's extension loader. See the long comment in pi.nix
   # before moving it back.
   home.activation.installVitePlus = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    export PATH="$HOME/.proto/shims:$HOME/.proto/bin:$PATH"
+    export PATH="$HOME/.proto/shims:$HOME/.proto/bin:${lib.makeBinPath [ pkgs.proto ]}:$PATH"
 
     if [ -x "${vpHome}/bin/vp" ]; then
       $VERBOSE_ECHO "vite-plus: vp already installed; skipping installer"
@@ -59,6 +67,7 @@ in
             lib.makeBinPath [
               pkgs.curl
               pkgs.gnutar
+              pkgs.gzip
             ]
           }:$PATH" \
           VP_HOME="${vpHome}" \
