@@ -11,7 +11,7 @@
     "test": "npm run test --workspaces --if-present"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.83.0",
+    "@earendil-works/pi-ai": "^0.84.0",
     "@earendil-works/pi-coding-agent": "^0.83.0",
     "@earendil-works/pi-tui": "^0.83.0",
     "typebox": "^1.1.38"
