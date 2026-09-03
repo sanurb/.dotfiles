@@ -14,15 +14,15 @@
     ]
   },
   "dependencies": {
-    "html-to-text": "^9.0.5",
-    "linkedom": "^0.18.12",
-    "turndown": "^7.2.0",
+    "html-to-text": "^10.0.1",
+    "linkedom": "^0.18.13",
+    "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2"
   },
   "devDependencies": {
-    "@types/node": "^24.5.2",
-    "@types/turndown": "^5.0.5",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "@types/node": "^26.4.1",
+    "@types/turndown": "^5.0.6",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
   }
 }
