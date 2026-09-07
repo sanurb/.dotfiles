@@ -43,16 +43,13 @@ func runBackup(skipPrompt bool) int {
 		fmt.Fprintln(os.Stderr, "mkdir backup dir:", err)
 		return 1
 	}
-	for _, c := range cs {
-		dst := filepath.Join(dest, c.rel)
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			fmt.Fprintln(os.Stderr, "mkdir parent:", err)
-			return 1
-		}
-		if err := os.Rename(c.abs, dst); err != nil {
-			fmt.Fprintln(os.Stderr, "move", c.rel, ":", err)
-			return 1
-		}
+	rels := make([]string, len(cs))
+	for i, c := range cs {
+		rels[i] = c.rel
+	}
+	if err := quarantineConflicts(home, dest, rels); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
 	}
 	fmt.Printf("✓ Backed up %d path(s) → %s\n", len(cs), dest)
 	return 0

@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // trackedPaths is the canonical list of $HOME-relative paths that
 // Home Manager projects as symlinks; collisions with real files/dirs
 // at these locations need quarantining before activation. Each entry
-// must match a `home.file."..."` source in modules/. `dots backup` is
-// the only entry point and reads directly from this slice; a previous
-// duplicate listing in modules/scripts/backup.sh was retired.
+// must match a `home.file` or `xdg.configFile` target in modules/, at the
+// same directory/file granularity. Apply, the wizard, and backup share it.
 var trackedPaths = []string{
-	".config/ghostty/config",
+	".config/ghostty",
 	".config/zellij/config.kdl",
 	".config/fish/config.fish",
 	".config/starship.toml",
-	".config/nvim/init.lua",
+	".config/nvim",
 	".config/git/config",
 	".zshrc",
 	".bashrc",
@@ -37,29 +37,50 @@ type collision struct {
 }
 
 // findCollisions returns paths that exist as real files/dirs (not symlinks).
-// A pre-existing symlink is assumed to be a previous Home Manager activation
-// and is left alone — Home Manager will rewrite it.
+// Symlinks at any component below home are left alone, including unmanaged
+// links; the snapshotter must never move files through a directory alias.
 func findCollisions(home string) ([]collision, error) {
 	var out []collision
 	for _, rel := range trackedPaths {
-		abs := filepath.Join(home, rel)
-		info, err := os.Lstat(abs)
+		c, err := collisionAt(home, rel)
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
+			return nil, err
+		}
+		if c != nil {
+			out = append(out, *c)
+		}
+	}
+	return out, nil
+}
+
+// Lstat only avoids following the final component. Check every component
+// below home so directory symlinks never expose repository files as
+// brownfield collisions. home itself may be an OS-provided alias.
+func collisionAt(home, rel string) (*collision, error) {
+	if !filepath.IsLocal(rel) || filepath.Clean(rel) != rel || rel == "." {
+		return nil, fmt.Errorf("invalid collision path %q", rel)
+	}
+	abs := home
+	var info os.FileInfo
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		abs = filepath.Join(abs, part)
+		var err error
+		info, err = os.Lstat(abs)
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		if err != nil {
 			return nil, fmt.Errorf("lstat %s: %w", abs, err)
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			continue
+			return nil, nil
 		}
-		kind := "file"
-		if info.IsDir() {
-			kind = "dir"
-		}
-		out = append(out, collision{rel: rel, abs: abs, kind: kind})
 	}
-	return out, nil
+	kind := "file"
+	if info.IsDir() {
+		kind = "dir"
+	}
+	return &collision{rel: rel, abs: abs, kind: kind}, nil
 }
 
 func runScan() int {

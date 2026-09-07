@@ -70,15 +70,12 @@ func (f fsSnapshotter) Snapshot(cs []ui.Collision) (ui.SnapshotResult, error) {
 	if err != nil {
 		return ui.SnapshotResult{}, fmt.Errorf("snapshot dir: %w", err)
 	}
-	for _, c := range cs {
-		src := filepath.Join(home, c.Path)
-		dst := filepath.Join(dest, c.Path)
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return ui.SnapshotResult{}, err
-		}
-		if err := os.Rename(src, dst); err != nil {
-			return ui.SnapshotResult{}, fmt.Errorf("snapshot %s: %w", c.Path, err)
-		}
+	rels := make([]string, len(cs))
+	for i, c := range cs {
+		rels[i] = c.Path
+	}
+	if err := quarantineConflicts(home, dest, rels); err != nil {
+		return ui.SnapshotResult{}, err
 	}
 	return ui.SnapshotResult{Count: len(cs), Path: dest}, nil
 }
