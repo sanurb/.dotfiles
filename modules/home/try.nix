@@ -12,7 +12,7 @@ let
   #
   # The gemspec declares no runtime dependencies — try is stdlib-only
   # Ruby — so there is no gem closure to resolve and the build is a copy
-  # plus a wrapper that puts ruby on PATH. required_ruby_version is
+  # plus an interpreter substitution. required_ruby_version is
   # ">= 3.0.0"; pkgs.ruby satisfies that and tracks nixpkgs rather than
   # pinning a minor upstream never asked for.
   try = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
@@ -26,8 +26,6 @@ let
       hash = "sha256-ZSt6LSp0AQTbdN86lJGJPWcx6oFR63AFi4s8Vjr5a5o=";
     };
 
-    nativeBuildInputs = [ pkgs.makeBinaryWrapper ];
-
     # The repo ships a Makefile whose default target prints help and
     # exits 1, so stdenv's default build phase fails. There is nothing to
     # compile here anyway — installPhase is a copy.
@@ -36,13 +34,28 @@ let
     # lib/ has to sit beside the entrypoint: try.rb resolves its requires
     # relative to __dir__, so installing the script alone yields a binary
     # that dies on its first require.
+    #
+    # Every `/usr/bin/env ruby` is rewritten to the store ruby, and that
+    # is the whole point of not using a wrapper here. v1.10.1 hardcodes
+    # that string into the shell functions `try init` emits, so wrapping
+    # the binary fixes only direct invocation: the function still went
+    # through the user's PATH, which on macOS is ruby 2.6.10 while try
+    # requires >= 3.0. The result was `try` the binary working while `try`
+    # the shell function — the actual interface, since it has to cd the
+    # parent — died with `undefined method 'define' for Data:Class`.
+    #
+    # Three sites are covered by the one substitution: the shebang and
+    # both emitted snippets (fish and POSIX). --replace-fail means a
+    # version that stops spelling it this way fails the build instead of
+    # silently reintroducing the PATH lookup.
     installPhase = ''
       runHook preInstall
       mkdir -p $out/bin
       cp try.rb $out/bin/try
       cp -r lib $out/bin/
       chmod +x $out/bin/try
-      wrapProgram $out/bin/try --prefix PATH : ${lib.makeBinPath [ pkgs.ruby ]}
+      substituteInPlace $out/bin/try \
+        --replace-fail '/usr/bin/env ruby' '${lib.getExe pkgs.ruby}'
       runHook postInstall
     '';
 
@@ -67,6 +80,18 @@ let
           exit 1
           ;;
       esac
+      # The emitted shell function must be self-contained: any `env ruby`
+      # in it means the user's PATH decides which interpreter runs try,
+      # which is exactly the regression this package was fixed for.
+      snippet=$(SHELL=/bin/bash "$out/bin/try" init 2>&1)
+      case "$snippet" in
+        *"env ruby"*)
+          echo "try init emitted an interpreter lookup instead of a store path:" >&2
+          echo "$snippet" >&2
+          exit 1
+          ;;
+      esac
+
       runHook postInstallCheck
     '';
 
