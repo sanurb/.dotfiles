@@ -1,0 +1,9 @@
+# Reviewed revisions. Update deliberately; activation never follows a branch tip.
+# Inspired by dmmulroy/.dotfiles fd84f529229f3ed41f7e72e784164da5fd1d6a41.
+[[plugins]]
+source = "plannotator/herdr-annotate"
+rev = "53b6e3211a4103c3de9d361eb3f3bacc7426d23b"
+
+[[plugins]]
+source = "paulbkim-dev/vim-herdr-navigation"
+rev = "79679dacc791f70fc34de8b29a3cf9706c0f5b2f"

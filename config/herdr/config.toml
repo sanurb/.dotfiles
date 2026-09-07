@@ -8,7 +8,7 @@
 # vim-herdr-navigation bindings below pair with
 # config/nvim/after/plugin/herdr-navigation.lua for seamless <C-h/j/k/l>
 # navigation across nvim splits and herdr panes; the herdr-side plugin is
-# installed by herdr itself (`herdr integration`), not tracked here.
+# pinned in plugins.toml and installed by the Home Manager activation.
 
 onboarding = false
 
@@ -31,6 +31,7 @@ settings = "prefix+shift+s"
 workspace_picker = ["prefix+s", "prefix+w"]
 detach = ["prefix+d", "prefix+q"]
 reload_config = "prefix+r"
+open_notification_target = "prefix+i"
 previous_workspace = "prefix+("
 next_workspace = "prefix+)"
 focus_agent = "prefix+alt+1..9"
@@ -64,6 +65,37 @@ key = "ctrl+l"
 type = "plugin_action"
 command = "vim-herdr-navigation.right"
 description = "Navigate right (Vim/Herdr)"
+
+[[keys.command]]
+key = "prefix+a"
+type = "plugin_action"
+command = "annotate.capture"
+description = "Annotate selected terminal text"
+
+[[keys.command]]
+key = "prefix+shift+a"
+type = "plugin_action"
+command = "annotate.copy-context"
+description = "Copy annotations as agent context"
+
+# Keep prefix+m for pane zoom.
+[[keys.command]]
+key = "prefix+shift+m"
+type = "plugin_action"
+command = "annotate.manage"
+description = "Manage annotations"
+
+[[keys.command]]
+key = "prefix+o"
+type = "plugin_action"
+command = "annotate.open"
+description = "Review documents in the current folder"
+
+[[keys.command]]
+key = "prefix+shift+o"
+type = "plugin_action"
+command = "annotate.last"
+description = "Review the agent's last reply"
 
 [ui]
 sidebar_width = 32
