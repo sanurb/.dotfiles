@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/sanurb/.dotfiles/apps/cli/internal/agents"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/applied"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/bootstrap"
 	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
@@ -104,6 +105,32 @@ func computePlan(profile string) (plan.Plan, error) {
 			Summary: "install proto-pinned runtimes from .prototools",
 			Command: "proto use",
 		})
+	}
+
+	// Converge the agent-CLI plane declared in config/agents/agents.toml.
+	// Ordered between install-runtimes and apply-profile, and both edges
+	// are load-bearing:
+	//   after install-runtimes — the bun provider needs the proto-pinned
+	//     bun that `proto use` has just installed.
+	//   before apply-profile   — herdr's activation hook installs the
+	//     plugins declared in config/herdr/plugins.toml, which needs the
+	//     herdr binary to already exist.
+	//
+	// Emitted whenever the manifest exists, without probing for drift.
+	// This mirrors install-runtimes, which does not check whether the
+	// runtimes are already present either: probing the roster costs ~1.5s
+	// of subprocess startup, and computePlan is on the hot path of
+	// `dots status` (22ms today). The executor probes and no-ops when
+	// everything is already converged.
+	if root, err := workspace.Root(); err == nil {
+		if _, serr := os.Stat(agents.Path(root)); serr == nil {
+			p.Steps = append(p.Steps, plan.Step{
+				ID:      nextID(),
+				Kind:    plan.KindSyncAgents,
+				Action:  plan.ActionChange,
+				Summary: fmt.Sprintf("converge agent CLIs declared in %s", agents.RelPath),
+			})
+		}
 	}
 
 	// "+" on a fresh host (no prior receipt) so the first apply reads

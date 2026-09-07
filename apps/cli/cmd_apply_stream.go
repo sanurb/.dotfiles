@@ -29,7 +29,7 @@ import (
 // incompatible with NDJSON-on-stdout. If the plan contains either,
 // we emit a BOOTSTRAP_REQUIRED error envelope before opening the
 // stream — agents resolve the prereq and retry.
-func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string, noPreflight bool) int {
+func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string, noPreflight, skipAgents bool) int {
 	command := commandLine("apply", rest)
 
 	if needsInteractiveConsent(p) {
@@ -98,6 +98,16 @@ func runApplyStreaming(p plan.Plan, env []string, profile string, rest []string,
 				fmt.Fprintln(logFile, "login-shell:", err)
 			}
 
+		case plan.KindSyncAgents:
+			// Same policy as the prose path; progress lands in the
+			// per-run log rather than on stdout, which the NDJSON
+			// stream owns.
+			if skipAgents {
+				fmt.Fprintln(logFile, "sync-agents: skipped (--skip-agents)")
+				break
+			}
+			problem = syncAgentsStep(context.Background(), env, logFile)
+
 		case plan.KindInstallRuntimes:
 			if code := runInstallRuntimesTo(env, logFile); code != exitcode.Success {
 				problem = envelope.New(envelope.CodeBuildFailed,
@@ -160,7 +170,11 @@ func applyStreamingActions() []envelope.Action {
 // process-level outcome.
 func mapCodeToExit(c envelope.Code) int {
 	switch c {
-	case envelope.CodeWorkspaceNotFound, envelope.CodePreflightFailed, envelope.CodeBootstrapRequired:
+	case envelope.CodeWorkspaceNotFound, envelope.CodePreflightFailed, envelope.CodeBootstrapRequired,
+		// A malformed agents.toml is a schema mismatch, which the
+		// exit-code table calls PreFlight — and it is what the
+		// `dots agents` verb already returns for the same condition.
+		envelope.CodeAgentManifestInvalid:
 		return exitcode.PreFlight
 	case envelope.CodeInvalidArgument, envelope.CodeUnknownCommand:
 		return exitcode.Misuse

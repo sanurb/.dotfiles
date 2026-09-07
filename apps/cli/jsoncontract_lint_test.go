@@ -46,6 +46,7 @@ func TestNoStdoutLeakOnJSONPath(t *testing.T) {
 		"cmd_plan.go":         "human renderPlan() under !common.JSON",
 		"cmd_capture.go":      "human TOML/JSON body write under !common.JSON",
 		"cmd_status.go":       "human renderStatusHuman() under !common.JSON",
+		"cmd_agents.go":       "human renderAgentsHuman() + --dry-run plan under !common.JSON",
 		"cmd_profile.go":      "human Printf rendering under !common.JSON",
 		"cmd_why.go":          "human Println managed/unmanaged under !common.JSON",
 		"cmd_apply_stream.go": "subprocess Stdin/Stdout/Stderr fields are I/O plumbing, not envelope writes",

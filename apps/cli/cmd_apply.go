@@ -45,6 +45,9 @@ func runApply(rest []string) int {
 	var noPreflight bool
 	fs.BoolVar(&noPreflight, "no-preflight", false, "skip the doctor pre-flight check before activation")
 
+	var skipAgents bool
+	fs.BoolVar(&skipAgents, "skip-agents", false, "skip the sync-agents step; converge only the Nix plane")
+
 	var printCommand bool
 	fs.BoolVar(&printCommand, "print-command", false, "print the activation invocation and exit; no preflight, no execution")
 
@@ -122,7 +125,7 @@ func runApply(rest []string) int {
 	// Diverging here keeps the prose loop below untouched so TTY
 	// behavior is exactly preserved across this commit.
 	if common.JSON {
-		return runApplyStreaming(p, env, profile, rest, noPreflight)
+		return runApplyStreaming(p, env, profile, rest, noPreflight, skipAgents)
 	}
 
 	// bootstrap-nix is terminal: the just-installed nix is not on this
@@ -182,6 +185,25 @@ func runApply(rest []string) int {
 			// readProfileFromState in plan_compute.go).
 			if _, err := loginshell.Apply(context.Background(), p.Profile, os.Stderr); err != nil {
 				fmt.Fprintln(os.Stderr, "login-shell:", err)
+			}
+
+		case plan.KindSyncAgents:
+			// Ordered before apply-profile because herdr's activation
+			// hook installs plugins through the herdr binary this step
+			// provides. A real failure therefore stops the apply rather
+			// than letting activation run against a half-converged
+			// plane; --skip-agents is the documented escape hatch, and
+			// a provider whose toolchain is not on PATH yet is a skip,
+			// not a failure (see syncAgentsStep).
+			if skipAgents {
+				fmt.Fprintln(os.Stderr, "sync-agents: skipped (--skip-agents)")
+				break
+			}
+			if problem := syncAgentsStep(context.Background(), env, os.Stderr); problem != nil {
+				fmt.Fprintln(os.Stderr, "apply: agent sync failed:")
+				fmt.Fprintf(os.Stderr, "  what: %s\n", problem.Error())
+				fmt.Fprintf(os.Stderr, "  next: %s\n", problem.EffectiveFix())
+				return mapCodeToExit(problem.Code)
 			}
 
 		case plan.KindInstallRuntimes:
@@ -391,15 +413,8 @@ func snapshotConflicts(rels []string) error {
 	if err != nil {
 		return fmt.Errorf("create backup dir: %w", err)
 	}
-	for _, rel := range rels {
-		src := filepath.Join(home, rel)
-		dst := filepath.Join(dest, rel)
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return fmt.Errorf("create backup parent for %s: %w", rel, err)
-		}
-		if err := os.Rename(src, dst); err != nil {
-			return fmt.Errorf("snapshot %s: %w", rel, err)
-		}
+	if err := quarantineConflicts(home, dest, rels); err != nil {
+		return err
 	}
 	fmt.Fprintf(os.Stderr, "✓ snapshotted %d path(s) → %s\n", len(rels), dest)
 	return nil

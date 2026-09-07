@@ -108,6 +108,15 @@ var commands = map[string]command{
 		group:             groupConverge,
 		run:               runSync,
 	},
+	// Fourth package plane. Grouped with converge because its reason
+	// to exist is `agents sync`; the default `agents status`
+	// subcommand is read-only and exits 0 regardless of drift.
+	"agents": {
+		requiresWorkspace: true,
+		summary:           cmdAgentsSummary,
+		group:             groupConverge,
+		run:               runAgents,
+	},
 
 	// Group A — measure (read-only)
 	"status":  {summary: cmdStatusSummary, group: groupMeasure, run: runStatus},

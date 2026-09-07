@@ -33,6 +33,7 @@ const (
 	KindSnapshotConflicts = "snapshot-conflicts"
 	KindApplyProfile      = "apply-profile"
 	KindInstallRuntimes   = "install-runtimes"
+	KindSyncAgents        = "sync-agents"
 )
 
 // Step.Action values — the diff verb. ActionAdd is "+", ActionChange is
@@ -178,9 +179,9 @@ func (p Plan) HasKind(kinds ...string) bool {
 // HasSideEffectSteps reports whether the plan contains any step that
 // mutates host state independently of apply-profile. These are the
 // "make-ready / sync" steps — bootstrap-nix, clone-workspace,
-// snapshot-conflicts, install-runtimes — whose presence means there
-// is real work to do regardless of whether the converged-state hash
-// matches a prior receipt. Centralizes the kind list so adding a
+// snapshot-conflicts, install-runtimes, sync-agents — whose presence
+// means there is real work to do regardless of whether the
+// converged-state hash matches a prior receipt. Centralizes the kind list so adding a
 // new side-effect step (e.g., a future bootstrap-homebrew) updates
 // one site instead of every caller's switch.
 func (p Plan) HasSideEffectSteps() bool {
@@ -189,6 +190,7 @@ func (p Plan) HasSideEffectSteps() bool {
 		KindCloneWorkspace,
 		KindSnapshotConflicts,
 		KindInstallRuntimes,
+		KindSyncAgents,
 	)
 }
 

@@ -1,0 +1,82 @@
+# agents.toml — Bill of Materials for fast-churning agent CLIs.
+#
+# Same contract as .prototools: pinned, deliberate, never follows a tip.
+# This file exists because agent CLIs are the fastest-moving software on
+# the host and belong in neither of the two planes that already work:
+#
+#   Nix (flake.lock)   compiled system software; cycles in months
+#   proto (.prototools) language runtimes; cycles in quarters
+#   THIS FILE           agent CLIs; cycles daily
+#
+# Before this file, herdr and pi were installed by Home Manager
+# activation hooks that guarded on *binary existence* rather than
+# version. That made them install-once/never-update: two hosts running
+# `dots apply` from the same commit ended up on different builds, with
+# no version recorded anywhere in the repo. The guard is now the version.
+#
+# Reconciled by `dots agents sync` and by the sync-agents step of
+# `dots apply` (ordered after install-runtimes, so bun exists, and before
+# apply-profile, so herdr exists for its activation hook). Inspected by
+# `dots agents status`. None of it touches Nix evaluation — that
+# decoupling is the entire point.
+
+schema_version = 1
+
+# ---------------------------------------------------------------------
+# managed — dots owns the installed version and converges to it.
+# ---------------------------------------------------------------------
+
+# herdr's own install.sh cannot pin: MANIFEST_URL is hardcoded to
+# latest.json and VERSION is read out of that manifest, so the script
+# always lands whatever is newest. We bypass it and fetch the release
+# asset directly, verifying the SHA-256 that herdr.dev publishes under
+# releases.<version>.sha256 — the same digest its installer checks.
+# Refresh version and sha256 together — they are one fact. Both are
+# published at https://herdr.dev/latest.json under releases.<version>.
+[agents.herdr]
+provider = "github-release"
+version = "0.8.2"
+repo = "herdrdev/herdr"
+asset = "herdr-{os}-{arch}"
+probe = "herdr --version"
+
+[agents.herdr.sha256]
+linux-x86_64 = "976150a14d490c94b243ea2e1a7eb2dfb67f12e36b182db90936f6728e6aecf4"
+linux-aarch64 = "f55610658e1c2e0d2aaef730b4b2ab885f7f8ba00285ab372bfb14f2e3d5b40d"
+macos-x86_64 = "ab50262c8190cd7aa9056d249d255c08c328c3e8716de9cfa29db4f131b8e2c1"
+macos-aarch64 = "a5d4f4d504d8b309c91f811050559300faba31258425f53c50852fc96f6ae574"
+
+# pi installs through bun's global prefix rather than vp or npm. The
+# reason is load-bearing and documented at length in modules/home/pi.nix:
+# vp's install path contains a literal '#', which truncates the file://
+# URL jiti builds for extension imports and breaks every extension that
+# does a runtime import. ~/.bun/bin has no '#'.
+[agents.pi]
+provider = "bun"
+version = "0.85.1"
+package = "@earendil-works/pi-coding-agent"
+probe = "pi --version"
+
+# ---------------------------------------------------------------------
+# native — these ship their own autoupdater. dots reports the observed
+# version and never converges it. Recording them here is deliberate:
+# an agent absent from the BOM is unaccounted for, whereas one marked
+# `native` is a decision. Pinning a self-updating binary would mean
+# fighting its updater to get a version that arrives on its own.
+# ---------------------------------------------------------------------
+
+[agents.claude-code]
+provider = "native"
+probe = "claude --version"
+
+[agents.codex]
+provider = "native"
+probe = "codex --version"
+
+# opencode comes from nixpkgs (modules/home/opencode.nix), so its
+# version is already pinned by flake.lock. Listed as native so
+# `dots agents status` shows the whole roster in one place rather than
+# leaving a hole a reader has to know about.
+[agents.opencode]
+provider = "native"
+probe = "opencode --version"

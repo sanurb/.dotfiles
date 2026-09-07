@@ -30,6 +30,16 @@ const (
 	// is outside its closed set.
 	CodeStateInvalid Code = "STATE_INVALID"
 
+	// CodeAgentManifestInvalid — config/agents/agents.toml is
+	// unparseable, or a row fails validation (unknown provider,
+	// missing digest, version on a native agent).
+	CodeAgentManifestInvalid Code = "AGENT_MANIFEST_INVALID"
+
+	// CodeAgentSyncFailed — one or more agents could not be converged
+	// to their declared version: download failure, checksum mismatch,
+	// or a failing package-manager install.
+	CodeAgentSyncFailed Code = "AGENT_SYNC_FAILED"
+
 	// CodeBootstrapRequired — Nix or the workspace clone is missing
 	// and the verb cannot proceed without interactive consent.
 	CodeBootstrapRequired Code = "BOOTSTRAP_REQUIRED"
@@ -94,6 +104,14 @@ var catalog = map[Code]CodeMeta{
 	CodeActivationFailed: {
 		Retryable: false, UserActionRequired: true,
 		DefaultFix: "Inspect the log_path; resolve the home-manager activation conflict, then re-run `dots apply`.",
+	},
+	CodeAgentManifestInvalid: {
+		Retryable: false, UserActionRequired: true,
+		DefaultFix: "Fix the reported row in config/agents/agents.toml, then re-run `dots agents status`.",
+	},
+	CodeAgentSyncFailed: {
+		Retryable: true, UserActionRequired: true,
+		DefaultFix: "Re-run `dots agents sync`. A checksum mismatch is not transient: the pinned digest in config/agents/agents.toml is stale — refresh version and sha256 together.",
 	},
 	CodeBootstrapRequired: {
 		Retryable: true, UserActionRequired: true,

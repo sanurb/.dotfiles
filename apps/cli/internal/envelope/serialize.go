@@ -48,6 +48,20 @@ func (p *Problem) WithNextActions(a ...Action) *Problem { p.NextActions = a; ret
 // auto-populate the field.
 func (p *Problem) WithRunID(id string) *Problem { p.RunID = id; return p }
 
+// EffectiveFix returns the remediation string this Problem would emit:
+// its own Fix when set, otherwise the catalog default. Exported so a
+// verb's human-format error path prints exactly what its --json error
+// envelope would carry, instead of a hand-copied second wording.
+func (p *Problem) EffectiveFix() string {
+	if p.Fix != "" {
+		return p.Fix
+	}
+	if meta, ok := Lookup(p.Code); ok {
+		return meta.DefaultFix
+	}
+	return catalog[CodeInternalError].DefaultFix
+}
+
 func (p *Problem) Error() string {
 	if p.Message != "" {
 		return p.Message

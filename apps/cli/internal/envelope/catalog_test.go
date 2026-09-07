@@ -17,6 +17,8 @@ import (
 var allCodeConstants = []Code{
 	CodeAborted,
 	CodeActivationFailed,
+	CodeAgentManifestInvalid,
+	CodeAgentSyncFailed,
 	CodeBootstrapRequired,
 	CodeBuildFailed,
 	CodeConfigInvalid,

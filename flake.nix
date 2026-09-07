@@ -261,11 +261,33 @@
           packages = {
             homeActivation = (mkHome system).activationPackage;
             home-manager = home-manager.packages.${system}.default;
+            plannotator-tui = pkgs.callPackage ./modules/packages/plannotator-tui.nix { };
           };
 
           # `nix flake check` runs every entry here. Keep them cheap — the
           # gate is only useful if it fits in the verification budget.
           checks = {
+            herdr-neovim-annotation =
+              pkgs.runCommand "herdr-neovim-annotation"
+                {
+                  nativeBuildInputs = [ pkgs.neovim-unwrapped ];
+                }
+                ''
+                  export HOME="$TMPDIR/home"
+                  mkdir -p "$HOME"
+                  nvim --headless -u NONE -l ${./modules/tests/herdr-annotate.lua} ${./config/nvim/after/plugin/herdr-annotate.lua}
+                  touch "$out"
+                '';
+            herdr-plugin-sync =
+              pkgs.runCommand "herdr-plugin-sync"
+                {
+                  nativeBuildInputs = [ pkgs.bash ];
+                }
+                ''
+                  bash ${./modules/tests/herdr-plugins.sh} ${./modules/scripts/herdr-plugins.sh}
+                  touch "$out"
+                '';
+            plannotator-tui = pkgs.callPackage ./modules/packages/plannotator-tui.nix { };
             # Schema parity is structural: Go embeds the SCHEMA_VERSION file,
             # Nix reads the same file. This check just guards the file's
             # well-formedness so a bad commit fails fast rather than panicking
@@ -353,37 +375,69 @@
                   ''
               );
 
-            # Herdr's official installer supports Linux and macOS but expects
-            # curl, awk, and a SHA-256 utility on PATH. Assert against the
-            # generated activation hook on every flake system so neither the
-            # cross-platform hook nor its explicit prerequisites regress.
-            herdr-activation-contract =
+            # The agent-CLI plane (config/agents/agents.toml) replaced the
+            # herdr and pi activation installers, and with them the check
+            # that asserted the generated installer hook's shape. This is
+            # its successor, gating the property that matters now: every
+            # managed row is installable on every system this flake builds
+            # for, and every unmanaged row says so deliberately.
+            #
+            # Reading the BOM with builtins.fromTOML is not redundant with
+            # the parser in apps/cli/internal/agents — it is the point. The
+            # Go side speaks a deliberate subset of TOML, so making both
+            # readers agree is the same Go/Nix parity discipline
+            # SCHEMA_VERSION and SATELLITES already use.
+            agents-manifest-contract =
               let
-                activation = builtins.unsafeDiscardStringContext profileEvaluated.home.activation.installHerdr.data;
-                requiredFragments = [
-                  (nixpkgs.lib.makeBinPath [
-                    pkgs.curl
-                    pkgs.gawk
-                    pkgs.coreutils
-                  ])
-                  "if run ${pkgs.curl}/bin/curl"
-                  "--proto '=https'"
-                  "HERDR_INSTALL_DIR="
-                  "${pkgs.runtimeShell} \"$installer\""
-                ];
-                missing = builtins.filter (
-                  fragment: !(nixpkgs.lib.hasInfix (builtins.unsafeDiscardStringContext fragment) activation)
-                ) requiredFragments;
+                bom = builtins.fromTOML (builtins.readFile ./config/agents/agents.toml);
+                # BOM platform vocabulary for the system under evaluation.
+                target =
+                  {
+                    x86_64-linux = "linux-x86_64";
+                    aarch64-linux = "linux-aarch64";
+                    aarch64-darwin = "macos-aarch64";
+                  }
+                  .${system};
+                rows = nixpkgs.lib.mapAttrsToList (name: row: row // { inherit name; }) bom.agents;
+                problems =
+                  nixpkgs.lib.optional (bom.schema_version or 0 != 1)
+                    "schema_version must be 1, got ${builtins.toString (bom.schema_version or 0)}"
+                  ++ nixpkgs.lib.concatMap (
+                    row:
+                    let
+                      provider = row.provider or "";
+                    in
+                    nixpkgs.lib.optional (!(row ? probe)) "agents.${row.name}: no probe declared"
+                    ++ nixpkgs.lib.optional (
+                      !(builtins.elem provider [
+                        "github-release"
+                        "bun"
+                        "native"
+                      ])
+                    ) "agents.${row.name}: unknown provider \"${provider}\""
+                    # A version on a self-updating agent would be a claim
+                    # nothing enforces; a managed agent without one is
+                    # unpinned, which is the defect this plane exists to fix.
+                    ++ nixpkgs.lib.optional (
+                      provider == "native" && row ? version
+                    ) "agents.${row.name}: native provider must not declare a version"
+                    ++ nixpkgs.lib.optional (
+                      provider != "native" && !(row ? version)
+                    ) "agents.${row.name}: managed provider must declare a version"
+                    ++ nixpkgs.lib.optional (
+                      provider == "github-release" && !((row.sha256 or { }) ? ${target})
+                    ) "agents.${row.name}: no sha256 for ${target}; unbuildable on this system"
+                  ) rows;
               in
-              pkgs.runCommand "herdr-activation-contract" { } (
-                if missing == [ ] then
+              pkgs.runCommand "agents-manifest-contract" { } (
+                if problems == [ ] then
                   ''
-                    echo "ok: Herdr activation is cross-platform and supplies installer prerequisites" > $out
+                    echo "ok: agents.toml pins every managed agent for ${target}" > $out
                   ''
                 else
                   ''
-                    echo "Herdr activation contract missing generated hook fragments:" >&2
-                    ${pkgs.coreutils}/bin/printf '  %s\n' ${nixpkgs.lib.escapeShellArgs missing} >&2
+                    echo "config/agents/agents.toml contract violations:" >&2
+                    ${pkgs.coreutils}/bin/printf '  %s\n' ${nixpkgs.lib.escapeShellArgs problems} >&2
                     exit 1
                   ''
               );
