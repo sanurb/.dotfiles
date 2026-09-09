@@ -8,6 +8,12 @@
         "command": ["/Users/sanurb/.local/bin/codebase-memory-mcp"],
         "enabled": true
       },
+      "computer": {
+        "type": "local",
+        "command": ["cua-driver", "mcp"],
+        "enabled": true,
+        "timeout": 60000
+      },
       "context7": {
         "type": "remote",
         "url": "https://mcp.context7.com/mcp"
