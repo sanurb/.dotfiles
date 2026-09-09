@@ -49,6 +49,8 @@ let
       };
 
     dontUnpack = true;
+    # Stripping removes the embedded application payload and leaves only Bun.
+    dontStrip = true;
 
     # The asset is a Bun single-file executable: self-contained JS runtime
     # plus the bundled linkedom parser, so there is no node/bun to provide
