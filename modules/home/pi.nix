@@ -11,15 +11,18 @@ let
   piWebToolsRoot = "${piConfigRoot}/agent/extensions/web-tools";
   cuaDriverVersion = "0.24.0";
   cuaDriverInstallDir = "${config.home.homeDirectory}/.local/bin";
-  cuaDriverInstallerPath = lib.makeBinPath [
-    pkgs.bash
-    pkgs.coreutils
-    pkgs.curl
-    pkgs.gawk
-    pkgs.gnugrep
-    pkgs.gnused
-    pkgs.gnutar
-  ];
+  cuaDriverInstallerPath =
+    lib.makeBinPath [
+      pkgs.bash
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.gawk
+      pkgs.gzip
+      pkgs.gnugrep
+      pkgs.gnused
+      pkgs.gnutar
+    ]
+    + lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ":/usr/bin:/usr/sbin";
   vpHome = "${config.home.homeDirectory}/.vite-plus";
 
   # PATH prefix for the hooks below. The shim dirs lead so a workspace

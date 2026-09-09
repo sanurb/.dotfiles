@@ -13,11 +13,11 @@ import (
 // the only entry point and reads directly from this slice; a previous
 // duplicate listing in modules/scripts/backup.sh was retired.
 var trackedPaths = []string{
-	".config/ghostty/config",
+	".config/ghostty",
 	".config/zellij/config.kdl",
 	".config/fish/config.fish",
 	".config/starship.toml",
-	".config/nvim/init.lua",
+	".config/nvim",
 	".config/git/config",
 	".zshrc",
 	".bashrc",
