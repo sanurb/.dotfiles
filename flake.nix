@@ -367,6 +367,7 @@
                     pkgs.coreutils
                     pkgs.curl
                     pkgs.gawk
+                    pkgs.gzip
                     pkgs.gnugrep
                     pkgs.gnused
                     pkgs.gnutar
@@ -376,6 +377,9 @@
                   "CUA_DRIVER_RS_TELEMETRY_ENABLED=0"
                   "if run ${pkgs.curl}/bin/curl"
                   "${pkgs.bash}/bin/bash \"$installer\" --no-modify-path"
+                ]
+                ++ nixpkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+                  "/usr/bin:/usr/sbin"
                 ];
                 missing = builtins.filter (
                   fragment: !(nixpkgs.lib.hasInfix (builtins.unsafeDiscardStringContext fragment) activation)
