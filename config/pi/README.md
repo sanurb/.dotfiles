@@ -43,6 +43,8 @@ Adapted from [dmmulroy/.dotfiles](https://github.com/dmmulroy/.dotfiles)
     deliberately so the agent loads only the reference it needs.
   - `recipe-diagrams/` ships `scripts/render_recipe_diagram.py`
     (stdlib-only, needs `python3`).
+  - `cua-driver/` is pinned to Cua Driver v0.24.0 and documents the
+    snapshot-action-verify loop used by the persistent `computer` MCP server.
   - Deliberately NOT vendored from upstream: `herdr` (installer-owned, see
     above) and `workday-training` (marks Workday compliance courses passed
     via the SCORM API without taking them — falsifies auditable training
@@ -50,7 +52,7 @@ Adapted from [dmmulroy/.dotfiles](https://github.com/dmmulroy/.dotfiles)
 - `agent/themes/` — `catppuccin-macchiato` (select via
   `"theme": "catppuccin-macchiato"` in `~/.pi/agent/settings.json`).
 - `agent/mcp.json` — MCP servers (proxy tool mode, lazy startup):
-  codebase-memory-mcp, context7, grep_app, opensrc.
+  codebase-memory-mcp, computer (Cua Driver), context7, grep_app, opensrc.
 - `agent/cloak.json` — secret-masking patterns (env files, opencode
   apiKeys, auth.json tokens, Cloudflare Access vars).
 

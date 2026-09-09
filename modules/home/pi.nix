@@ -9,6 +9,17 @@ let
   piPackage = "@earendil-works/pi-coding-agent";
   piConfigRoot = "${workspaceRoot}/config/pi";
   piWebToolsRoot = "${piConfigRoot}/agent/extensions/web-tools";
+  cuaDriverVersion = "0.24.0";
+  cuaDriverInstallDir = "${config.home.homeDirectory}/.local/bin";
+  cuaDriverInstallerPath = lib.makeBinPath [
+    pkgs.bash
+    pkgs.coreutils
+    pkgs.curl
+    pkgs.gawk
+    pkgs.gnugrep
+    pkgs.gnused
+    pkgs.gnutar
+  ];
   vpHome = "${config.home.homeDirectory}/.vite-plus";
 
   # PATH prefix for the hooks below. The shim dirs lead so a workspace
@@ -138,6 +149,66 @@ in
         fi
       ''
   );
+
+  # Cua Driver backs the persistent `computer` MCP server declared in
+  # config/pi/agent/mcp.json. Its macOS release must be installed through
+  # the upstream installer rather than copied into the Nix store: the signed
+  # /Applications/CuaDriver.app bundle is the stable identity that owns the
+  # Accessibility and Screen Recording grants. Linux uses the same installer
+  # and keeps its versioned payload under ~/.cua-driver.
+  #
+  # Pin the release that matches the vendored skill. The installer verifies
+  # the release checksum and avoids editing shell startup files. As with
+  # installPi below, a network or permission failure reports an actionable
+  # recovery without aborting the rest of Home Manager activation.
+  home.activation.installCuaDriver = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    cua_driver_binary="$(command -v cua-driver 2>/dev/null || true)"
+    if [ -z "$cua_driver_binary" ] && [ -x "${cuaDriverInstallDir}/cua-driver" ]; then
+      cua_driver_binary="${cuaDriverInstallDir}/cua-driver"
+    fi
+    cua_driver_reported_version=""
+    if [ -n "$cua_driver_binary" ]; then
+      cua_driver_reported_version="$("$cua_driver_binary" --version 2>/dev/null || true)"
+    fi
+
+    case "$cua_driver_reported_version" in
+      *'${cuaDriverVersion}'*)
+        $VERBOSE_ECHO "pi: cua-driver ${cuaDriverVersion} already installed; skipping installer"
+        ;;
+      *)
+        installer="$(${pkgs.coreutils}/bin/mktemp)"
+        $VERBOSE_ECHO "pi: installing cua-driver ${cuaDriverVersion}"
+        if run ${pkgs.curl}/bin/curl \
+          --proto '=https' \
+          --tlsv1.2 \
+          --fail \
+          --silent \
+          --show-error \
+          --location \
+          --retry 3 \
+          --connect-timeout 10 \
+          --max-time 30 \
+          https://cua.ai/driver/install.sh \
+          --output "$installer" \
+          && run ${pkgs.coreutils}/bin/env \
+            PATH="${cuaDriverInstallerPath}:$PATH" \
+            CUA_DRIVER_RS_VERSION="${cuaDriverVersion}" \
+            CUA_DRIVER_RS_INSTALL_DIR="${cuaDriverInstallDir}" \
+            CUA_DRIVER_RS_NO_MODIFY_PATH=1 \
+            CUA_DRIVER_RS_TELEMETRY_ENABLED=0 \
+            ${pkgs.bash}/bin/bash "$installer" --no-modify-path
+        then
+          $VERBOSE_ECHO "pi: cua-driver installed"
+        fi
+        ${pkgs.coreutils}/bin/rm -f "$installer"
+        ;;
+    esac
+
+    if [ ! -x "${cuaDriverInstallDir}/cua-driver" ] && ! command -v cua-driver >/dev/null 2>&1; then
+      echo "pi: cua-driver was NOT installed (installer failed)." >&2
+      echo '  fix: run `CUA_DRIVER_RS_VERSION=${cuaDriverVersion} /bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"`, then rerun `dots apply`.' >&2
+    fi
+  '';
 
   # Idempotent install hook, same shape as the vp hook in vite-plus.nix:
   # guard on the binary so a warm machine is a no-op, and fail soft so a

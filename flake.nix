@@ -353,6 +353,47 @@
                   ''
               );
 
+            # The Cua Driver skill and its executable are version-coupled.
+            # Assert that Pi's activation pins v0.24.0, supplies the official
+            # installer's dependencies, and keeps the installer fail-soft
+            # rather than leaving the enabled `computer` MCP server without
+            # its command on a fresh machine.
+            cua-driver-activation-contract =
+              let
+                activation = builtins.unsafeDiscardStringContext profileEvaluated.home.activation.installCuaDriver.data;
+                requiredFragments = [
+                  (nixpkgs.lib.makeBinPath [
+                    pkgs.bash
+                    pkgs.coreutils
+                    pkgs.curl
+                    pkgs.gawk
+                    pkgs.gnugrep
+                    pkgs.gnused
+                    pkgs.gnutar
+                  ])
+                  "CUA_DRIVER_RS_VERSION=\"0.24.0\""
+                  "CUA_DRIVER_RS_NO_MODIFY_PATH=1"
+                  "CUA_DRIVER_RS_TELEMETRY_ENABLED=0"
+                  "if run ${pkgs.curl}/bin/curl"
+                  "${pkgs.bash}/bin/bash \"$installer\" --no-modify-path"
+                ];
+                missing = builtins.filter (
+                  fragment: !(nixpkgs.lib.hasInfix (builtins.unsafeDiscardStringContext fragment) activation)
+                ) requiredFragments;
+              in
+              pkgs.runCommand "cua-driver-activation-contract" { } (
+                if missing == [ ] then
+                  ''
+                    echo "ok: Cua Driver activation is pinned, cross-platform, and fails soft" > $out
+                  ''
+                else
+                  ''
+                    echo "Cua Driver activation contract missing generated hook fragments:" >&2
+                    ${pkgs.coreutils}/bin/printf '  %s\n' ${nixpkgs.lib.escapeShellArgs missing} >&2
+                    exit 1
+                  ''
+              );
+
             # Herdr's official installer supports Linux and macOS but expects
             # curl, awk, and a SHA-256 utility on PATH. Assert against the
             # generated activation hook on every flake system so neither the
