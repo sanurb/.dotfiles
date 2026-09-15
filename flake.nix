@@ -125,6 +125,10 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       inherit systems;
 
+      # treefmt-nix exports the configured wrapper as `nix fmt` and adds its
+      # formatting check to `nix flake check`.
+      imports = [ inputs.treefmt-nix.flakeModule ];
+
       perSystem =
         { system, ... }:
         let
@@ -221,6 +225,10 @@
           profileEvaluated = mkSyntheticConfig profileModules;
         in
         {
+          # Shared with Devenv via treefmt.nix: every formatter entry point
+          # uses the same programs, versions, includes, and exclusions.
+          treefmt = import ./treefmt.nix { inherit pkgs; };
+
           devShells.default =
             if haveDevenvRoot then
               devenv.lib.mkShell {
@@ -525,8 +533,6 @@
               fixHint = "modules/home/shells/nushell.nix must declare xdg.configFile.\"nushell/config.nu\" via mkOutOfStoreSymlink";
             };
           };
-
-          formatter = pkgs.nixpkgs-fmt;
         };
 
       # Each value must BE a homeConfiguration (carrying `.activationPackage`

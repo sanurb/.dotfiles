@@ -33,6 +33,7 @@ tasks:
       - "**/*.yml"
       - "/devenv.nix"
       - "/flake.nix"
+      - "/treefmt.nix"
     options:
       cache: true
 

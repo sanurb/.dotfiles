@@ -64,6 +64,9 @@
       eza
       jq
       git
+      # Keep difftastic hermetic without Devenv's integration, which exports
+      # GIT_EXTERNAL_DIFF and silently changes `git diff` semantics.
+      difftastic
 
       # CI gates — repo-wide static checkers wired through Moon as
       # `root:lint`. Each tool owns one concern:
@@ -90,16 +93,15 @@
       lua-language-server # Lua (nvim config)
       nixd # Nix
     ]
-    ++ lib.optionals pkgs.stdenv.isLinux [
+    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
       ghostty # Linux-only via nixpkgs; macOS uses Homebrew
     ];
 
   # Nix tooling is fine — proto does not manage Nix.
   languages.nix.enable = true;
 
-  # First-class shell integrations.
+  # First-class shell integration.
   starship.enable = true;
-  difftastic.enable = true;
 
   # Unified, declarative formatting. Treefmt is the only entrypoint;
   # every formatter binary is sourced from the same nixpkgs hash as
@@ -117,88 +119,17 @@
   # tasks; routing hooks through `moon run` reuses that machinery.
   treefmt = {
     enable = true;
-    config = {
-      projectRootFile = "flake.nix";
-
-      # Tool-managed and machine-generated files are off-limits to every
-      # formatter — reformatting them either fights another writer
-      # (lazy.nvim, npm, Nix) or adds churn that obscures real diffs.
-      settings.global.excludes = [
-        "config/nvim/lazy-lock.json"
-        "config/nvim/.undodir/**"
-        "config/opencode/package-lock.json"
-        "config/pi/package-lock.json"
-        "config/pi/node_modules/**"
-        "config/pi/agent/extensions/**/node_modules/**"
-        # Vendored skill content (mattpocock/skills + Cloudflare docs
-        # bundle) — reformatting would churn every future re-vendor diff.
-        "config/pi/agent/skills/**"
-        "flake.lock"
-        "*.lock"
-        ".moon/cache/**"
-        ".devenv/**"
-        ".direnv/**"
-      ];
-
-      programs.gofumpt.enable = true;
-
-      # nixfmt is the RFC-166 official Nix formatter; nixpkgs-fmt is
-      # archived. nixpkgs ≥ 25.11 ships nixfmt as the default and the
-      # `nixfmt-rfc-style` alias is a deprecation shim. Use `nixfmt`.
-      programs.nixfmt.enable = true;
-
-      # dprint covers the Markdown / JSON / TOML / YAML surface that
-      # native Go/Nix formatters don't touch. Wasm plugins are pinned
-      # via nixpkgs (pkgs.dprint-plugins.getPluginList) so the plugin
-      # set is hermetic — no URL fetch from inside the Nix sandbox.
-      # Pretty YAML (g-plane) is anchor-aware, which matters since
-      # GitHub Actions enabled YAML anchors in Sept 2025.
-      programs.dprint = {
-        enable = true;
-        includes = [
-          "*.md"
-          "*.json"
-          "*.jsonc"
-          "*.toml"
-          "*.yaml"
-          "*.yml"
-        ];
-        settings = {
-          lineWidth = 100;
-          indentWidth = 2;
-          # dprint self-traverses (it does not consume treefmt's file
-          # list), so treefmt's `global.excludes` never reaches it. Its
-          # own `excludes` is the only thing that keeps it out of nvim's
-          # machine-generated undo/context dir, whose %-escaped *.md files
-          # carry invalid UTF-8 and abort the whole `treefmt:run` task.
-          excludes = [
-            "config/nvim/.undodir/**"
-            "config/nvim/lazy-lock.json"
-            "config/opencode/package-lock.json"
-            "config/pi/package-lock.json"
-            "config/pi/node_modules/**"
-            "config/pi/agent/extensions/**/node_modules/**"
-            "config/pi/agent/skills/**"
-          ];
-          # Preserve author line breaks for ADRs / READMEs / SKILL.md;
-          # "never" would flatten every paragraph to one long line and
-          # "always" would re-flow prose to fit lineWidth (also bad).
-          markdown.textWrap = "maintain";
-          json = { };
-          toml = { };
-          yaml = { };
-          plugins = pkgs.dprint-plugins.getPluginList (
-            plugins: with plugins; [
-              dprint-plugin-markdown
-              dprint-plugin-json
-              dprint-plugin-toml
-              g-plane-pretty_yaml
-            ]
-          );
-        };
-      };
-    };
+    # One formatter definition serves the dev-shell wrapper and `nix fmt`.
+    config = import ./treefmt.nix { inherit pkgs; };
   };
+
+  # Devenv's treefmt integration wires `devenv:treefmt:run` before every
+  # shell entry. Shell entry must be read-only with respect to the workspace:
+  # concurrent direnv reloads otherwise run treefmt against the same files and
+  # contend on its single evaluation-cache database, failing with "failed to
+  # open cache db ...: timeout". Keep the generated wrapper and formatter
+  # configuration, but run it only through explicit `nix fmt` / Moon gates.
+  tasks."devenv:treefmt:run".before = lib.mkForce [ ];
 
   env = {
     EDITOR = "nvim";
