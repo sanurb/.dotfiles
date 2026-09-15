@@ -7,11 +7,11 @@
   #
   # Satellite (opt-out per host), not foundation: AWS access is a
   # work-specific need, and a host with no AWS footprint shouldn't carry
-  # the closure. No `programs.awscli` HM module exists; direct
-  # home.packages install follows the jo/procs/ast-grep pattern.
+  # the closure. Granted handles role selection, but awscli2 remains required
+  # by EKS kubeconfigs that execute `aws eks get-token` for authentication.
   #
-  # Credentials and config (~/.aws/{config,credentials}) are host-local
-  # state, deliberately outside this repo — a public-safe dotfiles tree
-  # must never vendor access keys, role ARNs, or account IDs.
+  # This module installs only the binary: it never runs `aws eks
+  # update-kubeconfig` or mutates ~/.kube/config. AWS config, credentials,
+  # role ARNs, and account IDs remain host-local and outside this public repo.
   home.packages = [ pkgs.awscli2 ];
 }

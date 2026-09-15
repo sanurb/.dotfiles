@@ -6,12 +6,14 @@
   # persona touches Kubernetes — a laptop with no cluster access carries
   # no benefit from the binary.
   #
-  # No `programs.kubectl` HM module exists; direct home.packages install
-  # follows the jo/procs/ast-grep pattern. Cluster context is host-local
-  # state (~/.kube/config), deliberately outside this repo — a public-safe
-  # dotfiles tree must never vendor cluster credentials or endpoints.
-  # Completion is left to the shells' generic machinery (zsh's
-  # enableCompletion; fish loads `kubectl completion fish` on demand) —
-  # no per-tool wiring to declare here.
+  # No `programs.kubectl` HM module exists; direct home.packages installation
+  # follows the procs/ast-grep pattern. Enter through `kubie ctx` or
+  # `kubie exec` for normal operation: Kubie supplies a temporary KUBECONFIG
+  # scoped to that child environment, preventing one terminal from changing
+  # another terminal's active context.
+  #
+  # Cluster credentials and endpoints remain host-local under ~/.kube. For
+  # manifest rendering, prefer standalone `kustomize build ... | kubectl
+  # apply -f -` over the version-lagged `kubectl apply -k` engine.
   home.packages = [ pkgs.kubectl ];
 }
