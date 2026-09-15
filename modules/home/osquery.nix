@@ -14,5 +14,5 @@
   # osquery.io — a one-time manual install per host, same shape as
   # granting Full Disk Access (which osquery also needs on macOS for
   # the full `processes` / `system_info` table fidelity).
-  home.packages = lib.optional pkgs.stdenv.isLinux pkgs.osquery;
+  home.packages = lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.osquery;
 }

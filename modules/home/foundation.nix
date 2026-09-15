@@ -16,7 +16,7 @@ let
   # (always defined by HM, honouring $XDG_DATA_HOME) keeps us correct if
   # the user relocates their data dir rather than hardcoding ~/.local/share.
   pnpmHome =
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       "${config.home.homeDirectory}/Library/pnpm"
     else
       "${config.xdg.dataHome}/pnpm";

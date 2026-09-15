@@ -35,7 +35,7 @@
   # time may lack `/opt/homebrew/bin`. We probe the canonical install
   # paths so the hook still works when apply is launched from a shell
   # (or devenv subshell) where shellenv hasn't run.
-  home.activation = lib.mkIf pkgs.stdenv.isDarwin {
+  home.activation = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     installGhostty = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if [ -d "/Applications/Ghostty.app" ] || [ -d "$HOME/Applications/Ghostty.app" ]; then
         $VERBOSE_ECHO "ghostty: already installed; skipping brew cask"
