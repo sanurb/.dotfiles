@@ -301,6 +301,32 @@
             # they reach a user's `dots apply`.
             home-activation = (mkHome system).activationPackage;
 
+            # OpenCode's structural-search tool must invoke the executable
+            # exposed by nixpkgs. The default package omits the deprecated
+            # `sg` alias, so keeping the caller and package contract together
+            # prevents a selected satellite from failing only at tool runtime.
+            ast-grep-opencode-command-contract =
+              let
+                toolSource = builtins.readFile ./config/opencode/tool/ast-grep.ts;
+                packageSelected = builtins.elem pkgs.ast-grep profileEvaluated.home.packages;
+                usesPackagedCommand = nixpkgs.lib.hasInfix ''"ast-grep"'' toolSource;
+                usesRemovedAlias = nixpkgs.lib.hasInfix ''"sg"'' toolSource;
+              in
+              pkgs.runCommand "ast-grep-opencode-command-contract" { } (
+                if packageSelected && usesPackagedCommand && !usesRemovedAlias then
+                  ''
+                    ${pkgs.ast-grep}/bin/ast-grep --version > $out
+                  ''
+                else
+                  ''
+                    echo "ast-grep OpenCode contract failed:" >&2
+                    echo "  package selected: ${nixpkgs.lib.boolToString packageSelected}" >&2
+                    echo "  uses ast-grep command: ${nixpkgs.lib.boolToString usesPackagedCommand}" >&2
+                    echo "  uses removed sg alias: ${nixpkgs.lib.boolToString usesRemovedAlias}" >&2
+                    exit 1
+                  ''
+              );
+
             # Vite+'s upstream installer resolves curl and tar by name.
             # Home Manager activation has a deliberately minimal PATH,
             # so assert against the generated hook (not just module source)
