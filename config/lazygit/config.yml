@@ -76,9 +76,9 @@ git:
   # delta is configured in modules/home/delta.nix. useConfig: false
   # tells lazygit to invoke our pager directly while delta still reads
   # the [delta] git-config section for its options (side-by-side, etc.).
-  pagers:
+  diffRenderers:
     - colorArg: always
-      pager: delta --paging=never
+      command: delta --paging=never
       useConfig: false
   commit:
     signOff: false

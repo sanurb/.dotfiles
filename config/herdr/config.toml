@@ -72,6 +72,7 @@ confirm_close = false
 prompt_new_workspace_name = true
 accent = "#c6a0f6"
 
+agent_panel_sort = "spaces"
 [ui.toast]
 delivery = "herdr"
 
