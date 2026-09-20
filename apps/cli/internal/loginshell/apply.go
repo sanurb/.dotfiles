@@ -26,18 +26,16 @@ func Apply(ctx context.Context, target string, reporter io.Writer) (Decision, er
 		reporter = io.Discard
 	}
 
+	loginTarget, err := resolveLoginShellTarget(target, true)
+	if err != nil {
+		return Decision{Kind: SkipUnsupported, Detail: err.Error()}, err
+	}
 	in := Inputs{
 		Target:       target,
 		CurrentShell: currentLoginShell(),
-		Resolve: func(name string) string {
-			path, err := exec.LookPath(name)
-			if err != nil {
-				return ""
-			}
-			return path
-		},
-		EtcShells: readEtcShells(),
-		IsNixOS:   isNixOS(),
+		Resolve:      func(string) string { return loginTarget },
+		EtcShells:    readEtcShells(),
+		IsNixOS:      isNixOS(),
 	}
 
 	d := Decide(in)
@@ -193,19 +191,31 @@ func interactiveStdin() bool {
 // side effects. `dots doctor` uses it to surface the same outcome Apply
 // would act on, so the divergence is visible before an apply runs.
 func Probe(target string) Decision {
+	loginTarget, _ := resolveLoginShellTarget(target, false)
 	return Decide(Inputs{
 		Target:       target,
 		CurrentShell: currentLoginShell(),
-		Resolve: func(name string) string {
-			path, err := exec.LookPath(name)
-			if err != nil {
-				return ""
-			}
-			return path
-		},
-		EtcShells: readEtcShells(),
-		IsNixOS:   isNixOS(),
+		Resolve:      func(string) string { return loginTarget },
+		EtcShells:    readEtcShells(),
+		IsNixOS:      isNixOS(),
 	})
+}
+
+// resolveLoginShellTarget maps a selected shell to either its executable or a
+// stable launcher. The launcher keeps login working while /nix is unavailable.
+func resolveLoginShellTarget(target string, installLauncher bool) (string, error) {
+	binaryName := shellBinary(target)
+	if binaryName == "" {
+		return "", nil
+	}
+	resolvedTarget, err := exec.LookPath(binaryName)
+	if err != nil {
+		return "", nil
+	}
+	if installLauncher {
+		return prepareResilientLoginShellTarget(binaryName, resolvedTarget)
+	}
+	return probeResilientLoginShellTarget(binaryName, resolvedTarget), nil
 }
 
 // currentLoginShell asks the OS what the current user's login shell

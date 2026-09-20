@@ -144,12 +144,14 @@
           haveDevenvRoot = devenvRoot != "";
 
           # Doctor helpers: assert that a given set of xdg.configFile keys
-          # land in the resolved Home Manager config. Each live-edit surface
-          # (fish/ghostty/zellij/wezterm/nushell/starship) routes through
+          # land in the resolved Home Manager config. Most live-edit surfaces
+          # (fish/zellij/wezterm/nushell/starship) route through
           # mkOutOfStoreSymlink so edits to config/<tool>/ skip Nix eval; if
           # a future refactor drops the xdg.configFile entry, the file would
           # silently fall back to the slow `programs.<tool>.extraConfig`
-          # path. This gate fails the PR before that lands.
+          # path. Ghostty is checked separately because its startup-critical
+          # config uses direct activation links that remain valid without
+          # /nix. These gates fail the PR before either contract regresses.
           #
           # `nix flake check` runs in pure mode where `getEnv
           # "DOTS_WORKSPACE_ROOT"` returns "", which would collapse the
@@ -490,12 +492,35 @@
               fixHint = "modules/home/shells/fish.nix must declare xdg.configFile.\"fish/conf.d\" and \"fish/functions\" via mkOutOfStoreSymlink";
             };
 
-            ghostty-config-wired = mkConfigWiredCheck {
-              name = "ghostty-config-wired";
-              evaluated = profileEvaluated;
-              expectedKeys = [ "ghostty" ];
-              fixHint = "modules/home/terminals/ghostty.nix must declare xdg.configFile.\"ghostty\" via mkOutOfStoreSymlink";
-            };
+            ghostty-config-wired =
+              let
+                activation = builtins.unsafeDiscardStringContext profileEvaluated.home.activation.linkGhosttyConfig.data;
+                requiredFragments = [
+                  "config/ghostty"
+                  "config.ghostty"
+                  "link_ghostty_config_path"
+                  "ln -s"
+                  "$HOME/.config/ghostty"
+                ]
+                ++ nixpkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+                  "$HOME/Library/Application Support/com.mitchellh.ghostty"
+                ];
+                missing = builtins.filter (fragment: !(nixpkgs.lib.hasInfix fragment activation)) requiredFragments;
+                sourceMissing = !(builtins.pathExists ./config/ghostty/config);
+              in
+              pkgs.runCommand "ghostty-config-wired" { } (
+                if missing == [ ] && !sourceMissing then
+                  ''
+                    echo "ok: Ghostty config is linked directly without a Nix-store hop" > $out
+                  ''
+                else
+                  ''
+                    echo "Ghostty direct-config contract failed:" >&2
+                    echo "  source config missing: ${nixpkgs.lib.boolToString sourceMissing}" >&2
+                    ${pkgs.coreutils}/bin/printf '  missing activation fragment: %s\n' ${nixpkgs.lib.escapeShellArgs missing} >&2
+                    exit 1
+                  ''
+              );
 
             zellij-config-wired = mkConfigWiredCheck {
               name = "zellij-config-wired";

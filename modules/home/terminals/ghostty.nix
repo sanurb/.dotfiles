@@ -1,5 +1,4 @@
 {
-  config,
   pkgs,
   lib,
   workspaceRoot,
@@ -14,18 +13,87 @@
   # terminal in the wizard installs it — even when the install happens
   # outside Nix on macOS.
   #
-  # Live-editable seam — same pattern as modules/home/editor.nix and
-  # modules/home/multiplexers/tmux.nix. Editing anything under
-  # config/ghostty/ in the repo is picked up the next time ghostty
-  # reloads its config; no `dots apply` round-trip required.
+  # Startup-critical config deliberately bypasses xdg.configFile. Home
+  # Manager's mkOutOfStoreSymlink still routes through /nix/store before
+  # reaching the workspace, so Ghostty loses its config during a delayed Nix
+  # APFS mount — the same window in which a Nix-backed login shell is absent.
+  # Direct links keep the config, themes, and shaders available independently
+  # of /nix while retaining the live-edit workflow.
   #
-  # We symlink the whole directory (not just `config`) so siblings —
-  # shaders/, themes/ — resolve via Ghostty's config-relative lookup.
-  # When workspaceRoot is empty (HM run outside `dots apply`) we skip
-  # the link rather than emit a dangling pointer.
-  xdg.configFile."ghostty" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/ghostty";
-  };
+  # Ghostty 1.2.3 made config.ghostty canonical. On macOS we use its native
+  # Application Support location so `ghostty +edit-config` opens the managed
+  # file instead of creating an empty native file that appears to have wiped
+  # the XDG config.
+  home.activation.linkGhosttyConfig = lib.mkIf (workspaceRoot != "") (
+    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      ghostty_source=${lib.escapeShellArg "${workspaceRoot}/config/ghostty"}
+
+      prepare_ghostty_config_dir() {
+        config_dir="$1"
+        if [ -L "$config_dir" ]; then
+          link_target="$(readlink "$config_dir" 2>/dev/null || true)"
+          case "$link_target" in
+            /nix/store/*|"$ghostty_source")
+              run rm "$config_dir"
+              ;;
+            *)
+              echo "ghostty: preserving unmanaged link $config_dir -> $link_target" >&2
+              return 1
+              ;;
+          esac
+        elif [ -e "$config_dir" ] && [ ! -d "$config_dir" ]; then
+          echo "ghostty: $config_dir exists but is not a directory" >&2
+          return 1
+        fi
+        if [ ! -e "$config_dir" ]; then
+          run mkdir -p "$config_dir"
+        fi
+      }
+
+      link_ghostty_config_path() {
+        source_path="$1"
+        destination_path="$2"
+
+        if [ -L "$destination_path" ]; then
+          run rm "$destination_path"
+        elif [ -e "$destination_path" ]; then
+          # Ghostty creates an empty native config on first edit. It contains
+          # no user data and is safe to replace with the managed config.
+          if [ -f "$destination_path" ] && [ ! -s "$destination_path" ]; then
+            run rm "$destination_path"
+          else
+            echo "ghostty: preserving unmanaged path $destination_path" >&2
+            return
+          fi
+        fi
+        run ln -s "$source_path" "$destination_path"
+      }
+
+      # Themes and relative shader paths are always resolved through XDG on
+      # macOS too, even when the main config comes from Application Support.
+      ghostty_xdg_dir="$HOME/.config/ghostty"
+      if prepare_ghostty_config_dir "$ghostty_xdg_dir"; then
+        link_ghostty_config_path "$ghostty_source/shaders" "$ghostty_xdg_dir/shaders"
+        link_ghostty_config_path "$ghostty_source/themes" "$ghostty_xdg_dir/themes"
+      fi
+
+      ${
+        if pkgs.stdenv.hostPlatform.isDarwin then
+          ''
+            ghostty_native_dir="$HOME/Library/Application Support/com.mitchellh.ghostty"
+            if prepare_ghostty_config_dir "$ghostty_native_dir"; then
+              link_ghostty_config_path "$ghostty_source/config" "$ghostty_native_dir/config.ghostty"
+            fi
+          ''
+        else
+          ''
+            if [ -d "$ghostty_xdg_dir" ]; then
+              link_ghostty_config_path "$ghostty_source/config" "$ghostty_xdg_dir/config.ghostty"
+            fi
+          ''
+      }
+    ''
+  );
 
   # Activation hook: ensure Ghostty.app exists on macOS. Idempotent —
   # checks both /Applications and ~/Applications before invoking brew.
@@ -35,8 +103,8 @@
   # time may lack `/opt/homebrew/bin`. We probe the canonical install
   # paths so the hook still works when apply is launched from a shell
   # (or devenv subshell) where shellenv hasn't run.
-  home.activation = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
-    installGhostty = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.installGhostty = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin (
+    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if [ -d "/Applications/Ghostty.app" ] || [ -d "$HOME/Applications/Ghostty.app" ]; then
         $VERBOSE_ECHO "ghostty: already installed; skipping brew cask"
       else
@@ -53,6 +121,6 @@
           echo "       /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"" >&2
         fi
       fi
-    '';
-  };
+    ''
+  );
 }
