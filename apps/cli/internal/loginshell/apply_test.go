@@ -1,18 +1,26 @@
 package loginshell
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 )
 
 func TestRegisterHint(t *testing.T) {
-	// The hint is a copy/paste one-liner; it must name the exact path
-	// twice (etc/shells + chsh) so a user can finish by hand.
+	// The hint is a copy/paste one-liner; it must register idempotently and
+	// name the exact path for both /etc/shells and chsh.
 	got := RegisterHint("/Users/sanurb/.nix-profile/bin/fish")
-	for _, want := range []string{"/etc/shells", "chsh -s", "/Users/sanurb/.nix-profile/bin/fish"} {
+	for _, want := range []string{"grep -qxF", "/etc/shells", "chsh -s", "/Users/sanurb/.nix-profile/bin/fish"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("hint %q missing %q", got, want)
 		}
+	}
+}
+
+func TestRegisterHintQuotesShellMetacharacters(t *testing.T) {
+	got := RegisterHint("/Users/O'Brien/My Shell/fish")
+	if output, err := exec.Command("sh", "-n", "-c", got).CombinedOutput(); err != nil {
+		t.Fatalf("RegisterHint generated invalid shell: %v\n%s\n%s", err, output, got)
 	}
 }
 

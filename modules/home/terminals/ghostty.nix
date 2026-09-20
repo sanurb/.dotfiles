@@ -4,6 +4,9 @@
   workspaceRoot,
   ...
 }:
+let
+  coreutils = lib.getBin pkgs.coreutils;
+in
 {
   # Ghostty — config managed as a plain text file so it remains portable
   # to a non-Nix host (just copy the file). The upstream `pkgs.ghostty`
@@ -29,12 +32,14 @@
       ghostty_source=${lib.escapeShellArg "${workspaceRoot}/config/ghostty"}
 
       prepare_ghostty_config_dir() {
-        config_dir="$1"
+        local config_dir="$1"
+        local link_target
+
         if [ -L "$config_dir" ]; then
-          link_target="$(readlink "$config_dir" 2>/dev/null || true)"
+          link_target="$(${coreutils}/bin/readlink "$config_dir" 2>/dev/null || true)"
           case "$link_target" in
             /nix/store/*|"$ghostty_source")
-              run rm "$config_dir"
+              run ${coreutils}/bin/rm -- "$config_dir"
               ;;
             *)
               echo "ghostty: preserving unmanaged link $config_dir -> $link_target" >&2
@@ -46,27 +51,27 @@
           return 1
         fi
         if [ ! -e "$config_dir" ]; then
-          run mkdir -p "$config_dir"
+          run ${coreutils}/bin/mkdir -p "$config_dir"
         fi
       }
 
       link_ghostty_config_path() {
-        source_path="$1"
-        destination_path="$2"
+        local source_path="$1"
+        local destination_path="$2"
 
         if [ -L "$destination_path" ]; then
-          run rm "$destination_path"
+          run ${coreutils}/bin/rm -- "$destination_path"
         elif [ -e "$destination_path" ]; then
           # Ghostty creates an empty native config on first edit. It contains
           # no user data and is safe to replace with the managed config.
           if [ -f "$destination_path" ] && [ ! -s "$destination_path" ]; then
-            run rm "$destination_path"
+            run ${coreutils}/bin/rm -- "$destination_path"
           else
             echo "ghostty: preserving unmanaged path $destination_path" >&2
             return
           fi
         fi
-        run ln -s "$source_path" "$destination_path"
+        run ${coreutils}/bin/ln -s "$source_path" "$destination_path"
       }
 
       # Themes and relative shader paths are always resolved through XDG on

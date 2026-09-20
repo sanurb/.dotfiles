@@ -2,13 +2,6 @@ package loginshell
 
 import "testing"
 
-// resolveMap returns a Resolve func backed by a string map; empty
-// values mean "not on PATH" so a single map can describe both the
-// presence and absence of a binary.
-func resolveMap(m map[string]string) func(string) string {
-	return func(name string) string { return m[name] }
-}
-
 func TestDecide(t *testing.T) {
 	t.Run("when fish is selected, login shell is /bin/zsh, fish is on PATH, and /etc/shells lists it, then chsh is required", func(t *testing.T) {
 		// Reproduces the exact scenario the user reports: fish picked
@@ -18,7 +11,7 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/bin/zsh",
-			Resolve:      resolveMap(map[string]string{"fish": "/Users/sanurb/.nix-profile/bin/fish"}),
+			TargetPath:   "/Users/sanurb/.nix-profile/bin/fish",
 			EtcShells:    []string{"# Comment", "/bin/zsh", "/Users/sanurb/.nix-profile/bin/fish"},
 			IsNixOS:      false,
 		})
@@ -34,7 +27,7 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/usr/local/bin/fish",
-			Resolve:      resolveMap(map[string]string{"fish": "/usr/local/bin/fish"}),
+			TargetPath:   "/usr/local/bin/fish",
 			EtcShells:    []string{"/usr/local/bin/fish"},
 		})
 		if got.Kind != NoChange {
@@ -46,7 +39,6 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/bin/zsh",
-			Resolve:      resolveMap(map[string]string{}), // fish absent
 			EtcShells:    []string{"/bin/zsh"},
 		})
 		if got.Kind != SkipTargetMissing {
@@ -58,7 +50,7 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/bin/zsh",
-			Resolve:      resolveMap(map[string]string{"fish": "/Users/sanurb/.nix-profile/bin/fish"}),
+			TargetPath:   "/Users/sanurb/.nix-profile/bin/fish",
 			EtcShells:    []string{"/bin/zsh"},
 		})
 		if got.Kind != RegisterShell {
@@ -73,7 +65,7 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/run/current-system/sw/bin/bash",
-			Resolve:      resolveMap(map[string]string{"fish": "/run/current-system/sw/bin/fish"}),
+			TargetPath:   "/run/current-system/sw/bin/fish",
 			EtcShells:    []string{"/run/current-system/sw/bin/fish"},
 			IsNixOS:      true,
 		})
@@ -93,7 +85,7 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/bin/zsh",
-			Resolve:      resolveMap(map[string]string{"fish": "/usr/local/bin/fish"}),
+			TargetPath:   "/usr/local/bin/fish",
 			EtcShells:    []string{"# top comment", "", "  ", "/bin/sh", "/usr/local/bin/fish"},
 		})
 		if got.Kind != Chsh {
@@ -107,7 +99,7 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "fish",
 			CurrentShell: "/bin/zsh",
-			Resolve:      resolveMap(map[string]string{"fish": "/usr/local/bin/fish"}),
+			TargetPath:   "/usr/local/bin/fish",
 			EtcShells:    []string{"/usr/local/bin/fish/"},
 		})
 		if got.Kind != Chsh {
@@ -119,7 +111,7 @@ func TestDecide(t *testing.T) {
 		got := Decide(Inputs{
 			Target:       "nushell",
 			CurrentShell: "/bin/zsh",
-			Resolve:      resolveMap(map[string]string{"nu": "/usr/local/bin/nu"}),
+			TargetPath:   "/usr/local/bin/nu",
 			EtcShells:    []string{"/usr/local/bin/nu"},
 		})
 		if got.Kind != Chsh || got.TargetPath != "/usr/local/bin/nu" {

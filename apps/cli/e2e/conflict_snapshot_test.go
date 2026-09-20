@@ -8,29 +8,31 @@ import (
 	"github.com/sanurb/.dotfiles/apps/cli/internal/plan"
 )
 
-// TestPlanIgnoresManagedDirectoryProjections ensures an existing Home Manager
-// directory symlink is not mistaken for real files that need quarantining.
-func TestPlanIgnoresManagedDirectoryProjections(t *testing.T) {
+// TestPlanIgnoresManagedConfigProjections ensures Home Manager directory
+// symlinks and activation-managed child symlinks are not mistaken for real
+// files that need quarantining.
+func TestPlanIgnoresManagedConfigProjections(t *testing.T) {
 	h := newHarness(t).
 		withStub("nix", nixStubBody).
 		withStateFile(buildStateTOML(stateOverrides{}))
 
-	projections := []struct {
-		relHome      string
-		relWorkspace string
-		seedFile     string
-	}{
-		{relHome: ".config/ghostty", relWorkspace: "config/ghostty", seedFile: "config"},
-		{relHome: ".config/nvim", relWorkspace: "config/nvim", seedFile: "init.lua"},
+	// Neovim remains a Home Manager directory projection.
+	nvimSource := filepath.Join(h.Workspace, "config/nvim")
+	mustWrite(t, filepath.Join(nvimSource, "init.lua"), "managed by the workspace\n")
+	nvimDestination := filepath.Join(h.Home, ".config/nvim")
+	mustMkdir(t, filepath.Dir(nvimDestination))
+	if err := os.Symlink(nvimSource, nvimDestination); err != nil {
+		t.Fatalf("create managed Neovim projection: %v", err)
 	}
-	for _, projection := range projections {
-		source := filepath.Join(h.Workspace, projection.relWorkspace)
-		mustWrite(t, filepath.Join(source, projection.seedFile), "managed by the workspace\n")
-		destination := filepath.Join(h.Home, projection.relHome)
-		mustMkdir(t, filepath.Dir(destination))
-		if err := os.Symlink(source, destination); err != nil {
-			t.Fatalf("create managed directory projection %s: %v", projection.relHome, err)
-		}
+
+	// Ghostty's parent is a real directory because its startup-critical child
+	// links deliberately bypass /nix/store.
+	ghosttyThemesSource := filepath.Join(h.Workspace, "config/ghostty/themes")
+	mustWrite(t, filepath.Join(ghosttyThemesSource, "gentleman"), "managed by the workspace\n")
+	ghosttyThemesDestination := filepath.Join(h.Home, ".config/ghostty/themes")
+	mustMkdir(t, filepath.Dir(ghosttyThemesDestination))
+	if err := os.Symlink(ghosttyThemesSource, ghosttyThemesDestination); err != nil {
+		t.Fatalf("create managed Ghostty themes projection: %v", err)
 	}
 
 	got := h.run("plan", "--json")
@@ -44,7 +46,7 @@ func TestPlanIgnoresManagedDirectoryProjections(t *testing.T) {
 			t.Fatalf("plan step has unexpected type %T", rawStep)
 		}
 		if step["kind"] == plan.KindSnapshotConflicts {
-			t.Fatalf("managed directory projections must not be snapshot conflicts: %v", step)
+			t.Fatalf("managed config projections must not be snapshot conflicts: %v", step)
 		}
 	}
 }

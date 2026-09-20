@@ -26,16 +26,21 @@ func Apply(ctx context.Context, target string, reporter io.Writer) (Decision, er
 		reporter = io.Discard
 	}
 
-	loginTarget, err := resolveLoginShellTarget(target, true)
-	if err != nil {
-		return Decision{Kind: SkipUnsupported, Detail: err.Error()}, err
+	nixOSHost := isNixOS()
+	loginTarget := ""
+	if !nixOSHost {
+		var err error
+		loginTarget, err = prepareLoginShellTarget(target)
+		if err != nil {
+			return Decision{Kind: SkipUnsupported, Detail: err.Error()}, err
+		}
 	}
 	in := Inputs{
 		Target:       target,
 		CurrentShell: currentLoginShell(),
-		Resolve:      func(string) string { return loginTarget },
+		TargetPath:   loginTarget,
 		EtcShells:    readEtcShells(),
-		IsNixOS:      isNixOS(),
+		IsNixOS:      nixOSHost,
 	}
 
 	d := Decide(in)
@@ -118,8 +123,7 @@ func loginUser() string {
 // works even though only the confirmation prompt uses os.Stdin.
 func registerInEtcShells(ctx context.Context, path string, reporter io.Writer) error {
 	fmt.Fprintf(reporter, "login-shell: registering %s in /etc/shells (sudo)\n", path)
-	script := fmt.Sprintf("grep -qxF %q /etc/shells || printf '%%s\\n' %q >> /etc/shells", path, path)
-	cmd := exec.CommandContext(ctx, "sudo", "sh", "-c", script)
+	cmd := exec.CommandContext(ctx, "sudo", "sh", "-c", etcShellRegistrationScript(path))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = reporter
 	cmd.Stderr = reporter
@@ -133,10 +137,17 @@ func registerInEtcShells(ctx context.Context, path string, reporter io.Writer) e
 // runs as root and avoids the second per-user PAM password prompt that
 // silently aborts without a TTY (see chsh's doc comment).
 func RegisterHint(path string) string {
+	registerCommand := "sudo sh -c " + shellSingleQuote(etcShellRegistrationScript(path))
+	quotedPath := shellSingleQuote(path)
 	if u := loginUser(); u != "" {
-		return fmt.Sprintf("echo %s | sudo tee -a /etc/shells && sudo chsh -s %s %s", path, path, u)
+		return fmt.Sprintf("%s && sudo chsh -s %s %s", registerCommand, quotedPath, shellSingleQuote(u))
 	}
-	return fmt.Sprintf("echo %s | sudo tee -a /etc/shells && sudo chsh -s %s", path, path)
+	return fmt.Sprintf("%s && sudo chsh -s %s", registerCommand, quotedPath)
+}
+
+func etcShellRegistrationScript(path string) string {
+	quotedPath := shellSingleQuote(path)
+	return fmt.Sprintf("grep -qxF -- %s /etc/shells || printf '%%s\\n' %s >> /etc/shells", quotedPath, quotedPath)
 }
 
 // canRegister reports whether Apply may attempt the privileged
@@ -191,31 +202,45 @@ func interactiveStdin() bool {
 // side effects. `dots doctor` uses it to surface the same outcome Apply
 // would act on, so the divergence is visible before an apply runs.
 func Probe(target string) Decision {
-	loginTarget, _ := resolveLoginShellTarget(target, false)
 	return Decide(Inputs{
 		Target:       target,
 		CurrentShell: currentLoginShell(),
-		Resolve:      func(string) string { return loginTarget },
+		TargetPath:   probeLoginShellTarget(target),
 		EtcShells:    readEtcShells(),
 		IsNixOS:      isNixOS(),
 	})
 }
 
-// resolveLoginShellTarget maps a selected shell to either its executable or a
-// stable launcher. The launcher keeps login working while /nix is unavailable.
-func resolveLoginShellTarget(target string, installLauncher bool) (string, error) {
-	binaryName := shellBinary(target)
-	if binaryName == "" {
+// prepareLoginShellTarget resolves the selected shell and installs a stable
+// launcher when its executable depends on /nix.
+func prepareLoginShellTarget(target string) (string, error) {
+	binaryName, resolvedTarget := resolveSelectedShellExecutable(target)
+	if resolvedTarget == "" {
 		return "", nil
+	}
+	return prepareResilientLoginShellTarget(binaryName, resolvedTarget)
+}
+
+// probeLoginShellTarget resolves the path that dots doctor should inspect
+// without creating or updating the resilient launcher.
+func probeLoginShellTarget(target string) string {
+	binaryName, resolvedTarget := resolveSelectedShellExecutable(target)
+	if resolvedTarget == "" {
+		return ""
+	}
+	return probeResilientLoginShellTarget(binaryName, resolvedTarget)
+}
+
+func resolveSelectedShellExecutable(target string) (binaryName, resolvedTarget string) {
+	binaryName = shellBinary(target)
+	if binaryName == "" {
+		return "", ""
 	}
 	resolvedTarget, err := exec.LookPath(binaryName)
 	if err != nil {
-		return "", nil
+		return binaryName, ""
 	}
-	if installLauncher {
-		return prepareResilientLoginShellTarget(binaryName, resolvedTarget)
-	}
-	return probeResilientLoginShellTarget(binaryName, resolvedTarget), nil
+	return binaryName, resolvedTarget
 }
 
 // currentLoginShell asks the OS what the current user's login shell

@@ -1,8 +1,6 @@
-// Package loginshell wires the pillar shell selected by the dots
-// wizard onto the user's OS-level login shell. Without this, a user
-// who picks fish in `dots install` ends up with a fish binary in
-// ~/.nix-profile/bin but a `/bin/zsh` login shell — the symptom they
-// describe as "fish was selected but did not end up installed."
+// Package loginshell wires the pillar shell selected by the dots wizard onto
+// the user's OS-level login shell. Nix-backed shells use a stable launcher so
+// login can fall back to an OS shell while /nix is temporarily unavailable.
 //
 // The package is split into two layers so the decision is pure and
 // unit-testable: Decide computes what to do from inputs; Apply
@@ -62,9 +60,9 @@ type Inputs struct {
 	// login shell (output of `dscl . -read /Users/$USER UserShell` on
 	// macOS, `getent passwd $USER` on Linux).
 	CurrentShell string
-	// Resolve maps a shell name to its absolute path on PATH, or ""
-	// when not found. Mirrors exec.LookPath semantics.
-	Resolve func(name string) string
+	// TargetPath is the selected shell's absolute executable or resilient
+	// launcher path. Empty means the selected shell is not installed.
+	TargetPath string
 	// EtcShells holds the lines of /etc/shells (already trimmed; "" /
 	// "#"-prefixed lines filtered out by the caller).
 	EtcShells []string
@@ -86,10 +84,7 @@ func Decide(in Inputs) Decision {
 		return Decision{Kind: SkipUnsupported, Detail: "unknown shell pillar value: " + in.Target}
 	}
 
-	target := ""
-	if in.Resolve != nil {
-		target = in.Resolve(binName)
-	}
+	target := in.TargetPath
 	if target == "" {
 		return Decision{Kind: SkipTargetMissing, Detail: binName + " not on PATH yet — rerun after this activation lands"}
 	}

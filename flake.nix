@@ -505,19 +505,28 @@
                 ++ nixpkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
                   "$HOME/Library/Application Support/com.mitchellh.ghostty"
                 ];
-                missing = builtins.filter (fragment: !(nixpkgs.lib.hasInfix fragment activation)) requiredFragments;
-                sourceMissing = !(builtins.pathExists ./config/ghostty/config);
+                missingFragments = builtins.filter (
+                  fragment: !(nixpkgs.lib.hasInfix fragment activation)
+                ) requiredFragments;
+                requiredSources = [
+                  ./config/ghostty/config
+                  ./config/ghostty/themes/gentleman
+                  ./config/ghostty/shaders/cursor_smear_gentleman.glsl
+                ];
+                missingSources = builtins.filter (path: !(builtins.pathExists path)) requiredSources;
+                hasStoreBackedProjection = profileEvaluated.xdg.configFile ? "ghostty";
               in
               pkgs.runCommand "ghostty-config-wired" { } (
-                if missing == [ ] && !sourceMissing then
+                if missingFragments == [ ] && missingSources == [ ] && !hasStoreBackedProjection then
                   ''
                     echo "ok: Ghostty config is linked directly without a Nix-store hop" > $out
                   ''
                 else
                   ''
                     echo "Ghostty direct-config contract failed:" >&2
-                    echo "  source config missing: ${nixpkgs.lib.boolToString sourceMissing}" >&2
-                    ${pkgs.coreutils}/bin/printf '  missing activation fragment: %s\n' ${nixpkgs.lib.escapeShellArgs missing} >&2
+                    echo "  has store-backed xdg projection: ${nixpkgs.lib.boolToString hasStoreBackedProjection}" >&2
+                    ${pkgs.coreutils}/bin/printf '  missing source: %s\n' ${nixpkgs.lib.escapeShellArgs (map toString missingSources)} >&2
+                    ${pkgs.coreutils}/bin/printf '  missing activation fragment: %s\n' ${nixpkgs.lib.escapeShellArgs missingFragments} >&2
                     exit 1
                   ''
               );
