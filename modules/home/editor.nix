@@ -60,6 +60,11 @@
     stylua
   ];
 
+  # IdeaVim shares the upstream editing conventions without installing an IDE.
+  home.file.".ideavimrc" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/ideavim/ideavimrc";
+  };
+
   # Default editor + man-page reader — what `programs.neovim.defaultEditor
   # = true` used to wire (only EDITOR; MANPAGER is added explicitly).
   # home.sessionVariables writes ~/.config/hm-session-vars.{sh,fish}

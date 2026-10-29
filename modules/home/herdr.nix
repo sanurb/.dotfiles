@@ -21,8 +21,8 @@ in
   # (herdr.dev). Not in nixpkgs; installed on Linux and macOS with Herdr's
   # official installer from a Home Manager activation script.
   #
-  # Only config.toml is seamed. ~/.config/herdr/ doubles as herdr's
-  # runtime home (herdr.sock, session.json, plugins/, logs, integration
+  # Only configuration and the optional plugin-source list are seamed.
+  # ~/.config/herdr/ doubles as herdr's runtime home (herdr.sock, session.json, plugins/, logs, integration
   # locks) — a whole-dir link would drag live sockets and session state
   # into the repo working tree, the same hazard pi.nix documents for
   # ~/.pi/agent/. Integration shims herdr writes elsewhere
@@ -31,9 +31,20 @@ in
   #
   # force=true adopts the config.toml herdr's onboarding wrote before
   # this module owned it.
-  xdg.configFile."herdr/config.toml" = lib.mkIf (workspaceRoot != "") {
-    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/herdr/config.toml";
-    force = true;
+  xdg.configFile = lib.mkIf (workspaceRoot != "") {
+    "herdr/config.toml" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/herdr/config.toml";
+      force = true;
+    };
+    "herdr/plugins.txt".source =
+      config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/herdr/plugins.txt";
+    "plannotator-tui/config.toml".source =
+      config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/plannotator-tui/config.toml";
+  };
+
+  # Only preferences are managed; review history stays machine-local.
+  home.file.".plannotator/config.json" = lib.mkIf (workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/plannotator/config.json";
   };
 
   # Idempotent cross-platform install. Download the official script to a

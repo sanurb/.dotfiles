@@ -29,7 +29,8 @@ Before continuing:
  *
  * The continuation is deferred by one event-loop turn so manual compaction can
  * finish reconnecting the agent runtime before a new prompt begins. During an
- * active automatic-compaction recovery, it is delivered as a follow-up.
+ * active automatic-compaction recovery, it is delivered as steering so the
+ * continuation is read before the retried agent performs more work.
  */
 export default function continueAfterCompaction(pi: ExtensionAPI): void {
 	const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
@@ -40,7 +41,7 @@ export default function continueAfterCompaction(pi: ExtensionAPI): void {
 
 		const timer = setTimeout(() => {
 			pendingTimers.delete(timer);
-			pi.sendUserMessage(prompt, { deliverAs: "followUp" });
+			pi.sendUserMessage(prompt, { deliverAs: "steer" });
 		}, 0);
 
 		pendingTimers.add(timer);

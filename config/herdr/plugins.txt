@@ -1,0 +1,4 @@
+# Optional GitHub plugin sources. Install explicitly with `herdr plugin install <source>`.
+# One Herdr owner/repository[/subdirectory] source per line.
+plannotator/herdr-annotate
+paulbkim-dev/vim-herdr-navigation

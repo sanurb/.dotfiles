@@ -364,15 +364,16 @@
             # Pi auto-discovers the repo-owned extensions directory, but unlike
             # `pi install` it does not install package.json dependencies for
             # local extensions. Assert that activation validates and installs
-            # the web-tools workspace before Pi tries to import html-to-text.
+            # every extension workspace, including Herdr's vendored SDK.
             pi-extension-dependencies-activation-contract =
               let
                 activation = builtins.unsafeDiscardStringContext profileEvaluated.home.activation.installPiExtensionDependencies.data;
                 requiredFragments = [
                   "createRequire"
                   "Object.keys(manifest.dependencies ?? {})"
-                  "npm install --ignore-scripts --workspace=pi-web-tools-extension"
-                  "--include-workspace-root=false"
+                  "readdirSync(extensionsRoot"
+                  "node --conditions=import --input-type=commonjs"
+                  "npm install --ignore-scripts --workspaces --include-workspace-root"
                 ];
                 missing = builtins.filter (fragment: !(nixpkgs.lib.hasInfix fragment activation)) requiredFragments;
               in

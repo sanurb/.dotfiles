@@ -1,5 +1,21 @@
-# Vite+ bin (https://viteplus.dev)
-# dots: replaced unguarded `source "$HOME/.vite-plus/env.fish"` with a -f test because Vite+ is optional and `source` on a missing file errors loudly during shell init.
-if test -f "$HOME/.vite-plus/env.fish"
-    source "$HOME/.vite-plus/env.fish"
+# Vite+ environment setup (https://viteplus.dev)
+#
+# Keep only environment behavior in startup configuration. Vite+'s generated
+# Fish setup executes `vp` to install dynamic completion registration eagerly;
+# completions/vp.fish and completions/vpr.fish register those completions lazily.
+# Proto shims retain priority over Vite+ managed runtimes.
+fish_add_path --global --append --path "$HOME/.vite-plus/bin"
+
+function vp --description "Run Vite+ and apply environment changes to this shell"
+    if test (count $argv) -ge 2; and test "$argv[1]" = "env"; and test "$argv[2]" = "use"
+        if contains -- -h $argv; or contains -- --help $argv
+            command vp $argv
+            return
+        end
+        set -lx VP_ENV_USE_EVAL_ENABLE 1
+        set -l __vp_out (env FISH_VERSION=$FISH_VERSION "$HOME/.vite-plus/bin/vp" $argv); or return $status
+        eval (string join ';' $__vp_out)
+    else
+        command vp $argv
+    end
 end

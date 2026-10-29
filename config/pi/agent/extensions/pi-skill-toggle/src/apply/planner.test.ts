@@ -72,6 +72,10 @@ class MemoryFileSystem implements FileSystem {
     return [];
   }
 
+  async realpath(path: string): Promise<string> {
+    return path;
+  }
+
   async stat(): Promise<{ isDirectory: boolean; isFile: boolean; mode: number }> {
     return { isDirectory: false, isFile: true, mode: 0o644 };
   }

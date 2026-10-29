@@ -103,7 +103,8 @@ dots apply         # realize the workspace
 ```
 
 See `DESIGN.md` for the architecture and `devenv.nix` for the declared
-toolchain.
+toolchain. [Reference dotfiles sync notes](docs/upstream-sync.md) record the
+upstream revision, imported additions, and intentional local differences.
 
 [direnv]: https://direnv.net/
 [tap]: https://github.com/sanurb/homebrew-tap

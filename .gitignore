@@ -49,6 +49,9 @@ config/nvim/.undodir/
 # derived artifacts, never committed (see modules/home/pi.nix)
 config/pi/node_modules/
 config/pi/agent/extensions/**/node_modules/
+# Host-local service policy and gateway configuration must not enter the repo.
+config/pi/agent/private-gateway.json
+config/pi/agent/cloudflare-deployment-allowlist.json
 
 # opencode plugin deps — same story: config/opencode/package-lock.json is
 # tracked, so `npm install` there is expected and its tree is derived.

@@ -4,15 +4,18 @@
 
 Use the persistent `computer` MCP server configured in
 `config/pi/agent/mcp.json`; Home Manager exposes that file at
-`~/.pi/agent/mcp.json`. Its tools have the `computer_` prefix. Prefer MCP for
-multi-call GUI workflows; use the CLI for installation, diagnostics, and
-isolated inspection. Do not mix one-shot CLI calls into an MCP action sequence.
+`~/.pi/agent/mcp.json`. Pi 1.4 exposes its tools in the `mcp__computer`
+namespace through codemode. Prefer MCP for multi-call GUI workflows; use the CLI
+for installation, diagnostics, and isolated inspection. Do not mix one-shot CLI
+calls into an MCP action sequence.
 
-Discover with `mcp({ search: "...", server: "computer" })`, describe an
-unfamiliar tool once, then reuse its schema. Pass `mcp.args` as serialized JSON:
+Discover with `searchTools("snapshot window", { namespace: "mcp__computer" })`,
+describe an unfamiliar tool once with `describeTool()`, then reuse its schema.
+Pass arguments as an object to the exact tool name returned by discovery:
 
-```text
-mcp({ tool: "computer_get_window_state", args: "{\"pid\":844,\"window_id\":10725}" })
+```js
+const result = await tools.mcp__computer__get_window_state({ pid: 844, window_id: 10725 });
+text(result);
 ```
 
 The installed tool schemas are authoritative when upstream examples disagree.

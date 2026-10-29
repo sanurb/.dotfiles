@@ -26,6 +26,9 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
+  // Flat extensions and their tests use this config. Packaged extensions
+  // are checked with their own compiler options by the workspace scripts.
+  "include": ["agent/extensions/*.ts", "agent/extensions/tests/*.ts"],
   // Skills are agent-facing content (docs + project templates), not
   // extension code — their templates carry their own toolchains.
   "exclude": ["node_modules", "agent/skills"]

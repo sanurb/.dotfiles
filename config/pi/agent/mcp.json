@@ -1,32 +1,15 @@
 {
-  "mcp": {
-    "toolMode": "proxy",
-    "startup": "lazy",
-    "servers": {
-      "codebase-memory-mcp": {
-        "type": "local",
-        "command": ["/Users/sanurb/.local/bin/codebase-memory-mcp"],
-        "enabled": true
-      },
-      "computer": {
-        "type": "local",
-        "command": ["cua-driver", "mcp"],
-        "enabled": true,
-        "timeout": 60000
-      },
-      "context7": {
-        "type": "remote",
-        "url": "https://mcp.context7.com/mcp"
-      },
-      "grep_app": {
-        "type": "remote",
-        "url": "https://mcp.grep.app"
-      },
-      "opensrc": {
-        "type": "local",
-        "command": ["npx", "-y", "opensrc-mcp"],
-        "enabled": true
-      }
+  "mcpServers": {
+    "computer": {
+      "command": "cua-driver",
+      "args": ["mcp"],
+      "enabled": true,
+      "exposure": "codemode",
+      "timeout": 60
+    },
+    "grep_app": {
+      "url": "https://mcp.grep.app",
+      "exposure": "codemode"
     }
   }
 }

@@ -91,6 +91,12 @@ in
     source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/starship/starship.toml";
   };
 
+  # Tinycast is a macOS application installed separately. Manage preferences,
+  # not its database, credentials, clipboard history, or installation.
+  xdg.configFile."tinycast/settings.json" = lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && workspaceRoot != "") {
+    source = config.lib.file.mkOutOfStoreSymlink "${workspaceRoot}/config/tinycast/settings.json";
+  };
+
   # Jujutsu — Git-compatible VCS, persona-agnostic infrastructure like
   # the rest of this cluster. No shell-hook story (pure CLI), config
   # small enough that programs.jujutsu.settings beats a live-editable

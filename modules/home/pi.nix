@@ -6,9 +6,9 @@
   ...
 }:
 let
-  piPackage = "@earendil-works/pi-coding-agent";
+  # The imported codemode/provider APIs require the Pi 1.4 release line.
+  piPackage = "@earendil-works/pi-coding-agent@^1.4.0";
   piConfigRoot = "${workspaceRoot}/config/pi";
-  piWebToolsRoot = "${piConfigRoot}/agent/extensions/web-tools";
   cuaDriverVersion = "0.24.0";
   cuaDriverInstallDir = "${config.home.homeDirectory}/.local/bin";
   cuaDriverInstallerPath =
@@ -78,7 +78,7 @@ in
   #   skills/      user-level skills (vendored mattpocock/skills set +
   #                the Cloudflare docs bundle)
   #   themes/      TUI themes selectable from settings.json
-  #   mcp.json     MCP server roster (proxy tool mode, lazy startup)
+  #   mcp.json     Native Pi MCP server roster (codemode exposure)
   #   cloak.json   secret-masking patterns for the pi-cloak extension
   #
   # force=true lets home-manager adopt the hand-made bootstrap symlinks
@@ -101,15 +101,11 @@ in
 
   # Auto-discovered local extensions are not package installs: Pi loads
   # their TypeScript directly and never runs npm install for package.json.
-  # web-tools therefore needs its declared runtime dependencies installed
-  # beside the real extension path under config/pi, where Node's upward
-  # module resolution can find them after ~/.pi/agent/extensions resolves
-  # through the Home Manager symlink.
-  #
-  # Resolve every declared dependency dynamically instead of duplicating
-  # the package list in Nix. A warm machine is a no-op; a fresh clone runs
-  # a workspace-scoped install that leaves unrelated extension workspaces
-  # and the workspace root out of scope.
+  # Resolve runtime dependencies from the root and every extension manifest:
+  # Herdr's SDK needs Effect/Ajv just as web-tools needs its HTML adapters.
+  # Keep the package list in package.json rather than a second Nix roster.
+  # Resolve with import conditions: Pi libraries expose ESM-only entry points.
+  # A warm machine is a no-op; a fresh clone installs the shared workspace.
   home.activation.installPiExtensionDependencies = lib.mkIf (workspaceRoot != "") (
     lib.hm.dag.entryAfter
       [
@@ -120,34 +116,42 @@ in
         export PATH="${protoPath}:$PATH"
 
         if (
-          node --input-type=commonjs - ${lib.escapeShellArg piWebToolsRoot} >/dev/null 2>&1 <<'NODE'
+          node --conditions=import --input-type=commonjs - ${lib.escapeShellArg piConfigRoot} >/dev/null 2>&1 <<'NODE'
         const { createRequire } = require("node:module");
-        const { readFileSync } = require("node:fs");
+        const { existsSync, readFileSync, readdirSync } = require("node:fs");
         const { join } = require("node:path");
 
-        const extensionRoot = process.argv[2];
-        const manifest = JSON.parse(readFileSync(join(extensionRoot, "package.json"), "utf8"));
-        const requireFromExtension = createRequire(join(extensionRoot, "index.ts"));
+        const configRoot = process.argv[2];
+        const extensionsRoot = join(configRoot, "agent", "extensions");
+        const packageRoots = [configRoot, ...readdirSync(extensionsRoot, { withFileTypes: true })
+          .filter(entry => entry.isDirectory())
+          .map(entry => join(extensionsRoot, entry.name))];
 
-        for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-          requireFromExtension.resolve(dependency);
+        for (const packageRoot of packageRoots) {
+          const manifestPath = join(packageRoot, "package.json");
+          if (!existsSync(manifestPath)) continue;
+          const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+          const requireFromExtension = createRequire(manifestPath);
+          for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+            requireFromExtension.resolve(dependency);
+          }
         }
         NODE
         ); then
-          $VERBOSE_ECHO "pi: web-tools runtime dependencies already installed; skipping"
+          $VERBOSE_ECHO "pi: extension runtime dependencies already installed; skipping"
         elif command -v npm >/dev/null 2>&1; then
-          $VERBOSE_ECHO "pi: installing web-tools runtime dependencies"
+          $VERBOSE_ECHO "pi: installing extension runtime dependencies"
           if (
             cd ${lib.escapeShellArg piConfigRoot}
-            run npm install --ignore-scripts --workspace=pi-web-tools-extension --include-workspace-root=false
+            run npm install --ignore-scripts --workspaces --include-workspace-root
           ); then
-            $VERBOSE_ECHO "pi: web-tools runtime dependencies installed"
+            $VERBOSE_ECHO "pi: extension runtime dependencies installed"
           else
-            echo "pi: failed to install web-tools runtime dependencies." >&2
+            echo "pi: failed to install extension runtime dependencies." >&2
             echo "  fix: run \`cd ${piConfigRoot} && npm install\`, then rerun \`dots apply\`." >&2
           fi
         else
-          echo "pi: npm not found on PATH — skipped web-tools runtime dependencies." >&2
+          echo "pi: npm not found on PATH — skipped extension runtime dependencies." >&2
           echo "  fix: install the proto-pinned Node/npm runtimes, then rerun \`dots apply\`." >&2
         fi
       ''
@@ -214,7 +218,7 @@ in
   '';
 
   # Idempotent install hook, same shape as the vp hook in vite-plus.nix:
-  # guard on the binary so a warm machine is a no-op, and fail soft so a
+  # guard on a compatible binary so a warm machine is a no-op, and fail soft so a
   # missing prerequisite prints a hint instead of aborting activation.
   #
   # `nh home switch` runs with a minimal PATH that lacks bun (proto-managed)
@@ -238,8 +242,15 @@ in
       run rm -f "${vpHome}/bin/pi" "${vpHome}/bins/pi.json"
     fi
 
+    pi_version=""
     if [ -x "$HOME/.bun/bin/pi" ]; then
-      $VERBOSE_ECHO "pi: ${piPackage} already installed; skipping"
+      pi_version="$("$HOME/.bun/bin/pi" --version 2>/dev/null || true)"
+    fi
+    if node -e '
+      const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(process.argv[1]);
+      process.exit(match && Number(match[1]) === 1 && Number(match[2]) >= 4 ? 0 : 1);
+    ' "$pi_version"; then
+      $VERBOSE_ECHO "pi: compatible version $pi_version already installed; skipping"
     elif command -v bun >/dev/null 2>&1; then
       $VERBOSE_ECHO "pi: installing ${piPackage} via bun"
       if run bun add -g "${piPackage}"; then

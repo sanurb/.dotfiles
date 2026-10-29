@@ -43,6 +43,8 @@ in
       ".scratch"
       "__scratch"
       "*.swp"
+      "**/.claude/settings.local.json"
+      "**/CLAUDE.local.md"
     ];
 
     # Commit signing. Only flips on when identity.signingKey is set on
@@ -74,6 +76,10 @@ in
       diff.algorithm = "histogram";
       merge.conflictStyle = "zdiff3";
       fetch.prune = true;
+      fetch.writeCommitGraph = true;
+      branch.sort = "-committerdate";
+      column.ui = "auto";
+      rebase.updateRefs = true;
       # Remember resolutions so the same conflict on a re-rebase /
       # re-merge resolves itself silently.
       rerere.enabled = true;

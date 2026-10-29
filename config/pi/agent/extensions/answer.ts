@@ -186,13 +186,7 @@ function findLastCompletedAssistantMessage(ctx: ExtensionContext): {
 }
 
 async function selectExtractionModel(
-  modelRegistry: {
-    find: (provider: string, modelId: string) => Model<Api> | undefined;
-    getApiKeyAndHeaders: (model: Model<Api>) => Promise<
-      | { ok: true; apiKey?: string; headers?: Record<string, string>; }
-      | { ok: false; error: string; }
-    >;
-  },
+  modelRegistry: Pick<ExtensionContext["modelRegistry"], "find" | "getApiKeyAndHeaders">,
   preferences: readonly ExtractionModelPreference[],
 ): Promise<Model<Api> | undefined> {
   for (const candidate of preferences) {

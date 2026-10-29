@@ -10,6 +10,8 @@ let
     "config/pi/package-lock.json"
     "config/pi/node_modules/**"
     "config/pi/agent/extensions/**/node_modules/**"
+    # Built upstream SDK artifacts must remain byte-for-byte vendored.
+    "config/pi/agent/extensions/herdr-codemode/vendor/**"
     # Vendored skill content (mattpocock/skills + Cloudflare docs bundle) —
     # reformatting would churn every future re-vendor diff.
     "config/pi/agent/skills/**"

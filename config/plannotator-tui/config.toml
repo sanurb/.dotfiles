@@ -1,0 +1,9 @@
+# Plannotator TUI configuration
+# Managed by modules/home/plannotator.nix at ~/.config/plannotator-tui/config.toml.
+
+[herdr]
+# Full-tab overlay by default. Alternatives: "split" or "popup".
+placement = "overlay"
+split_direction = "right"
+popup_width = "90%"
+popup_height = "85%"

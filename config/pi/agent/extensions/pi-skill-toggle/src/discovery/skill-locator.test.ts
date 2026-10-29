@@ -38,6 +38,45 @@ describe("DefaultSkillLocator", () => {
     assert.equal(byPath.has("/home/tester/.agents/skills/ignored-global-root.md"), false);
     assert.equal(byPath.has("/repo/.agents/skills/ignored-project-legacy-root.md"), false);
   });
+
+  it("deduplicates global and project skill roots that resolve to the same directory", async () => {
+    const canonicalSkillRoot = "/home/tester/.dotfiles/home/.agents/skills";
+    const fs = new MemoryTreeFileSystem(
+      [
+        "/home/tester/.agents/skills/code-review/SKILL.md",
+        `${canonicalSkillRoot}/code-review/SKILL.md`,
+      ],
+      new Map([
+        ["/home/tester/.agents/skills", canonicalSkillRoot],
+        [canonicalSkillRoot, canonicalSkillRoot],
+      ]),
+    );
+    const locator = new DefaultSkillLocator(fs);
+
+    const files = await locator.findSkillFiles("/home/tester/.dotfiles/home");
+
+    assert.equal(files.length, 1);
+    assert.equal(files[0]?.source.kind, "global");
+  });
+
+  it("deduplicates symlinked skill files when their parent roots are distinct", async () => {
+    const globalSkillFile = "/home/tester/.agents/skills/code-review/SKILL.md";
+    const projectSkillFile = "/home/tester/.dotfiles/home/.agents/skills/code-review/SKILL.md";
+    const fs = new MemoryTreeFileSystem(
+      [globalSkillFile, projectSkillFile],
+      new Map([
+        [globalSkillFile, projectSkillFile],
+        [projectSkillFile, projectSkillFile],
+      ]),
+    );
+    const locator = new DefaultSkillLocator(fs);
+
+    const files = await locator.findSkillFiles("/home/tester/.dotfiles/home");
+
+    assert.equal(files.length, 1);
+    assert.equal(files[0]?.filePath, globalSkillFile);
+    assert.equal(files[0]?.source.kind, "global");
+  });
 });
 
 function restoreEnv(name: string, value: string | undefined): void {
@@ -52,8 +91,15 @@ class MemoryTreeFileSystem implements FileSystem {
   private readonly files = new Set<string>();
   private readonly dirs = new Set<string>(["/"]);
 
-  constructor(paths: string[]) {
+  constructor(
+    paths: string[],
+    private readonly canonicalPaths = new Map<string, string>(),
+  ) {
     for (const path of paths) this.addFile(path);
+  }
+
+  async realpath(path: string): Promise<string> {
+    return this.canonicalPaths.get(path) ?? path;
   }
 
   async readFile(path: string): Promise<string> {

@@ -14,14 +14,21 @@ export class DefaultSkillLocator implements SkillLocator {
   async findSkillFiles(cwd: string): Promise<LocatedSkillFile[]> {
     const roots = getSkillRoots(cwd);
     const files: LocatedSkillFile[] = [];
-    const seen = new Set<string>();
+    const seenCanonicalSkillFiles = new Set<string>();
+    const seenSkillRoots = new Set<string>();
 
     for (const root of roots) {
       if (!(await this.fs.access(root.path))) continue;
+
+      const canonicalSkillRoot = await this.fs.realpath(root.path);
+      if (seenSkillRoots.has(canonicalSkillRoot)) continue;
+      seenSkillRoots.add(canonicalSkillRoot);
+
       const found = await this.scanSkillDir(root.path, root.path, root.source, root.includeRootMarkdownFiles);
       for (const file of found) {
-        if (seen.has(file.filePath)) continue;
-        seen.add(file.filePath);
+        const canonicalSkillFile = await this.fs.realpath(file.filePath);
+        if (seenCanonicalSkillFiles.has(canonicalSkillFile)) continue;
+        seenCanonicalSkillFiles.add(canonicalSkillFile);
         files.push(file);
       }
     }
